@@ -108,12 +108,15 @@ if selected_comp:
         st.write(f"**{c}** — {pinyin} — {definition}")
 
 # === Display current settings on main screen ===
-st.markdown("### 📌 Current Settings")
+st.markdown(
+    "<h2 style='font-size: 1.5em;'>📌 Current Selection</h2>",
+    unsafe_allow_html=True
+)    
 st.markdown(f"""
-- **Selected:** `{selected_comp}` Level:** `{max_depth}` Strokes:** `{min_strokes} – {max_strokes}`
+Component: `{selected_comp}` Level: `{max_depth}` Strokes:** `{min_strokes} – {max_strokes}`
 """)
 
 st.markdown(
-    "<span style='color: gray;'>👉 Tap > (top left) to change decomposition level and stroke count.</span>",
+    "<span style='color: gray;'>👉 {> top left} if you don't see the sidebar to change decomposition level and stroke count.</span>",
     unsafe_allow_html=True
 )
