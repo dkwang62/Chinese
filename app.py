@@ -2,7 +2,10 @@ import json
 from collections import defaultdict
 import streamlit as st
 
-st.title("🧩 Chinese Character Decomposition Explorer")
+st.markdown(
+    "<h1 style='font-size: 2.5em;'>🧩 Character Decomposition Explorer</h1>",
+    unsafe_allow_html=True
+)
 
 # === Step 1: Load strokes.txt from local file (cached) ===
 @st.cache_data
@@ -89,19 +92,6 @@ if not search_input:
 else:
     selected_comp = search_input.strip()
 
-# === Display current settings on main screen ===
-st.markdown("### 📌 Current Settings")
-st.markdown(f"""
-- **Selected component:** `{selected_comp}`  
-- **Decomposition level:** `{max_depth}`  
-- **Output character stroke range:** `{min_strokes} – {max_strokes}`
-""")
-
-st.markdown(
-    "<span style='color: gray;'>👉 Tap the menu ( > ) at the top left to change decomposition level and stroke count.</span>",
-    unsafe_allow_html=True
-)
-
 # === Step 5: Display decomposed characters ===
 if selected_comp:
     chars = [
@@ -116,3 +106,16 @@ if selected_comp:
         pinyin = entry.get("pinyin", "—")
         definition = entry.get("definition", "No definition available")
         st.write(f"**{c}** — {pinyin} — {definition}")
+
+# === Display current settings on main screen ===
+st.markdown("### 📌 Current Settings")
+st.markdown(f"""
+- **Selected component:** `{selected_comp}`  
+- **Decomposition level:** `{max_depth}`  
+- **Output character stroke range:** `{min_strokes} – {max_strokes}`
+""")
+
+st.markdown(
+    "<span style='color: gray;'>👉 Tap the menu ( > ) at the top left to change decomposition level and stroke count.</span>",
+    unsafe_allow_html=True
+)
