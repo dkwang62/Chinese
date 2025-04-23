@@ -1,11 +1,14 @@
-import streamlit as st
 import json
 from collections import defaultdict
+import streamlit as st
 
 st.set_page_config(layout="wide")
-st.title("🧩 Character Decomposition Explorer")
 
-# Load character decomposition data
+st.markdown("""
+<h1 style='font-size: 1.8em;'>🧩 Character Decomposition Explorer</h1>
+""", unsafe_allow_html=True)
+
+# === Step 1: Load strokes.txt from local file (cached) ===
 @st.cache_data
 def load_char_decomp():
     char_decomp = {}
@@ -21,53 +24,74 @@ def load_char_decomp():
 
 char_decomp = load_char_decomp()
 
-# Function to get stroke count
-def get_stroke_count(char):
-    return char_decomp.get(char, {}).get("strokes", float('inf'))
+# === Step 2: Recursive decomposition ===
+def get_all_components(char, max_depth=2, depth=0, seen=None):
+    if seen is None:
+        seen = set()
+    if char in seen or depth > max_depth:
+        return set()
+    seen.add(char)
 
-# Build component map
+    components = set()
+    for comp in char_decomp.get(char, {}).get("decomposition", ""):
+        if '\u4e00' <= comp <= '\u9fff':
+            components.add(comp)
+            components.update(get_all_components(comp, max_depth, depth + 1, seen))
+    return components
+
+# === Step 3: Build component map (cached) ===
 @st.cache_data
 def build_component_map(max_depth):
     component_map = defaultdict(list)
     for char in char_decomp:
-        components = set()
-        decomposition = char_decomp.get(char, {}).get("decomposition", "")
-        for comp in decomposition:
-            if '\u4e00' <= comp <= '\u9fff':
-                components.add(comp)
-        for comp in components:
+        all_components = get_all_components(char, max_depth=max_depth)
+        for comp in all_components:
             component_map[comp].append(char)
     return component_map
 
-# User inputs
-max_depth = st.slider("Max Decomposition Depth", 0, 5, 1)
-stroke_range = st.slider("Stroke Count Range", 0, 30, (4, 10))
+# === Step 4: Controls ===
+st.session_state.setdefault("selected_comp", "木")
+st.session_state.setdefault("max_depth", 1)
+st.session_state.setdefault("stroke_range", (4, 10))
+
+col1, col2 = st.columns(2)
+with col1:
+    max_depth = st.slider("Max Decomposition Depth", 0, 5, st.session_state.max_depth)
+    st.session_state.max_depth = max_depth
+with col2:
+    stroke_range = st.slider("Stroke Count Range", 0, 30, st.session_state.stroke_range)
+    st.session_state.stroke_range = stroke_range
 min_strokes, max_strokes = stroke_range
 
-component_map = build_component_map(max_depth)
+component_map = build_component_map(max_depth=max_depth)
 
-# Filter components based on stroke range
+# === Helper: Get stroke count ===
+def get_stroke_count(char):
+    return char_decomp.get(char, {}).get("strokes", float('inf'))
+
+# === Filter dropdown options ===
 filtered_components = [
     comp for comp in component_map
     if min_strokes <= get_stroke_count(comp) <= max_strokes
 ]
 sorted_components = sorted(filtered_components, key=get_stroke_count)
 
-# Component selection
+# === Component selection (dropdown only) ===
 selected_comp = st.selectbox(
     "Select a component:",
     options=sorted_components,
-    format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)"
+    format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
+    index=sorted_components.index(st.session_state.selected_comp) if st.session_state.selected_comp in sorted_components else 0
 )
+st.session_state.selected_comp = selected_comp
 
-# Display current selection
+# === Display current selection ===
 st.markdown(f"""
-**Component:** {selected_comp}  
-**Level:** {max_depth}  
-**Stroke Range:** {min_strokes} – {max_strokes}
-""")
+<h2 style='font-size: 1.2em;'>📌 Current Selection</h2>
+<p><strong>Component:</strong> {selected_comp} &nbsp;&nbsp; <strong>Level:</strong> {max_depth} &nbsp;&nbsp; <strong>Stroke Range:</strong> {min_strokes} – {max_strokes}</p>
+""", unsafe_allow_html=True)
 
-# Display decomposed characters
+# === Step 5: Display decomposed characters ===
 if selected_comp:
     chars = [
         c for c in component_map.get(selected_comp, [])
@@ -75,7 +99,10 @@ if selected_comp:
     ]
     chars = sorted(set(chars))
 
-    st.markdown(f"**Characters with '{selected_comp}':** {len(chars)} result(s)")
+    st.markdown(
+        f"<h2 style='font-size: 1.2em;'>🧬 Characters with: {selected_comp} — {len(chars)} result(s)</h2>",
+        unsafe_allow_html=True
+    )
     for c in chars:
         entry = char_decomp.get(c, {})
         pinyin = entry.get("pinyin", "—")
