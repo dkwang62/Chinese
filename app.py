@@ -80,4 +80,5 @@ def get_stroke_count(char):
 
 filtered_components = [
     comp for comp in component_map
-    if stroke_range[0] <= get_stroke_count(comp)_
+    if stroke_range[0] <= get_stroke_count(comp) <= stroke_range[1]
+]
