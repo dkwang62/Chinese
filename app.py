@@ -48,11 +48,10 @@ def build_component_map(max_depth):
 
 # === Initialize state ===
 st.session_state.setdefault("selected_comp", "木")
-st.session_state.setdefault("typed_comp", "木")
-st.session_state.setdefault("last_input_method", "dropdown")  # or 'text'
 st.session_state.setdefault("max_depth", 1)
 st.session_state.setdefault("stroke_range", (4, 10))
 st.session_state.setdefault("user_changed_stroke_range", False)
+st.session_state.setdefault("last_input_method", "dropdown")
 
 def get_stroke_count(char):
     return char_decomp.get(char, {}).get("strokes", float('inf'))
@@ -89,44 +88,40 @@ filtered_components = [
 ]
 sorted_components = sorted(filtered_components, key=get_stroke_count)
 
-# === Component selection ===
+# === Component Selection Area ===
 col_a, col_b = st.columns(2)
 
+# Manual dropdown logic
 with col_a:
-    if st.session_state.last_input_method == "dropdown":
-        dropdown_value = st.session_state.selected_comp
-    else:
-        # fallback to something in list or first option
-        dropdown_value = st.session_state.selected_comp if st.session_state.selected_comp in sorted_components else sorted_components[0]
     dropdown_selection = st.selectbox(
         "Select a component:",
         options=sorted_components,
         format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
-        index=sorted_components.index(dropdown_value) if dropdown_value in sorted_components else 0,
-        key="dropdown_comp"
+        index=sorted_components.index(st.session_state.selected_comp)
+        if st.session_state.selected_comp in sorted_components else 0,
+        key="dropdown_input"
     )
 
+# Manual text input logic
 with col_b:
-    if st.session_state.last_input_method == "text":
-        text_value = st.session_state.typed_comp
-    else:
-        text_value = st.session_state.selected_comp
-    text_input = st.text_input("Or type a component:", value=text_value, key="text_comp")
+    text_input = st.text_input(
+        "Or type a component:",
+        value=st.session_state.selected_comp if st.session_state.last_input_method == "text" else "",
+        key="text_input"
+    )
 
-# === Handle interactions ===
-# Priority 1: text input
-if text_input != st.session_state.selected_comp and text_input.strip() != "":
-    st.session_state.selected_comp = text_input.strip()
-    st.session_state.typed_comp = text_input.strip()
+# === Determine which input was used and update session state ===
+# Text input takes priority
+if text_input and text_input != st.session_state.selected_comp and text_input != dropdown_selection:
+    st.session_state.selected_comp = text_input
     st.session_state.last_input_method = "text"
-    st.session_state.user_changed_stroke_range = False
+    st.rerun()
 
-# Priority 2: dropdown
+# Dropdown input
 elif dropdown_selection != st.session_state.selected_comp:
     st.session_state.selected_comp = dropdown_selection
-    st.session_state.typed_comp = dropdown_selection
     st.session_state.last_input_method = "dropdown"
-    st.session_state.user_changed_stroke_range = False
+    st.rerun()
 
 selected_comp = st.session_state.selected_comp
 
