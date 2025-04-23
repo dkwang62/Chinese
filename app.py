@@ -8,38 +8,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# === Display Current Selection Info (top of screen) ===
-st.markdown(
-    "<h2 style='font-size: 1.3em;'>📌 Current Selection</h2>",
-    unsafe_allow_html=True
-)
-
-# === Sidebar: Controls & Filters ===
-st.sidebar.header("🔧 Filters and Settings")
-
-st.sidebar.markdown("#### 🧱 Decomposition Settings")
-max_depth = st.sidebar.slider(
-    "Max Decomposition Depth",
-    min_value=0, max_value=5, value=2,
-    help="How many levels deep to decompose the selected character"
-)
-
-st.sidebar.markdown("#### ✂️ Output Stroke Range")
-min_strokes, max_strokes = st.sidebar.slider(
-    "Stroke Count Range",
-    min_value=0, max_value=30, value=(2, 4),
-    help="Only show characters within this stroke count range"
-)
-
-st.sidebar.markdown("#### 🔍 Search or Select Component")
-search_input = st.text_input("Search for a component (e.g. 木):")
-
-# === Hint for small screen users ===
-st.markdown(
-    "<span style='color: gray;'>👉 Tap the `>` in the top-left to access filters for decomposition and strokes.</span>",
-    unsafe_allow_html=True
-)
-
 # === Step 1: Load strokes.txt from local file (cached) ===
 @st.cache_data
 def load_char_decomp():
@@ -81,6 +49,23 @@ def build_component_map(max_depth):
             component_map[comp].append(char)
     return component_map
 
+# === Main screen controls ===
+st.markdown("### 🔧 Filters and Settings")
+
+max_depth = st.slider(
+    "🧱 Max Decomposition Depth",
+    min_value=0, max_value=5, value=2,
+    help="How many levels deep to decompose the selected character"
+)
+
+min_strokes, max_strokes = st.slider(
+    "✂️ Stroke Count Range",
+    min_value=0, max_value=30, value=(2, 4),
+    help="Only show characters within this stroke count range"
+)
+
+search_input = st.text_input("🔍 Search for a component (e.g. 木):")
+
 component_map = build_component_map(max_depth=max_depth)
 
 # === Helper: Get stroke count ===
@@ -94,7 +79,7 @@ filtered_components = [
 ]
 sorted_components = sorted(filtered_components, key=get_stroke_count)
 
-# === Component Selection ===
+# === Component selection ===
 selected_comp = None
 if not search_input:
     selected_comp = st.selectbox(
@@ -105,15 +90,24 @@ if not search_input:
 else:
     selected_comp = search_input.strip()
 
-# === Show current settings after selection
-st.markdown(f"""
-- **Component:** `{selected_comp}`
-- **Level:** `{max_depth}`
-- **Stroke Range:** `{min_strokes} – {max_strokes}`
-""")
-
-# === Step 5: Display decomposed characters ===
+# === Current Selection Header ===
 if selected_comp:
+    st.markdown(
+        "<h2 style='font-size: 1.3em;'>📌 Current Selection</h2>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        f"""
+        <div style='display: flex; gap: 2em; font-size: 1.1em; padding: 0.5em 0;'>
+            <div><strong>Component:</strong> {selected_comp}</div>
+            <div><strong>Level:</strong> {max_depth}</div>
+            <div><strong>Stroke Range:</strong> {min_strokes} – {max_strokes}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # === Step 5: Display decomposed characters ===
     chars = [
         c for c in component_map.get(selected_comp, [])
         if min_strokes <= get_stroke_count(c) <= max_strokes
@@ -123,7 +117,7 @@ if selected_comp:
     st.markdown(
         f"<h2 style='font-size: 1.3em;'>🧬 Characters with: {selected_comp} — {len(chars)} result(s)</h2>",
         unsafe_allow_html=True
-    )    
+    )
     for c in chars:
         entry = char_decomp.get(c, {})
         pinyin = entry.get("pinyin", "—")
