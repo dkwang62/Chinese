@@ -89,11 +89,6 @@ if not search_input:
 else:
     selected_comp = search_input.strip()
 
-st.markdown(
-    "<span style='color: gray;'>👉 Tap the menu ( > ) at the top left to change decomposition level and stroke count.</span>",
-    unsafe_allow_html=True
-)
-
 # === Display current settings on main screen ===
 st.markdown("### 📌 Current Settings")
 st.markdown(f"""
@@ -101,6 +96,11 @@ st.markdown(f"""
 - **Decomposition level:** `{max_depth}`  
 - **Output character stroke range:** `{min_strokes} – {max_strokes}`
 """)
+
+st.markdown(
+    "<span style='color: gray;'>👉 Tap the menu ( > ) at the top left to change decomposition level and stroke count.</span>",
+    unsafe_allow_html=True
+)
 
 # === Step 5: Display decomposed characters ===
 if selected_comp:
