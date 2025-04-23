@@ -2,7 +2,8 @@ import json
 from collections import defaultdict
 import streamlit as st
 
-st.title("Chinese Character Decomposition Explorer")
+st.set_page_config(layout="wide")  # Optional: better use of space on larger screens
+st.title("📖 Chinese Character Decomposition Explorer")
 
 # === Step 1: Load strokes.txt from local file (cached) ===
 @st.cache_data
@@ -45,26 +46,33 @@ def build_component_map(max_depth):
             component_map[comp].append(char)
     return component_map
 
-# === Step 4: Sidebar Controls ===
-st.sidebar.header("🔧 Filters & Settings")
+# === Step 4: Unified Controls ===
+st.markdown("### 🧮 Controls")
 
-max_depth = st.sidebar.slider(
-    "Max Decomposition Depth",
-    0, 5, 2,
-    help="Controls how deeply each character is decomposed into components.",
-    key="depth"
-)
+col1, col2, col3 = st.columns([1, 2, 2])
 
-min_strokes, max_strokes = st.sidebar.slider(
-    "Stroke Count Range",
-    0, 30, (2, 4),
-    help="Filter both components and resulting characters by their number of strokes.",
-    key="stroke_range"
-)
+with col1:
+    depth = st.slider(
+        "Decomposition Depth",
+        0, 5, 2,
+        help="How deeply to break down each character.",
+        key="depth"
+    )
 
-search_input = st.sidebar.text_input("🔍 Search for a component (e.g. 木):", key="search")
+with col2:
+    stroke_range = st.slider(
+        "Stroke Count Range",
+        0, 30, (2, 4),
+        help="Filters both components and output characters.",
+        key="stroke_range"
+    )
 
-# === Step 5: Track and persist selected component ===
+with col3:
+    search_input = st.text_input(
+        "Search or Select Component (e.g. 木)",
+        key="search"
+    )
+
 component_map = build_component_map(max_depth=st.session_state.depth)
 
 def get_stroke_count(char):
@@ -72,45 +80,4 @@ def get_stroke_count(char):
 
 filtered_components = [
     comp for comp in component_map
-    if min_strokes <= get_stroke_count(comp) <= max_strokes
-]
-sorted_components = sorted(filtered_components, key=get_stroke_count)
-
-# Determine selected component
-if "selected_comp" not in st.session_state:
-    st.session_state.selected_comp = sorted_components[0] if sorted_components else None
-
-if st.session_state.search:
-    if st.session_state.search in component_map:
-        st.session_state.selected_comp = st.session_state.search.strip()
-else:
-    selected = st.selectbox(
-        "Select a component:",
-        options=sorted_components,
-        index=sorted_components.index(st.session_state.selected_comp) if st.session_state.selected_comp in sorted_components else 0,
-        format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)"
-    )
-    st.session_state.selected_comp = selected
-
-# === Step 6: Show current state clearly ===
-st.markdown(f"""
-### 📌 Current Selection
-- **Root Component:** `{st.session_state.selected_comp}`
-- **Decomposition Level:** `{st.session_state.depth}`
-- **Stroke Count Range for Output Characters:** `{st.session_state.stroke_range[0]} – {st.session_state.stroke_range[1]}`
-""")
-
-# === Step 7: Display characters ===
-if st.session_state.selected_comp:
-    chars = [
-        c for c in component_map.get(st.session_state.selected_comp, [])
-        if min_strokes <= get_stroke_count(c) <= max_strokes
-    ]
-    chars = sorted(set(chars))
-
-    st.subheader(f"Characters with component '{st.session_state.selected_comp}' ({len(chars)} found):")
-    for c in chars:
-        entry = char_decomp.get(c, {})
-        pinyin = entry.get("pinyin", "—")
-        definition = entry.get("definition", "No definition available")
-        st.write(f"**{c}** — {pinyin} — {definition}")
+    if stroke_range[0] <= get_stroke_count(comp)_
