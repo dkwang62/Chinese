@@ -91,22 +91,6 @@ if not search_input:
     )
 else:
     selected_comp = search_input.strip()
-
-# === Step 5: Display decomposed characters ===
-if selected_comp:
-    chars = [
-        c for c in component_map.get(selected_comp, [])
-        if min_strokes <= get_stroke_count(c) <= max_strokes
-    ]
-    chars = sorted(set(chars))
-
-    st.subheader(f"🧬 Characters containing: {selected_comp} — {len(chars)} result(s)")
-    for c in chars:
-        entry = char_decomp.get(c, {})
-        pinyin = entry.get("pinyin", "—")
-        definition = entry.get("definition", "No definition available")
-        st.write(f"**{c}** — {pinyin} — {definition}")
-
 # === Display current settings on main screen ===
 st.markdown(
     "<h2 style='font-size: 1.5em;'>📌 Current Selection</h2>",
@@ -120,3 +104,24 @@ st.markdown(
     "<span style='color: gray;'>👉 {> top left} if you don't see the sidebar to change decomposition level and stroke count.</span>",
     unsafe_allow_html=True
 )
+
+# === Step 5: Display decomposed characters ===
+if selected_comp:
+    chars = [
+        c for c in component_map.get(selected_comp, [])
+        if min_strokes <= get_stroke_count(c) <= max_strokes
+    ]
+    chars = sorted(set(chars))
+
+#    st.subheader(f"🧬 Characters containing: {selected_comp} — {len(chars)} result(s)")
+
+    st.markdown(
+        <h2 style='font-size: 1.5em;'>🧬 Characters with: {selected_comp} — {len(chars)} result(s)</h2>"
+        unsafe_allow_html=True
+    )    
+    for c in chars:
+        entry = char_decomp.get(c, {})
+        pinyin = entry.get("pinyin", "—")
+        definition = entry.get("definition", "No definition available")
+        st.write(f"**{c}** — {pinyin} — {definition}")
+
