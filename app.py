@@ -49,6 +49,7 @@ def build_component_map(max_depth):
 # === Initialize state ===
 st.session_state.setdefault("selected_comp", "木")
 st.session_state.setdefault("typed_comp", "木")
+st.session_state.setdefault("last_input_method", "dropdown")  # or 'text'
 st.session_state.setdefault("max_depth", 1)
 st.session_state.setdefault("stroke_range", (4, 10))
 st.session_state.setdefault("user_changed_stroke_range", False)
@@ -88,33 +89,44 @@ filtered_components = [
 ]
 sorted_components = sorted(filtered_components, key=get_stroke_count)
 
-# === Component selection area ===
+# === Component selection ===
 col_a, col_b = st.columns(2)
 
 with col_a:
+    if st.session_state.last_input_method == "dropdown":
+        dropdown_value = st.session_state.selected_comp
+    else:
+        # fallback to something in list or first option
+        dropdown_value = st.session_state.selected_comp if st.session_state.selected_comp in sorted_components else sorted_components[0]
     dropdown_selection = st.selectbox(
         "Select a component:",
         options=sorted_components,
         format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
-        index=sorted_components.index(st.session_state.selected_comp)
-            if st.session_state.selected_comp in sorted_components else 0,
-        key="dropdown_select"
+        index=sorted_components.index(dropdown_value) if dropdown_value in sorted_components else 0,
+        key="dropdown_comp"
     )
 
-# Detect change from dropdown
-if dropdown_selection != st.session_state.selected_comp:
-    st.session_state.selected_comp = dropdown_selection
-    st.session_state.typed_comp = dropdown_selection  # sync text input
-    st.session_state.user_changed_stroke_range = False  # reset slider to auto
-
 with col_b:
-    text_input = st.text_input("Or type a component:", value=st.session_state.typed_comp, key="text_input")
+    if st.session_state.last_input_method == "text":
+        text_value = st.session_state.typed_comp
+    else:
+        text_value = st.session_state.selected_comp
+    text_input = st.text_input("Or type a component:", value=text_value, key="text_comp")
 
-# Detect change from text input
-if text_input != st.session_state.selected_comp:
-    st.session_state.selected_comp = text_input
-    st.session_state.typed_comp = text_input
-    st.session_state.user_changed_stroke_range = False  # reset slider
+# === Handle interactions ===
+# Priority 1: text input
+if text_input != st.session_state.selected_comp and text_input.strip() != "":
+    st.session_state.selected_comp = text_input.strip()
+    st.session_state.typed_comp = text_input.strip()
+    st.session_state.last_input_method = "text"
+    st.session_state.user_changed_stroke_range = False
+
+# Priority 2: dropdown
+elif dropdown_selection != st.session_state.selected_comp:
+    st.session_state.selected_comp = dropdown_selection
+    st.session_state.typed_comp = dropdown_selection
+    st.session_state.last_input_method = "dropdown"
+    st.session_state.user_changed_stroke_range = False
 
 selected_comp = st.session_state.selected_comp
 
