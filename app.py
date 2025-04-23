@@ -8,7 +8,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# === Step 1: Load strokes.txt from local file (cached) ===
+# === Load strokes.txt from local file (cached) ===
 @st.cache_data
 def load_char_decomp():
     char_decomp = {}
@@ -24,7 +24,7 @@ def load_char_decomp():
 
 char_decomp = load_char_decomp()
 
-# === Step 2: Recursive decomposition ===
+# === Recursive decomposition ===
 def get_all_components(char, max_depth=2, depth=0, seen=None):
     if seen is None:
         seen = set()
@@ -39,7 +39,7 @@ def get_all_components(char, max_depth=2, depth=0, seen=None):
             components.update(get_all_components(comp, max_depth, depth + 1, seen))
     return components
 
-# === Step 3: Build component map (cached) ===
+# === Component map ===
 @st.cache_data
 def build_component_map(max_depth):
     component_map = defaultdict(list)
@@ -52,19 +52,23 @@ def build_component_map(max_depth):
 # === Main screen controls ===
 st.markdown("### 🔧 Filters and Settings")
 
-max_depth = st.slider(
-    "🧱 Max Decomposition Depth",
-    min_value=0, max_value=5, value=2,
-    help="How many levels deep to decompose the selected character"
-)
+col1, col2 = st.columns(2)
 
-min_strokes, max_strokes = st.slider(
-    "✂️ Stroke Count Range",
-    min_value=0, max_value=30, value=(2, 4),
-    help="Only show characters within this stroke count range"
-)
+with col1:
+    max_depth = st.slider(
+        "🧱 Max Decomposition Depth",
+        min_value=0, max_value=5, value=1,
+        help="How many levels deep to decompose the selected character"
+    )
 
-search_input = st.text_input("🔍 Search for a component (e.g. 木):")
+with col2:
+    min_strokes, max_strokes = st.slider(
+        "✂️ Stroke Count Range",
+        min_value=0, max_value=30, value=(4, 10),
+        help="Only show characters within this stroke count range"
+    )
+
+search_input = st.text_input("🔍 Search for a component (e.g. 木):", value="木")
 
 component_map = build_component_map(max_depth=max_depth)
 
@@ -90,7 +94,7 @@ if not search_input:
 else:
     selected_comp = search_input.strip()
 
-# === Current Selection Header ===
+# === Current selection ===
 if selected_comp:
     st.markdown(
         "<h2 style='font-size: 1.3em;'>📌 Current Selection</h2>",
@@ -107,7 +111,7 @@ if selected_comp:
         unsafe_allow_html=True
     )
 
-    # === Step 5: Display decomposed characters ===
+    # === Display decomposed characters ===
     chars = [
         c for c in component_map.get(selected_comp, [])
         if min_strokes <= get_stroke_count(c) <= max_strokes
