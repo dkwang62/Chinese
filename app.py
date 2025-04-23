@@ -1,4 +1,5 @@
 import json
+import time
 from collections import defaultdict
 import streamlit as st
 
@@ -49,31 +50,22 @@ def build_component_map(max_depth):
 # === Session State Setup ===
 if "selected_comp" not in st.session_state:
     st.session_state.selected_comp = "木"
-    st.session_state.input_method = "dropdown"  # or 'text'
     st.session_state.stroke_range = (4, 10)
     st.session_state.user_changed_stroke_range = False
-
-# === Controls ===
-st.session_state.max_depth = st.slider("Max Decomposition Depth", 0, 5, st.session_state.get("max_depth", 1))
-
-char_decomp = load_char_decomp()
-component_map = build_component_map(max_depth=st.session_state.max_depth)
+    st.session_state.input_method = "dropdown"
+    st.session_state.last_dropdown = "木"
 
 def get_stroke_count(char):
     return char_decomp.get(char, {}).get("strokes", float("inf"))
 
-# === Calculate dropdown options ===
-min_strokes, max_strokes = st.session_state.stroke_range
-filtered_components = [
-    comp for comp in component_map
-    if min_strokes <= get_stroke_count(comp) <= max_strokes
-]
-sorted_components = sorted(filtered_components, key=get_stroke_count)
+# === Controls ===
+st.session_state.max_depth = st.slider("Max Decomposition Depth", 0, 5, st.session_state.get("max_depth", 1))
+component_map = build_component_map(max_depth=st.session_state.max_depth)
 
-# === Suggested range based on component ===
+# === Determine auto stroke range ===
 selected_stroke = get_stroke_count(st.session_state.selected_comp)
 suggested_min = selected_stroke
-suggested_max = max(selected_stroke + 5, selected_stroke + 1)
+suggested_max = max(suggested_min + 5, suggested_min + 1)
 
 def on_slider_change():
     st.session_state.user_changed_stroke_range = True
@@ -82,52 +74,64 @@ if not st.session_state.user_changed_stroke_range:
     st.session_state.stroke_range = (suggested_min, suggested_max)
 
 st.session_state.stroke_range = st.slider(
-    "Stroke Count Range",
-    0, 30,
+    "Stroke Count Range", 0, 30,
     st.session_state.stroke_range,
     on_change=on_slider_change
 )
 
-# === UI Inputs ===
+min_strokes, max_strokes = st.session_state.stroke_range
+
+# === Filter components ===
+filtered_components = [
+    comp for comp in component_map
+    if min_strokes <= get_stroke_count(comp) <= max_strokes
+]
+sorted_components = sorted(filtered_components, key=get_stroke_count)
+
+# === Input UI ===
 col1, col2 = st.columns(2)
 
 with col1:
-    dropdown_val = st.selectbox(
+    dropdown = st.selectbox(
         "Select a component:",
         options=sorted_components,
-        index=sorted_components.index(st.session_state.selected_comp)
-            if st.session_state.selected_comp in sorted_components else 0,
-        key="dropdown_box"
+        format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
+        index=sorted_components.index(st.session_state.last_dropdown)
+        if st.session_state.last_dropdown in sorted_components else 0
     )
-    if st.session_state.input_method != "dropdown" and dropdown_val != st.session_state.selected_comp:
-        st.session_state.selected_comp = dropdown_val
-        st.session_state.input_method = "dropdown"
-        st.rerun()
 
 with col2:
-    if st.session_state.input_method == "text":
-        text_val = st.session_state.selected_comp
-    else:
-        text_val = ""
-    user_input = st.text_input("Or type a component:", value=text_val, key="text_box")
+    typed = st.text_input("Or type a component:", value=st.session_state.selected_comp if st.session_state.input_method == "text" else "")
 
-    if user_input and user_input != st.session_state.selected_comp:
-        st.session_state.selected_comp = user_input
-        st.session_state.input_method = "text"
-        st.session_state.user_changed_stroke_range = False
-        st.rerun()
+# === Priority handling ===
+# Text input first
+if typed and typed != st.session_state.selected_comp and st.session_state.input_method != "text":
+    st.session_state.selected_comp = typed
+    st.session_state.input_method = "text"
+    st.session_state.user_changed_stroke_range = False
+    st.experimental_rerun()
+
+# Dropdown next
+elif dropdown != st.session_state.selected_comp:
+    st.session_state.selected_comp = dropdown
+    st.session_state.last_dropdown = dropdown
+    st.session_state.input_method = "dropdown"
+    st.session_state.user_changed_stroke_range = False
+    # 👇 Simulate the "second click"
+    time.sleep(0.05)
+    st.experimental_rerun()
 
 selected_comp = st.session_state.selected_comp
 
-# === Display Selection ===
+# === Display current selection ===
 st.markdown(f"""
 <h2 style='font-size: 1.2em;'>📌 Current Selection</h2>
-<p><strong>Component:</strong> {selected_comp} &nbsp;&nbsp; 
-<strong>Level:</strong> {st.session_state.max_depth} &nbsp;&nbsp; 
+<p><strong>Component:</strong> {selected_comp} &nbsp;&nbsp;
+<strong>Level:</strong> {st.session_state.max_depth} &nbsp;&nbsp;
 <strong>Stroke Range:</strong> {min_strokes} – {max_strokes}</p>
 """, unsafe_allow_html=True)
 
-# === Show Characters ===
+# === Display results ===
 if selected_comp:
     chars = [
         c for c in component_map.get(selected_comp, [])
