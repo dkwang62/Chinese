@@ -50,20 +50,23 @@ def build_component_map(max_depth):
     return component_map
 
 # === Step 4: Controls (no sidebar) ===
-st.session_state.setdefault("selected_comp", "木")
-st.session_state.setdefault("max_depth", 1)
-st.session_state.setdefault("stroke_range", (4, 10))
+if "selected_comp" not in st.session_state:
+    st.session_state.selected_comp = "木"
+if "max_depth" not in st.session_state:
+    st.session_state.max_depth = 1
+if "stroke_range" not in st.session_state:
+    st.session_state.stroke_range = (4, 10)
+if "text_input_comp" not in st.session_state:
+    st.session_state.text_input_comp = st.session_state.selected_comp
 
 col1, col2 = st.columns(2)
 with col1:
-    max_depth = st.slider("Max Decomposition Depth", 0, 5, st.session_state.max_depth)
-    st.session_state.max_depth = max_depth
+    st.slider("Max Decomposition Depth", 0, 5, key="max_depth")
 with col2:
-    stroke_range = st.slider("Stroke Count Range", 0, 30, st.session_state.stroke_range)
-    st.session_state.stroke_range = stroke_range
-min_strokes, max_strokes = stroke_range
+    st.slider("Stroke Count Range", 0, 30, key="stroke_range")
+min_strokes, max_strokes = st.session_state.stroke_range
 
-component_map = build_component_map(max_depth=max_depth)
+component_map = build_component_map(max_depth=st.session_state.max_depth)
 
 # === Helper: Get stroke count ===
 def get_stroke_count(char):
@@ -76,57 +79,52 @@ filtered_components = [
 ]
 sorted_components = sorted(filtered_components, key=get_stroke_count)
 
-# === Component selection (dropdown + text input with stickiness) ===
+# === Component selection (dropdown + text input) ===
 col_a, col_b = st.columns(2)
 with col_a:
-    dropdown_selection = st.selectbox(
+    st.selectbox(
         "Select a component:",
         options=sorted_components,
         format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
         index=sorted_components.index(st.session_state.selected_comp) if st.session_state.selected_comp in sorted_components else 0,
-        key="dropdown_comp"
+        key="selected_comp"
     )
 with col_b:
-    text_input = st.text_input("Or type a component:", value=st.session_state.selected_comp, key="text_comp")
+    st.text_input("Or type a component:", key="text_input_comp")
 
-# === Validate user input ===
-input_char = text_input.strip()
-valid_input = input_char in component_map or input_char in char_decomp
-if valid_input:
-    st.session_state.selected_comp = input_char
-else:
-    if dropdown_selection != st.session_state.selected_comp:
-        st.session_state.selected_comp = dropdown_selection
-
-selected_comp = st.session_state.selected_comp
-
-# === Show warning for invalid input ===
-if text_input.strip() and not valid_input:
-    st.warning("Invalid component entered. Please select from the dropdown or enter a valid component.")
+# Sync text input with dropdown
+if st.session_state.selected_comp != st.session_state.text_input_comp:
+    # If dropdown was changed, update text input
+    if st.session_state.selected_comp in sorted_components:
+        st.session_state.text_input_comp = st.session_state.selected_comp
+    # If text input was changed and is valid, update selected_comp
+    elif st.session_state.text_input_comp.strip() and st.session_state.text_input_comp in component_map:
+        st.session_state.selected_comp = st.session_state.text_input_comp.strip()
+    # If text input is invalid, reset it to selected_comp and show warning
+    elif st.session_state.text_input_comp.strip():
+        st.session_state.text_input_comp = st.session_state.selected_comp
+        st.warning("Invalid component entered. Please select from the dropdown or enter a valid component.")
 
 # === Display current selection ===
-st.markdown("""
+st.markdown(f"""
 <h2 style='font-size: 1.2em;'>📌 Current Selection</h2>
-<p><strong>Component:</strong> {0} &nbsp;&nbsp; <strong>Level:</strong> {1} &nbsp;&nbsp; <strong>Stroke Range:</strong> {2} – {3}</p>
-""".format(selected_comp, max_depth, min_strokes, max_strokes), unsafe_allow_html=True)
+<p><strong>Component:</strong> {st.session_state.selected_comp}    <strong>Level:</strong> {st.session_state.max_depth}    <strong>Stroke Range:</strong> {min_strokes} – {max_strokes}</p>
+""", unsafe_allow_html=True)
 
 # === Step 5: Display decomposed characters ===
-if selected_comp in component_map:
+if st.session_state.selected_comp:
     chars = [
-        c for c in component_map.get(selected_comp, [])
+        c for c in component_map.get(st.session_state.selected_comp, [])
         if min_strokes <= get_stroke_count(c) <= max_strokes
     ]
-else:
-    chars = []
+    chars = sorted(set(chars))
 
-chars = sorted(set(chars))
-
-st.markdown(
-    f"<h2 style='font-size: 1.2em;'>🧬 Characters with: {selected_comp} — {len(chars)} result(s)</h2>",
-    unsafe_allow_html=True
-)
-for c in chars:
-    entry = char_decomp.get(c, {})
-    pinyin = entry.get("pinyin", "—")
-    definition = entry.get("definition", "No definition available")
-    st.write(f"**{c}** — {pinyin} — {definition}")
+    st.markdown(
+        f"<h2 style='font-size: 1.2em;'>🧬 Characters with: {st.session_state.selected_comp} — {len(chars)} result(s)</h2>",
+        unsafe_allow_html=True
+    )
+    for c in chars:
+        entry = char_decomp.get(c, {})
+        pinyin = entry.get("pinyin", "—")
+        definition = entry.get("definition", "No definition available")
+        st.write(f"**{c}** — {pinyin} — {definition}")
