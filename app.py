@@ -1,14 +1,11 @@
-import json
-import time
-from collections import defaultdict
 import streamlit as st
+import json
+from collections import defaultdict
 
 st.set_page_config(layout="wide")
+st.title("🧩 Character Decomposition Explorer")
 
-st.markdown("""
-<h1 style='font-size: 1.8em;'>🧩 Character Decomposition Explorer</h1>
-""", unsafe_allow_html=True)
-
+# Load character decomposition data
 @st.cache_data
 def load_char_decomp():
     char_decomp = {}
@@ -24,114 +21,53 @@ def load_char_decomp():
 
 char_decomp = load_char_decomp()
 
-def get_all_components(char, max_depth=2, depth=0, seen=None):
-    if seen is None:
-        seen = set()
-    if char in seen or depth > max_depth:
-        return set()
-    seen.add(char)
+# Function to get stroke count
+def get_stroke_count(char):
+    return char_decomp.get(char, {}).get("strokes", float('inf'))
 
-    components = set()
-    for comp in char_decomp.get(char, {}).get("decomposition", ""):
-        if '\u4e00' <= comp <= '\u9fff':
-            components.add(comp)
-            components.update(get_all_components(comp, max_depth, depth + 1, seen))
-    return components
-
+# Build component map
 @st.cache_data
 def build_component_map(max_depth):
     component_map = defaultdict(list)
     for char in char_decomp:
-        all_components = get_all_components(char, max_depth=max_depth)
-        for comp in all_components:
+        components = set()
+        decomposition = char_decomp.get(char, {}).get("decomposition", "")
+        for comp in decomposition:
+            if '\u4e00' <= comp <= '\u9fff':
+                components.add(comp)
+        for comp in components:
             component_map[comp].append(char)
     return component_map
 
-# === Session State Setup ===
-if "selected_comp" not in st.session_state:
-    st.session_state.selected_comp = "木"
-    st.session_state.stroke_range = (4, 10)
-    st.session_state.user_changed_stroke_range = False
-    st.session_state.input_method = "dropdown"
-    st.session_state.last_dropdown = "木"
+# User inputs
+max_depth = st.slider("Max Decomposition Depth", 0, 5, 1)
+stroke_range = st.slider("Stroke Count Range", 0, 30, (4, 10))
+min_strokes, max_strokes = stroke_range
 
-def get_stroke_count(char):
-    return char_decomp.get(char, {}).get("strokes", float("inf"))
+component_map = build_component_map(max_depth)
 
-# === Controls ===
-st.session_state.max_depth = st.slider("Max Decomposition Depth", 0, 5, st.session_state.get("max_depth", 1))
-component_map = build_component_map(max_depth=st.session_state.max_depth)
-
-# === Determine auto stroke range ===
-selected_stroke = get_stroke_count(st.session_state.selected_comp)
-suggested_min = selected_stroke
-suggested_max = max(suggested_min + 5, suggested_min + 1)
-
-def on_slider_change():
-    st.session_state.user_changed_stroke_range = True
-
-if not st.session_state.user_changed_stroke_range:
-    st.session_state.stroke_range = (suggested_min, suggested_max)
-
-st.session_state.stroke_range = st.slider(
-    "Stroke Count Range", 0, 30,
-    st.session_state.stroke_range,
-    on_change=on_slider_change
-)
-
-min_strokes, max_strokes = st.session_state.stroke_range
-
-# === Filter components ===
+# Filter components based on stroke range
 filtered_components = [
     comp for comp in component_map
     if min_strokes <= get_stroke_count(comp) <= max_strokes
 ]
 sorted_components = sorted(filtered_components, key=get_stroke_count)
 
-# === Input UI ===
-col1, col2 = st.columns(2)
+# Component selection
+selected_comp = st.selectbox(
+    "Select a component:",
+    options=sorted_components,
+    format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)"
+)
 
-with col1:
-    dropdown = st.selectbox(
-        "Select a component:",
-        options=sorted_components,
-        format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
-        index=sorted_components.index(st.session_state.last_dropdown)
-        if st.session_state.last_dropdown in sorted_components else 0
-    )
-
-with col2:
-    typed = st.text_input("Or type a component:", value=st.session_state.selected_comp if st.session_state.input_method == "text" else "")
-
-# === Priority handling ===
-# Text input first
-if typed and typed != st.session_state.selected_comp and st.session_state.input_method != "text":
-    st.session_state.selected_comp = typed
-    st.session_state.input_method = "text"
-    st.session_state.user_changed_stroke_range = False
-    st.experimental_rerun()
-
-# Dropdown next
-elif dropdown != st.session_state.selected_comp:
-    st.session_state.selected_comp = dropdown
-    st.session_state.last_dropdown = dropdown
-    st.session_state.input_method = "dropdown"
-    st.session_state.user_changed_stroke_range = False
-    # 👇 Simulate the "second click"
-    time.sleep(0.05)
-    st.experimental_rerun()
-
-selected_comp = st.session_state.selected_comp
-
-# === Display current selection ===
+# Display current selection
 st.markdown(f"""
-<h2 style='font-size: 1.2em;'>📌 Current Selection</h2>
-<p><strong>Component:</strong> {selected_comp} &nbsp;&nbsp;
-<strong>Level:</strong> {st.session_state.max_depth} &nbsp;&nbsp;
-<strong>Stroke Range:</strong> {min_strokes} – {max_strokes}</p>
-""", unsafe_allow_html=True)
+**Component:** {selected_comp}  
+**Level:** {max_depth}  
+**Stroke Range:** {min_strokes} – {max_strokes}
+""")
 
-# === Display results ===
+# Display decomposed characters
 if selected_comp:
     chars = [
         c for c in component_map.get(selected_comp, [])
@@ -139,10 +75,7 @@ if selected_comp:
     ]
     chars = sorted(set(chars))
 
-    st.markdown(
-        f"<h2 style='font-size: 1.2em;'>🧬 Characters with: {selected_comp} — {len(chars)} result(s)</h2>",
-        unsafe_allow_html=True
-    )
+    st.markdown(f"**Characters with '{selected_comp}':** {len(chars)} result(s)")
     for c in chars:
         entry = char_decomp.get(c, {})
         pinyin = entry.get("pinyin", "—")
