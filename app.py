@@ -2,8 +2,41 @@ import json
 from collections import defaultdict
 import streamlit as st
 
+# === App Title ===
 st.markdown(
-    "<h1 style='font-size: 1.5em;'>🧩 Character Decomposition Explorer</h1>",
+    "<h1 style='font-size: 2em;'>🧩 Character Decomposition Explorer</h1>",
+    unsafe_allow_html=True
+)
+
+# === Display Current Selection Info (top of screen) ===
+st.markdown(
+    "<h2 style='font-size: 1.3em;'>📌 Current Selection</h2>",
+    unsafe_allow_html=True
+)
+
+# === Sidebar: Controls & Filters ===
+st.sidebar.header("🔧 Filters and Settings")
+
+st.sidebar.markdown("#### 🧱 Decomposition Settings")
+max_depth = st.sidebar.slider(
+    "Max Decomposition Depth",
+    min_value=0, max_value=5, value=2,
+    help="How many levels deep to decompose the selected character"
+)
+
+st.sidebar.markdown("#### ✂️ Output Stroke Range")
+min_strokes, max_strokes = st.sidebar.slider(
+    "Stroke Count Range",
+    min_value=0, max_value=30, value=(2, 4),
+    help="Only show characters within this stroke count range"
+)
+
+st.sidebar.markdown("#### 🔍 Search or Select Component")
+search_input = st.text_input("Search for a component (e.g. 木):")
+
+# === Hint for small screen users ===
+st.markdown(
+    "<span style='color: gray;'>👉 Tap the `>` in the top-left to access filters for decomposition and strokes.</span>",
     unsafe_allow_html=True
 )
 
@@ -48,26 +81,6 @@ def build_component_map(max_depth):
             component_map[comp].append(char)
     return component_map
 
-# === Step 4: Sidebar Controls ===
-st.sidebar.header("🔧 Filters and Settings")
-
-st.sidebar.markdown("#### 🧱 Decomposition Settings")
-max_depth = st.sidebar.slider(
-    "Max Decomposition Depth",
-    min_value=0, max_value=5, value=2,
-    help="How many levels deep to decompose the selected character"
-)
-
-st.sidebar.markdown("#### ✂️ Output Stroke Range")
-min_strokes, max_strokes = st.sidebar.slider(
-    "Stroke Count Range",
-    min_value=0, max_value=30, value=(2, 4),
-    help="Only show characters within this stroke count range"
-)
-
-st.sidebar.markdown("#### 🔍 Search or Select Component")
-search_input = st.text_input("Search for a component (e.g. 木):")
-
 component_map = build_component_map(max_depth=max_depth)
 
 # === Helper: Get stroke count ===
@@ -91,19 +104,13 @@ if not search_input:
     )
 else:
     selected_comp = search_input.strip()
-# === Display current settings on main screen ===
-st.markdown(
-    "<h2 style='font-size: 1.5em;'>📌 Current Selection</h2>",
-    unsafe_allow_html=True
-)    
-st.markdown(f"""
-Component: `{selected_comp}` Level: `{max_depth}` Strokes:** `{min_strokes} – {max_strokes}`
-""")
 
-st.markdown(
-    "<span style='color: gray;'>👉 {> top left} if you don't see the sidebar to change decomposition level and stroke count.</span>",
-    unsafe_allow_html=True
-)
+# === Show current settings after selection
+st.markdown(f"""
+- **Component:** `{selected_comp}`
+- **Level:** `{max_depth}`
+- **Stroke Range:** `{min_strokes} – {max_strokes}`
+""")
 
 # === Step 5: Display decomposed characters ===
 if selected_comp:
@@ -114,7 +121,7 @@ if selected_comp:
     chars = sorted(set(chars))
 
     st.markdown(
-        <h2 style='font-size: 1.5em;'>🧬 Characters with: {selected_comp} — {len(chars)} result(s)</h2>"
+        f"<h2 style='font-size: 1.3em;'>🧬 Characters with: {selected_comp} — {len(chars)} result(s)</h2>",
         unsafe_allow_html=True
     )    
     for c in chars:
@@ -122,4 +129,3 @@ if selected_comp:
         pinyin = entry.get("pinyin", "—")
         definition = entry.get("definition", "No definition available")
         st.write(f"**{c}** — {pinyin} — {definition}")
-
