@@ -45,43 +45,70 @@ def build_component_map(max_depth):
             component_map[comp].append(char)
     return component_map
 
-# === Step 4: Controls ===
-st.sidebar.header("Filters")
-max_depth = st.sidebar.slider("Max Decomposition Depth", 0, 5, 2)
-min_strokes, max_strokes = st.sidebar.slider("Stroke Count Range", 0, 30, (2, 4))
-search_input = st.text_input("Search for a component (e.g. 木):")
+# === Step 4: Sidebar Controls ===
+st.sidebar.header("🔧 Filters & Settings")
 
-component_map = build_component_map(max_depth=max_depth)
+max_depth = st.sidebar.slider(
+    "Max Decomposition Depth",
+    0, 5, 2,
+    help="Controls how deeply each character is decomposed into components.",
+    key="depth"
+)
+
+min_strokes, max_strokes = st.sidebar.slider(
+    "Stroke Count Range",
+    0, 30, (2, 4),
+    help="Filter both components and resulting characters by their number of strokes.",
+    key="stroke_range"
+)
+
+search_input = st.sidebar.text_input("🔍 Search for a component (e.g. 木):", key="search")
+
+# === Step 5: Track and persist selected component ===
+component_map = build_component_map(max_depth=st.session_state.depth)
 
 def get_stroke_count(char):
     return char_decomp.get(char, {}).get("strokes", float('inf'))
 
-# Filter dropdown options
 filtered_components = [
     comp for comp in component_map
     if min_strokes <= get_stroke_count(comp) <= max_strokes
 ]
 sorted_components = sorted(filtered_components, key=get_stroke_count)
 
-selected_comp = None
-if not search_input:
-    selected_comp = st.selectbox(
+# Determine selected component
+if "selected_comp" not in st.session_state:
+    st.session_state.selected_comp = sorted_components[0] if sorted_components else None
+
+if st.session_state.search:
+    if st.session_state.search in component_map:
+        st.session_state.selected_comp = st.session_state.search.strip()
+else:
+    selected = st.selectbox(
         "Select a component:",
         options=sorted_components,
+        index=sorted_components.index(st.session_state.selected_comp) if st.session_state.selected_comp in sorted_components else 0,
         format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)"
     )
-else:
-    selected_comp = search_input.strip()
+    st.session_state.selected_comp = selected
 
-# === Step 5: Display characters ===
-if selected_comp:
+# === Step 6: Show current state clearly ===
+st.markdown(f"""
+### 📌 Current Selection
+- **Root Component:** `{st.session_state.selected_comp}`
+- **Decomposition Level:** `{st.session_state.depth}`
+- **Stroke Count Range for Output Characters:** `{st.session_state.stroke_range[0]} – {st.session_state.stroke_range[1]}`
+""")
+
+# === Step 7: Display characters ===
+if st.session_state.selected_comp:
     chars = [
-        c for c in component_map.get(selected_comp, [])
+        c for c in component_map.get(st.session_state.selected_comp, [])
         if min_strokes <= get_stroke_count(c) <= max_strokes
     ]
     chars = sorted(set(chars))
 
-    st.subheader(f"Component: {selected_comp} — {len(chars)} characters ({min_strokes}–{max_strokes} strokes)")
+    st.subheader(f"Characters with component '{st.session_state.selected_comp}' ({len(chars)} found):")
     for c in chars:
         entry = char_decomp.get(c, {})
         pinyin = entry.get("pinyin", "—")
