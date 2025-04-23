@@ -3,7 +3,7 @@ from collections import defaultdict
 import streamlit as st
 
 st.markdown(
-    "<h1 style='font-size: 2.5em;'>🧩 Character Decomposition Explorer</h1>",
+    "<h1 style='font-size: 1.5em;'>🧩 Character Decomposition Explorer</h1>",
     unsafe_allow_html=True
 )
 
@@ -110,12 +110,10 @@ if selected_comp:
 # === Display current settings on main screen ===
 st.markdown("### 📌 Current Settings")
 st.markdown(f"""
-- **Selected component:** `{selected_comp}`  
-- **Decomposition level:** `{max_depth}`  
-- **Output character stroke range:** `{min_strokes} – {max_strokes}`
+- **Selected:** `{selected_comp}` Level:** `{max_depth}` Strokes:** `{min_strokes} – {max_strokes}`
 """)
 
 st.markdown(
-    "<span style='color: gray;'>👉 Tap the menu ( > ) at the top left to change decomposition level and stroke count.</span>",
+    "<span style='color: gray;'>👉 Tap > (top left) to change decomposition level and stroke count.</span>",
     unsafe_allow_html=True
 )
