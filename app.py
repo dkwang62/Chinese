@@ -56,8 +56,6 @@ if "max_depth" not in st.session_state:
     st.session_state.max_depth = 1
 if "stroke_range" not in st.session_state:
     st.session_state.stroke_range = (4, 10)
-if "text_input_comp" not in st.session_state:
-    st.session_state.text_input_comp = st.session_state.selected_comp
 
 col1, col2 = st.columns(2)
 with col1:
@@ -80,6 +78,14 @@ filtered_components = [
 sorted_components = sorted(filtered_components, key=get_stroke_count)
 
 # === Component selection (dropdown + text input) ===
+def on_text_input_change():
+    """Callback to handle text input changes."""
+    text_value = st.session_state.text_input_comp.strip()
+    if text_value and text_value in component_map:
+        st.session_state.selected_comp = text_value
+    elif text_value:
+        st.warning("Invalid component entered. Please select from the dropdown or enter a valid component.")
+
 col_a, col_b = st.columns(2)
 with col_a:
     st.selectbox(
@@ -90,20 +96,12 @@ with col_a:
         key="selected_comp"
     )
 with col_b:
-    st.text_input("Or type a component:", key="text_input_comp")
-
-# Sync text input with dropdown
-if st.session_state.selected_comp != st.session_state.text_input_comp:
-    # If dropdown was changed, update text input
-    if st.session_state.selected_comp in sorted_components:
-        st.session_state.text_input_comp = st.session_state.selected_comp
-    # If text input was changed and is valid, update selected_comp
-    elif st.session_state.text_input_comp.strip() and st.session_state.text_input_comp in component_map:
-        st.session_state.selected_comp = st.session_state.text_input_comp.strip()
-    # If text input is invalid, reset it to selected_comp and show warning
-    elif st.session_state.text_input_comp.strip():
-        st.session_state.text_input_comp = st.session_state.selected_comp
-        st.warning("Invalid component entered. Please select from the dropdown or enter a valid component.")
+    st.text_input(
+        "Or type a component:",
+        value=st.session_state.selected_comp,
+        key="text_input_comp",
+        on_change=on_text_input_change
+    )
 
 # === Display current selection ===
 st.markdown(f"""
