@@ -53,21 +53,36 @@ def build_component_map(max_depth):
 st.session_state.setdefault("selected_comp", "木")
 st.session_state.setdefault("max_depth", 1)
 st.session_state.setdefault("stroke_range", (4, 10))
+st.session_state.setdefault("user_changed_stroke_range", False)
 
 col1, col2 = st.columns(2)
 with col1:
     max_depth = st.slider("Max Decomposition Depth", 0, 5, st.session_state.max_depth)
     st.session_state.max_depth = max_depth
-with col2:
-    stroke_range = st.slider("Stroke Count Range", 0, 30, st.session_state.stroke_range)
-    st.session_state.stroke_range = stroke_range
-min_strokes, max_strokes = stroke_range
-
-component_map = build_component_map(max_depth=max_depth)
 
 # === Helper: Get stroke count ===
 def get_stroke_count(char):
     return char_decomp.get(char, {}).get("strokes", float('inf'))
+
+# Determine new suggested range based on selected component
+selected_stroke = get_stroke_count(st.session_state.selected_comp)
+suggested_min = selected_stroke
+suggested_max = max(suggested_min + 5, suggested_min + 1)
+
+def on_slider_change():
+    st.session_state.user_changed_stroke_range = True
+
+with col2:
+    if not st.session_state.user_changed_stroke_range:
+        st.session_state.stroke_range = (suggested_min, suggested_max)
+    stroke_range = st.slider(
+        "Stroke Count Range", 0, 30, st.session_state.stroke_range, on_change=on_slider_change
+    )
+    st.session_state.stroke_range = stroke_range
+
+min_strokes, max_strokes = stroke_range
+
+component_map = build_component_map(max_depth=max_depth)
 
 # === Filter dropdown options ===
 filtered_components = [
@@ -91,8 +106,10 @@ with col_b:
 # Update session state with latest selection
 if text_input.strip() != st.session_state.selected_comp:
     st.session_state.selected_comp = text_input.strip()
+    st.session_state.user_changed_stroke_range = False  # reset range adjustment flag
 elif dropdown_selection != st.session_state.selected_comp:
     st.session_state.selected_comp = dropdown_selection
+    st.session_state.user_changed_stroke_range = False  # reset range adjustment flag
 
 selected_comp = st.session_state.selected_comp
 
