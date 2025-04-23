@@ -49,7 +49,7 @@ def build_component_map(max_depth):
             component_map[comp].append(char)
     return component_map
 
-# === Step 4: Controls ===
+# === Step 4: Controls (no sidebar) ===
 if "selected_comp" not in st.session_state:
     st.session_state.selected_comp = "木"
 if "max_depth" not in st.session_state:
@@ -59,10 +59,10 @@ if "stroke_range" not in st.session_state:
 
 col1, col2 = st.columns(2)
 with col1:
-    max_depth = st.slider("Max Decomposition Depth", 0, 5, st.session_state.max_depth, key="max_depth")
+    st.slider("Max Decomposition Depth", 0, 5, key="max_depth")
 with col2:
-    stroke_range = st.slider("Stroke Count Range", 0, 30, st.session_state.stroke_range, key="stroke_range")
-min_strokes, max_strokes = stroke_range
+    st.slider("Stroke Count Range", 0, 30, key="stroke_range")
+min_strokes, max_strokes = st.session_state.stroke_range
 
 component_map = build_component_map(max_depth=st.session_state.max_depth)
 
@@ -77,14 +77,25 @@ filtered_components = [
 ]
 sorted_components = sorted(filtered_components, key=get_stroke_count)
 
-# === Component selection (dropdown only) ===
-selected_comp = st.selectbox(
-    "Select a component:",
-    options=sorted_components,
-    format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
-    index=sorted_components.index(st.session_state.selected_comp) if st.session_state.selected_comp in sorted_components else 0,
-    key="selected_comp"
-)
+# === Component selection (dropdown + text input) ===
+col_a, col_b = st.columns(2)
+with col_a:
+    st.selectbox(
+        "Select a component:",
+        options=sorted_components,
+        format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
+        index=sorted_components.index(st.session_state.selected_comp) if st.session_state.selected_comp in sorted_components else 0,
+        key="selected_comp"
+    )
+with col_b:
+    text_input = st.text_input("Or type a component:", key="text_input_comp")
+
+# Sync text input with dropdown if valid
+if st.session_state.text_input_comp.strip() and st.session_state.text_input_comp in component_map:
+    if st.session_state.text_input_comp != st.session_state.selected_comp:
+        st.session_state.selected_comp = st.session_state.text_input_comp.strip()
+elif st.session_state.text_input_comp.strip() and st.session_state.text_input_comp not in component_map:
+    st.warning("Invalid component entered. Please select from the dropdown or enter a valid component.")
 
 # === Display current selection ===
 st.markdown(f"""
