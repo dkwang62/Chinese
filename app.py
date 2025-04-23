@@ -113,8 +113,6 @@ if selected_comp:
     ]
     chars = sorted(set(chars))
 
-#    st.subheader(f"🧬 Characters containing: {selected_comp} — {len(chars)} result(s)")
-
     st.markdown(
         <h2 style='font-size: 1.5em;'>🧬 Characters with: {selected_comp} — {len(chars)} result(s)</h2>"
         unsafe_allow_html=True
