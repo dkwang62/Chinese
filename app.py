@@ -54,6 +54,7 @@ st.session_state.setdefault("selected_comp", "木")
 st.session_state.setdefault("max_depth", 1)
 st.session_state.setdefault("stroke_range", (4, 10))
 st.session_state.setdefault("user_changed_stroke_range", False)
+st.session_state.setdefault("typed_comp", "")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -64,7 +65,17 @@ with col1:
 def get_stroke_count(char):
     return char_decomp.get(char, {}).get("strokes", float('inf'))
 
-# Determine new suggested range based on selected component
+component_map = build_component_map(max_depth=max_depth)
+
+# === Filter dropdown options ===
+min_strokes, max_strokes = st.session_state.stroke_range
+filtered_components = [
+    comp for comp in component_map
+    if min_strokes <= get_stroke_count(comp) <= max_strokes
+]
+sorted_components = sorted(filtered_components, key=get_stroke_count)
+
+# === Determine suggested stroke range ===
 selected_stroke = get_stroke_count(st.session_state.selected_comp)
 suggested_min = selected_stroke
 suggested_max = max(suggested_min + 5, suggested_min + 1)
@@ -72,6 +83,7 @@ suggested_max = max(suggested_min + 5, suggested_min + 1)
 def on_slider_change():
     st.session_state.user_changed_stroke_range = True
 
+# === Stroke Range Slider ===
 with col2:
     if not st.session_state.user_changed_stroke_range:
         st.session_state.stroke_range = (suggested_min, suggested_max)
@@ -82,15 +94,6 @@ with col2:
 
 min_strokes, max_strokes = stroke_range
 
-component_map = build_component_map(max_depth=max_depth)
-
-# === Filter dropdown options ===
-filtered_components = [
-    comp for comp in component_map
-    if min_strokes <= get_stroke_count(comp) <= max_strokes
-]
-sorted_components = sorted(filtered_components, key=get_stroke_count)
-
 # === Component selection (dropdown + text input) ===
 col_a, col_b = st.columns(2)
 with col_a:
@@ -98,18 +101,22 @@ with col_a:
         "Select a component:",
         options=sorted_components,
         format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
-        index=sorted_components.index(st.session_state.selected_comp) if st.session_state.selected_comp in sorted_components else 0
+        index=sorted_components.index(st.session_state.selected_comp) if st.session_state.selected_comp in sorted_components else 0,
+        key="dropdown_comp"
     )
 with col_b:
-    text_input = st.text_input("Or type a component:", value=st.session_state.selected_comp)
+    text_input = st.text_input("Or type a component:", value=st.session_state.typed_comp, key="text_comp")
 
-# Update session state with latest selection
-if text_input.strip() != st.session_state.selected_comp:
-    st.session_state.selected_comp = text_input.strip()
-    st.session_state.user_changed_stroke_range = False  # reset range adjustment flag
-elif dropdown_selection != st.session_state.selected_comp:
+# === Sync logic between dropdown and input ===
+# Case 1: Text input takes precedence
+if text_input and text_input != st.session_state.selected_comp:
+    st.session_state.selected_comp = text_input
+    st.session_state.typed_comp = text_input
+    st.session_state.user_changed_stroke_range = False  # reset slider to auto-adjust
+# Case 2: Dropdown changed (only update if input was blank or previously matched dropdown)
+elif dropdown_selection != st.session_state.selected_comp and (not st.session_state.typed_comp or st.session_state.typed_comp == dropdown_selection):
     st.session_state.selected_comp = dropdown_selection
-    st.session_state.user_changed_stroke_range = False  # reset range adjustment flag
+    st.session_state.typed_comp = ""  # clear the text input
 
 selected_comp = st.session_state.selected_comp
 
