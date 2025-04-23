@@ -4,11 +4,6 @@ import streamlit as st
 
 st.title("🧩 Chinese Character Decomposition Explorer")
 
-st.markdown(
-    "<span style='color: gray;'>👉 Tap the menu ( > ) at the top left to change decomposition level and stroke count.</span>",
-    unsafe_allow_html=True
-)
-
 # === Step 1: Load strokes.txt from local file (cached) ===
 @st.cache_data
 def load_char_decomp():
@@ -93,6 +88,11 @@ if not search_input:
     )
 else:
     selected_comp = search_input.strip()
+
+st.markdown(
+    "<span style='color: gray;'>👉 Tap the menu ( > ) at the top left to change decomposition level and stroke count.</span>",
+    unsafe_allow_html=True
+)
 
 # === Display current settings on main screen ===
 st.markdown("### 📌 Current Settings")
