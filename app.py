@@ -50,20 +50,21 @@ def build_component_map(max_depth):
     return component_map
 
 # === Step 4: Controls ===
-st.session_state.setdefault("selected_comp", "木")
-st.session_state.setdefault("max_depth", 1)
-st.session_state.setdefault("stroke_range", (4, 10))
+if "selected_comp" not in st.session_state:
+    st.session_state.selected_comp = "木"
+if "max_depth" not in st.session_state:
+    st.session_state.max_depth = 1
+if "stroke_range" not in st.session_state:
+    st.session_state.stroke_range = (4, 10)
 
 col1, col2 = st.columns(2)
 with col1:
-    max_depth = st.slider("Max Decomposition Depth", 0, 5, st.session_state.max_depth)
-    st.session_state.max_depth = max_depth
+    max_depth = st.slider("Max Decomposition Depth", 0, 5, st.session_state.max_depth, key="max_depth")
 with col2:
-    stroke_range = st.slider("Stroke Count Range", 0, 30, st.session_state.stroke_range)
-    st.session_state.stroke_range = stroke_range
+    stroke_range = st.slider("Stroke Count Range", 0, 30, st.session_state.stroke_range, key="stroke_range")
 min_strokes, max_strokes = stroke_range
 
-component_map = build_component_map(max_depth=max_depth)
+component_map = build_component_map(max_depth=st.session_state.max_depth)
 
 # === Helper: Get stroke count ===
 def get_stroke_count(char):
@@ -81,26 +82,26 @@ selected_comp = st.selectbox(
     "Select a component:",
     options=sorted_components,
     format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
-    index=sorted_components.index(st.session_state.selected_comp) if st.session_state.selected_comp in sorted_components else 0
+    index=sorted_components.index(st.session_state.selected_comp) if st.session_state.selected_comp in sorted_components else 0,
+    key="selected_comp"
 )
-st.session_state.selected_comp = selected_comp
 
 # === Display current selection ===
 st.markdown(f"""
 <h2 style='font-size: 1.2em;'>📌 Current Selection</h2>
-<p><strong>Component:</strong> {selected_comp} &nbsp;&nbsp; <strong>Level:</strong> {max_depth} &nbsp;&nbsp; <strong>Stroke Range:</strong> {min_strokes} – {max_strokes}</p>
+<p><strong>Component:</strong> {st.session_state.selected_comp}    <strong>Level:</strong> {st.session_state.max_depth}    <strong>Stroke Range:</strong> {min_strokes} – {max_strokes}</p>
 """, unsafe_allow_html=True)
 
 # === Step 5: Display decomposed characters ===
-if selected_comp:
+if st.session_state.selected_comp:
     chars = [
-        c for c in component_map.get(selected_comp, [])
+        c for c in component_map.get(st.session_state.selected_comp, [])
         if min_strokes <= get_stroke_count(c) <= max_strokes
     ]
     chars = sorted(set(chars))
 
     st.markdown(
-        f"<h2 style='font-size: 1.2em;'>🧬 Characters with: {selected_comp} — {len(chars)} result(s)</h2>",
+        f"<h2 style='font-size: 1.2em;'>🧬 Characters with: {st.session_state.selected_comp} — {len(chars)} result(s)</h2>",
         unsafe_allow_html=True
     )
     for c in chars:
