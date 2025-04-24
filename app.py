@@ -7,7 +7,7 @@ st.set_page_config(layout="wide")
 
 # Display a title using markdown with HTML styling for a larger, emoji-enhanced header
 st.markdown("""
-<h1 style='font-size: 1.8em;'>🧩 Character Decomposition Explorer</h1>
+<h1 style='font-size: 1.2em;'>🧩 Character Decomposition Explorer</h1>
 """, unsafe_allow_html=True)
 
 # === Step 1: Load strokes.txt from local file (cached) ===
@@ -95,7 +95,7 @@ with col1:
 with col2:
     # Add a slider for stroke count range, bound to st.session_state.stroke_range
     # Range: 0 to 30, default is st.session_state.stroke_range
-    st.slider("Stroke Count Range", 0, 30, key="stroke_range")
+    st.slider("Strokes Range", 0, 30, key="stroke_range")
 # Unpack the stroke range tuple into min and max values
 min_strokes, max_strokes = st.session_state.stroke_range
 
@@ -158,9 +158,16 @@ with col_b:
 
 # === Display current selection ===
 st.markdown(f"""
-<h2 style='font-size: 1.2em;'>📌 Current Selection</h2>
-<p><span style='font-size: 2.4em;'>{st.session_state.selected_comp}</span>    <strong>Depth:</strong> {st.session_state.max_depth}    <strong>Strokes:</strong> {min_strokes} – {max_strokes}</p>
+<div style='display: flex; align-items: center; gap: 20px;'>
+    <h2 style='font-size: 1.2em; margin: 0;'>📌 Current Selection</h2>
+    <p style='margin: 0;'>
+        <span style='font-size: 2.4em;'>{st.session_state.selected_comp}</span>    
+        <strong>Depth:</strong> {st.session_state.max_depth}    
+        <strong>Strokes:</strong> {min_strokes} – {max_strokes}
+    </p>
+</div>
 """, unsafe_allow_html=True)
+
 # === Step 5: Display decomposed characters ===
 # Check if a component is selected (non-empty)
 if st.session_state.selected_comp:
