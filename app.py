@@ -124,7 +124,7 @@ if st.session_state.selected_comp:
     # Display all elements in a single row using flexbox
     st.markdown(f"""
     <div style='display: flex; align-items: center; gap: 20px;'>
-    #    <h2 style='font-size: 1.2em; margin: 0;'>📌 Current Selection</h2>
+        <h2 style='font-size: 1.2em; margin: 0;'>📌 Selected </h2>
         <span style='font-size: 2.4em;'>{st.session_state.selected_comp}</span>
         <p style='margin: 0;'>
             <strong>Depth:</strong> {st.session_state.max_depth}    
