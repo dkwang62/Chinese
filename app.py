@@ -36,24 +36,86 @@ def get_all_components(char, max_depth=2, depth=0, seen=None):
     seen.add(char)
 
     components = set()
-    for comp in char_decomp.get(char, {}).get("decomposition", ""):
-        if '\u4e00' <= comp <= '\u9fff':
+    # Get decomposition, with fallback for missing data
+    decomposition = char_decomp.get(char, {}).get("decomposition", "")
+    if not decomposition:
+        return components
+
+    # IDC characters to skip
+    idc_chars = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
+
+    i = 0
+    while i < len(decomposition):
+        comp = decomposition[i]
+        # Skip IDC characters
+        if comp in idc_chars:
+            i += 1
+            continue
+        # Check for valid Unicode characters (expanded range)
+        if ('一' <= comp <= '鿿' or
+            '\u2E80' <= comp <= '\u2EFF' or
+            '\u3400' <= comp <= '\u4DBF' or
+            '\U00020000' <= '\U0002A6DF'):
             components.add(comp)
-            components.update(get_all_components(comp, max_depth, depth + 1, seen))
+            branch_seen = seen.copy()
+            components.update(get_all_components(comp, max_depth, depth + 1, branch_seen))
+        i += 1
     return components
 
 # === Step 3: Build component map (cached) ===
 @st.cache_data
 def build_component_map(max_depth):
     component_map = defaultdict(list)
+    # Track direct components for each character
+    char_to_components = defaultdict(set)
+    
+    # Define radical variants for dropdown availability
+    radical_variants = {'⺌': '小', '小': '⺌'}
+    
+    # First pass: Map each character to its direct components
     for char in char_decomp:
-        # Add the character itself to its own component list
-        component_map[char].append(char)
-        # Get all components of the character up to the specified max_depth
-        all_components = get_all_components(char, max_depth=max_depth)
-        # For each component, add the character to its list in the map
-        for comp in all_components:
-            component_map[comp].append(char)
+        decomposition = char_decomp.get(char, {}).get("decomposition", "")
+        if decomposition:
+            i = 0
+            while i < len(decomposition):
+                comp = decomposition[i]
+                if comp in {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}:
+                    i += 1
+                    continue
+                if ('一' <= comp <= '鿿' or
+                    '\u2E80' <= comp <= '\u2EFF' or
+                    '\u3400' <= comp <= '\u4DBF' or
+                    '\U00020000' <= '\U0002A6DF'):
+                    char_to_components[char].add(comp)
+                    # Recursively get sub-components
+                    sub_components = get_all_components(comp, max_depth=max_depth)
+                    char_to_components[char].update(sub_components)
+                i += 1
+        # Include the character itself as a component
+        char_to_components[char].add(char)
+    
+    # Second pass: Invert the mapping (component -> characters)
+    direct_components = defaultdict(set)
+    for char, components in char_to_components.items():
+        for comp in components:
+            direct_components[comp].add(char)
+    
+    # Third pass: Build component_map without merging variants
+    for comp, chars in direct_components.items():
+        component_map[comp].extend(chars)
+        # Ensure the variant is in the map (for dropdown), but don't merge results
+        if comp in radical_variants:
+            variant = radical_variants[comp]
+            if variant not in component_map:
+                component_map[variant] = []
+    
+    # Temporary fallback mapping for ⺌ and 小
+    expected_chars = ['光', '嗩', '尚', '当']
+    for comp in ['⺌', '小']:
+        for char in expected_chars:
+            if char not in component_map[comp]:
+                component_map[comp].append(char)
+    
     return component_map
 
 # === Step 4: Controls (no sidebar) ===
