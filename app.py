@@ -63,18 +63,17 @@ def get_all_components(char, max_depth=2, depth=0, seen=None):
 
 # === Step 3: Build component map (cached) ===
 # Define a function to create a map of components to characters that contain them
-@st.cache_data  # Cache the result to avoid recomputing the map unnecessarily
+@st.cache_data
 def build_component_map(max_depth):
-    # Initialize a defaultdict that auto-creates empty lists for new keys
     component_map = defaultdict(list)
-    # Loop through each character in the loaded data
     for char in char_decomp:
+        # Add the character itself to its own component list
+        component_map[char].append(char)
         # Get all components of the character up to the specified max_depth
         all_components = get_all_components(char, max_depth=max_depth)
         # For each component, add the character to its list in the map
         for comp in all_components:
             component_map[comp].append(char)
-    # Return the completed component map
     return component_map
 
 # === Step 4: Controls (no sidebar) ===
@@ -158,11 +157,10 @@ with col_b:
     )
 
 # === Display current selection ===
-# Display the current selection using markdown with HTML styling
-# Show the selected component, decomposition level, and stroke range
+=== Display current selection ===
 st.markdown(f"""
 <h2 style='font-size: 1.2em;'>📌 Current Selection</h2>
-<p><strong>Component:</strong> {st.session_state.selected_comp}    <strong>Level:</strong> {st.session_state.max_depth}    <strong>Stroke Range:</strong> {min_strokes} – {max_strokes}</p>
+<p><strong>Component:</strong> <span style='font-size: 2.4em;'>{st.session_state.selected_comp}</span>    <strong>Level:</strong> {st.session_state.max_depth}    <strong>Stroke Range:</strong> {min_strokes} – {max_strokes}</p>
 """, unsafe_allow_html=True)
 
 # === Step 5: Display decomposed characters ===
