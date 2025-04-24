@@ -1,3 +1,4 @@
+88
 import json  # Import the json module to parse JSON data from the strokes.txt file
 from collections import defaultdict  # Import defaultdict to create a dictionary that auto-initializes empty lists
 import streamlit as st  # Import Streamlit to build the interactive web app
