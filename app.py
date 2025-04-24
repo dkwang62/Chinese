@@ -157,7 +157,6 @@ with col_b:
     )
 
 # === Display current selection ===
-=== Display current selection ===
 st.markdown(f"""
 <h2 style='font-size: 1.2em;'>📌 Current Selection</h2>
 <p><strong>Component:</strong> <span style='font-size: 2.4em;'>{st.session_state.selected_comp}</span>    <strong>Level:</strong> {st.session_state.max_depth}    <strong>Stroke Range:</strong> {min_strokes} – {max_strokes}</p>
