@@ -196,9 +196,11 @@ if st.session_state.selected_comp:
     </div>
     """, unsafe_allow_html=True)
 
-    # Loop through each character and display its details
+    # Loop through each character and display its details with stroke count
     for c in chars:
         entry = char_decomp.get(c, {})
         pinyin = entry.get("pinyin", "—")
         definition = entry.get("definition", "No definition available")
-        st.write(f"**{c}** — {pinyin} — {definition}")
+        stroke_count = get_stroke_count(c)
+        stroke_text = f"{stroke_count} strokes" if stroke_count != float('inf') else "unknown strokes"
+        st.write(f"**{c}** — {pinyin} — {definition} ({stroke_text})")
