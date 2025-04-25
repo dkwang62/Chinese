@@ -180,8 +180,8 @@ if st.session_state.selected_comp:
         c for c in component_map.get(st.session_state.selected_comp, [])
         if min_strokes <= get_stroke_count(c) <= max_strokes
     ]
-    # Sort and remove duplicates
-    chars = sorted(set(chars))
+    # Sort by stroke count (lowest to highest) and remove duplicates
+    chars = sorted(set(chars), key=get_stroke_count)
 
     # Display all elements in a single row using flexbox
     st.markdown(f"""
