@@ -93,7 +93,10 @@ char_decomp = load_char_decomp()
 
 # Fallback decompositions for missing characters
 FALLBACK_DECOMPS = {
-    '尕': {'decomposition': '⿱⺌四', 'strokes': 5, 'pinyin': ['gǎ'], 'definition': 'small, little', 'radical': '小'}
+    '尕': {'decomposition': '⿱⺌四', 'strokes': 5, 'pinyin': ['gǎ'], 'definition': 'small, little', 'radical': '小'},
+    '赏': {'decomposition': '⿱⺌贝', 'strokes': 12, 'pinyin': ['shǎng'], 'definition': 'reward, award', 'radical': '贝'},
+    '掌': {'decomposition': '⿱⺌手', 'strokes': 12, 'pinyin': ['zhǎng'], 'definition': 'palm of hand; to hold in hand', 'radical': '手'},
+    '尝': {'decomposition': '⿱⺌旨', 'strokes': 9, 'pinyin': ['cháng'], 'definition': 'to taste; to experience', 'radical': '口'}
 }
 
 # Utility functions
@@ -150,22 +153,32 @@ def get_all_components(char, max_depth, depth=0, seen=None):
             components.update(get_all_components(comp, max_depth, depth + 1, seen.copy()))
     return components
 
-# Check if character matches IDC pattern
-def matches_idc_pattern(char, selected_comp, idc_filter):
-    if idc_filter == "Any":
-        return True
+# Check if character matches filters
+def matches_filters(char, selected_comp, idc_filter):
     decomposition = FALLBACK_DECOMPS.get(char, {}).get('decomposition', char_decomp.get(char, {}).get("decomposition", ""))
     if not decomposition:
         return False
-    # Apply radical variant mapping for ⺌ and 小
+    
+    # Primary filter: Check for component or its variant
     radical_variants = {'⺌': '小', '小': '⺌'}
     effective_comp = [selected_comp]
     if selected_comp in radical_variants:
         effective_comp.append(radical_variants[selected_comp])
-    # Check if decomposition starts with the IDC and contains the component or its variant
-    idc_match = decomposition.startswith(idc_filter)
+    
     comp_match = any(comp in decomposition for comp in effective_comp)
-    return idc_match and comp_match
+    if not comp_match:
+        # Check sub-components if max_depth > 0
+        all_components = get_all_components(char, st.session_state.max_depth)
+        comp_match = any(comp in all_components for comp in effective_comp)
+    
+    if not comp_match:
+        return False
+    
+    # Secondary filter: Check IDC if not "Any"
+    if idc_filter == "Any":
+        return True
+    idc_match = decomposition.startswith(idc_filter)
+    return idc_match
 
 # Build component map
 @st.cache_data
@@ -264,17 +277,20 @@ def render_char_card(char, compounds):
         <p class='details'>{details}</p>
     """, unsafe_allow_html=True)
     
-    # Debug information for all characters
+    # Debug information
     decomposition = FALLBACK_DECOMPS.get(char, {}).get('decomposition', char_decomp.get(char, {}).get("decomposition", "No decomposition"))
     source = "FALLBACK_DECOMPS" if char in FALLBACK_DECOMPS else "strokes1.json"
-    idc_match = decomposition.startswith(st.session_state.idc_filter) if st.session_state.idc_filter != "Any" else True
     comp_match = any(comp in decomposition for comp in [st.session_state.selected_comp, '小' if st.session_state.selected_comp == '⺌' else '⺌'])
+    all_components = get_all_components(char, st.session_state.max_depth)
+    comp_match_deep = any(comp in all_components for comp in [st.session_state.selected_comp, '小' if st.session_state.selected_comp == '⺌' else '⺌'])
+    idc_match = decomposition.startswith(st.session_state.idc_filter) if st.session_state.idc_filter != "Any" else True
     st.markdown(f"""
     <div class='debug-section'>
         <strong>Debug for {char}:</strong> Decomposition: {decomposition}, 
         Stroke Count: {get_stroke_count(char)}, 
+        Component Match (direct): {comp_match}, 
+        Component Match (deep): {comp_match_deep}, 
         IDC Match: {idc_match}, 
-        Component Match: {comp_match}, 
         Source: {source}
     </div>
     """, unsafe_allow_html=True)
@@ -323,7 +339,7 @@ def main():
     chars = [
         c for c in component_map.get(st.session_state.selected_comp, [])
         if min_strokes <= get_stroke_count(c) <= max_strokes and
-        matches_idc_pattern(c, st.session_state.selected_comp, st.session_state.idc_filter)
+        matches_filters(c, st.session_state.selected_comp, st.session_state.idc_filter)
     ]
     
     char_compounds = {}
