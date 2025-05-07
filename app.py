@@ -91,10 +91,9 @@ def load_char_decomp():
 
 char_decomp = load_char_decomp()
 
-# Fallback decompositions for missing or incorrect characters
+# Fallback decompositions for missing characters
 FALLBACK_DECOMPS = {
-    '尕': {'decomposition': '⿱⺌四', 'strokes': 5, 'pinyin': ['gǎ'], 'definition': 'small, little', 'radical': '小'},
-    '尗': {'decomposition': '⿱上小', 'strokes': 6, 'pinyin': ['shū'], 'definition': 'younger brother; father\'s younger brother', 'radical': '小'}
+    '尕': {'decomposition': '⿱⺌四', 'strokes': 5, 'pinyin': ['gǎ'], 'definition': 'small, little', 'radical': '小'}
 }
 
 # Utility functions
@@ -242,7 +241,7 @@ def render_controls(component_map):
     st.selectbox(
         "Filter by Structure (IDC):",
         options=list(IDC_PATTERNS.keys()),
-        format_func=lambda x: IDC_PATTERNS[x],
+        format_func=lambda x: f"{x} {IDC_PATTERNS[x]}" if x != "Any" else IDC_PATTERNS[x],
         key="idc_filter"
     )
 
@@ -309,7 +308,7 @@ def main():
         "Strokes": f"{get_stroke_count(st.session_state.selected_comp)} strokes" if get_stroke_count(st.session_state.selected_comp) != -1 else "unknown strokes",
         "Depth": str(st.session_state.max_depth),
         "Stroke Range": f"{st.session_state.stroke_range[0]} – {st.session_state.stroke_range[1]}",
-        "Structure": IDC_PATTERNS[st.session_state.idc_filter]
+        "Structure": f"{st.session_state.idc_filter} {IDC_PATTERNS[st.session_state.idc_filter]}" if st.session_state.idc_filter != "Any" else IDC_PATTERNS[st.session_state.idc_filter]
     }
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
     
@@ -337,7 +336,7 @@ def main():
             char_compounds[c] = [comp for comp in compounds if len(comp) == length]
     
     filtered_chars = [c for c in chars if not char_compounds[c] == [] or st.session_state.display_mode == "Single Character"]
-    st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.selected_comp} ({IDC_PATTERNS[st.session_state.idc_filter]}) — {len(filtered_chars)} result(s)</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.selected_comp} ({st.session_state.idc_filter} {IDC_PATTERNS[st.session_state.idc_filter]}) — {len(filtered_chars)} result(s)</h2>", unsafe_allow_html=True)
     
     for char in sorted(filtered_chars, key=get_stroke_count):
         render_char_card(char, char_compounds.get(char, []))
