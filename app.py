@@ -178,7 +178,7 @@ def render_controls(component_map):
         )
     with col3:
         st.selectbox(
-            "Filter by IDC:",
+            "IDC Character structure:",
             options=idc_options,
             index=idc_options.index(st.session_state.selected_idc) if st.session_state.selected_idc in idc_options else 0,
             key="selected_idc"
