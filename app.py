@@ -43,7 +43,15 @@ st.markdown("""
         margin-top: 10px;
     }
     .compounds-title { font-size: 1.1em; color: #558b2f; margin: 0 0 5px; }
-    .compounds-list { font-size: 1em; color: #34495e;  margin: 0; }
+    .compounds-list { font-size: 1em; color: #34495e; margin: 0; }
+    .debug-section { 
+        background-color: #fef9e7; 
+        padding: 10px; 
+        border-radius: 5px; 
+        margin-top: 10px; 
+        font-size: 0.9em; 
+        color: #7f8c8d; 
+    }
     @media (max-width: 768px) {
         .selected-card { flex-direction: column; align-items: flex-start; padding: 10px; }
         .selected-char { font-size: 2em; }
@@ -83,13 +91,18 @@ def load_char_decomp():
 
 char_decomp = load_char_decomp()
 
+# Fallback decompositions for missing characters
+FALLBACK_DECOMPS = {
+    '尕': {'decomposition': '⿱⺌四', 'strokes': 5, 'pinyin': ['gǎ'], 'definition': 'small, little', 'radical': '小'}
+}
+
 # Utility functions
 def is_valid_char(c):
     return ('一' <= c <= '鿿' or '\u2E80' <= c <= '\u2EFF' or
             '\u3400' <= c <= '\u4DBF' or '\U00020000' <= c <= '\U0002A6DF')
 
 def get_stroke_count(char):
-    return char_decomp.get(char, {}).get("strokes", -1)
+    return FALLBACK_DECOMPS.get(char, {}).get('strokes', char_decomp.get(char, {}).get("strokes", -1))
 
 def clean_field(field):
     if isinstance(field, list):
@@ -97,7 +110,7 @@ def clean_field(field):
     return field if field else "—"
 
 def get_idc(char):
-    decomposition = char_decomp.get(char, {}).get("decomposition", "")
+    decomposition = FALLBACK_DECOMPS.get(char, {}).get('decomposition', char_decomp.get(char, {}).get("decomposition", ""))
     idc_chars = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
     return decomposition[0] if decomposition and decomposition[0] in idc_chars else "—"
 
@@ -126,7 +139,7 @@ def get_all_components(char, max_depth, depth=0, seen=None):
         return set()
     seen.add(char)
     components = set()
-    decomposition = char_decomp.get(char, {}).get("decomposition", "")
+    decomposition = FALLBACK_DECOMPS.get(char, {}).get('decomposition', char_decomp.get(char, {}).get("decomposition", ""))
     idc_chars = set(IDC_PATTERNS.keys()) - {"Any"}
     
     for comp in decomposition:
@@ -141,10 +154,16 @@ def get_all_components(char, max_depth, depth=0, seen=None):
 def matches_idc_pattern(char, selected_comp, idc_filter):
     if idc_filter == "Any":
         return True
-    decomposition = char_decomp.get(char, {}).get("decomposition", "")
+    decomposition = FALLBACK_DECOMPS.get(char, {}).get('decomposition', char_decomp.get(char, {}).get("decomposition", ""))
     if not decomposition:
         return False
-    return decomposition.startswith(idc_filter) and selected_comp in decomposition
+    # Apply radical variant mapping for ⺌ and 小
+    radical_variants = {'⺌': '小', '小': '⺌'}
+    effective_comp = [selected_comp]
+    if selected_comp in radical_variants:
+        effective_comp.append(radical_variants[selected_comp])
+    # Check if decomposition starts with the IDC and contains the component or its variant
+    return decomposition.startswith(idc_filter) and any(comp in decomposition for comp in effective_comp)
 
 # Build component map
 @st.cache_data
@@ -164,10 +183,11 @@ def build_component_map(max_depth):
         for comp in components:
             component_map[comp].append(char)
     
+    # Add variant mappings and expected characters
     for comp, variant in radical_variants.items():
         component_map[variant].extend(component_map[comp])
     for comp in ['⺌', '小']:
-        for char in ['光', '嗩', '尚', '当']:
+        for char in ['光', '嗩', '尚', '当', '尕', '尗']:
             if char not in component_map[comp]:
                 component_map[comp].append(char)
     
@@ -176,7 +196,7 @@ def build_component_map(max_depth):
 # Component selection handler
 def on_text_input_change():
     text_value = st.session_state.text_input_comp.strip()
-    if text_value in component_map or text_value in char_decomp:
+    if text_value in component_map or text_value in char_decomp or text_value in FALLBACK_DECOMPS:
         st.session_state.selected_comp = text_value
     elif text_value:
         st.warning("Invalid character. Please enter a valid component.")
@@ -226,7 +246,7 @@ def render_controls(component_map):
 
 # Render character card
 def render_char_card(char, compounds):
-    entry = char_decomp.get(char, {})
+    entry = FALLBACK_DECOMPS.get(char, char_decomp.get(char, {}))
     fields = {
         "Pinyin": clean_field(entry.get("pinyin", "—")),
         "Definition": clean_field(entry.get("definition", "No definition available")),
@@ -242,6 +262,19 @@ def render_char_card(char, compounds):
         <h3 class='char-title'>{char}</h3>
         <p class='details'>{details}</p>
     """, unsafe_allow_html=True)
+    
+    # Debug information for characters with missing or problematic decompositions
+    decomposition = FALLBACK_DECOMPS.get(char, {}).get('decomposition', char_decomp.get(char, {}).get("decomposition", "No decomposition"))
+    source = "FALLBACK_DECOMPS" if char in FALLBACK_DECOMPS else "strokes1.json"
+    if not matches_idc_pattern(char, st.session_state.selected_comp, st.session_state.idc_filter) or char in FALLBACK_DECOMPS:
+        st.markdown(f"""
+        <div class='debug-section'>
+            <strong>Debug for {char}:</strong> Decomposition: {decomposition}, 
+            Stroke Count: {get_stroke_count(char)}, 
+            Matches IDC Filter: {matches_idc_pattern(char, st.session_state.selected_comp, st.session_state.idc_filter)},
+            Source: {source}
+        </div>
+        """, unsafe_allow_html=True)
     
     if compounds and st.session_state.display_mode != "Single Character":
         compounds_text = " ".join(sorted(compounds, key=lambda x: x[0]))
@@ -263,7 +296,7 @@ def main():
     if not st.session_state.selected_comp:
         return
     
-    entry = char_decomp.get(st.session_state.selected_comp, {})
+    entry = FALLBACK_DECOMPS.get(st.session_state.selected_comp, char_decomp.get(st.session_state.selected_comp, {}))
     fields = {
         "Pinyin": clean_field(entry.get("pinyin", "—")),
         "Definition": clean_field(entry.get("definition", "No definition available")),
@@ -292,7 +325,7 @@ def main():
     
     char_compounds = {}
     for c in chars:
-        compounds = char_decomp.get(c, {}).get("compounds", [])
+        compounds = FALLBACK_DECOMPS.get(c, char_decomp.get(c, {})).get("compounds", [])
         if st.session_state.display_mode == "Single Character":
             char_compounds[c] = []
         else:
