@@ -43,7 +43,7 @@ st.markdown("""
         margin-top: 10px;
     }
     .compounds-title { font-size: 1.1em; color: #558b2f; margin: 0 0 5px; }
-    .compounds-list { font-size: 1em; color: #34495e; margin: 0; }
+    .compounds-list { font-size: 1em; color: #34495e;  margin: 0; }
     @media (max-width: 768px) {
         .selected-card { flex-direction: column; align-items: flex-start; padding: 10px; }
         .selected-char { font-size: 2em; }
@@ -63,7 +63,7 @@ def init_session_state():
         "max_depth": 0,
         "stroke_range": (3, 14),
         "display_mode": "Single Character",
-        "idc_filter": "Any"  # New session state for IDC filter
+        "idc_filter": "Any"
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -95,6 +95,11 @@ def clean_field(field):
     if isinstance(field, list):
         return field[0] if field else "—"
     return field if field else "—"
+
+def get_idc(char):
+    decomposition = char_decomp.get(char, {}).get("decomposition", "")
+    idc_chars = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
+    return decomposition[0] if decomposition and decomposition[0] in idc_chars else "—"
 
 # IDC definitions
 IDC_PATTERNS = {
@@ -139,7 +144,6 @@ def matches_idc_pattern(char, selected_comp, idc_filter):
     decomposition = char_decomp.get(char, {}).get("decomposition", "")
     if not decomposition:
         return False
-    # Check if the decomposition starts with the selected IDC and contains the component
     return decomposition.startswith(idc_filter) and selected_comp in decomposition
 
 # Build component map
@@ -160,7 +164,6 @@ def build_component_map(max_depth):
         for comp in components:
             component_map[comp].append(char)
     
-    # Add variant mappings and expected characters
     for comp, variant in radical_variants.items():
         component_map[variant].extend(component_map[comp])
     for comp in ['⺌', '小']:
@@ -229,7 +232,8 @@ def render_char_card(char, compounds):
         "Definition": clean_field(entry.get("definition", "No definition available")),
         "Radical": clean_field(entry.get("radical", "—")),
         "Hint": clean_field(entry.get("etymology", {}).get("hint", "No hint available")),
-        "Strokes": f"{get_stroke_count(char)} strokes" if get_stroke_count(char) != -1 else "unknown strokes"
+        "Strokes": f"{get_stroke_count(char)} strokes" if get_stroke_count(char) != -1 else "unknown strokes",
+        "IDC": get_idc(char)
     }
     
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
@@ -259,7 +263,6 @@ def main():
     if not st.session_state.selected_comp:
         return
     
-    # Display selected component
     entry = char_decomp.get(st.session_state.selected_comp, {})
     fields = {
         "Pinyin": clean_field(entry.get("pinyin", "—")),
@@ -280,7 +283,6 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Filter and display characters
     min_strokes, max_strokes = st.session_state.stroke_range
     chars = [
         c for c in component_map.get(st.session_state.selected_comp, [])
