@@ -91,9 +91,10 @@ def load_char_decomp():
 
 char_decomp = load_char_decomp()
 
-# Fallback decompositions for missing characters
+# Fallback decompositions for missing or incorrect characters
 FALLBACK_DECOMPS = {
-    '尕': {'decomposition': '⿱⺌四', 'strokes': 5, 'pinyin': ['gǎ'], 'definition': 'small, little', 'radical': '小'}
+    '尕': {'decomposition': '⿱⺌四', 'strokes': 5, 'pinyin': ['gǎ'], 'definition': 'small, little', 'radical': '小'},
+    '尗': {'decomposition': '⿱上小', 'strokes': 6, 'pinyin': ['shū'], 'definition': 'younger brother; father\'s younger brother', 'radical': '小'}
 }
 
 # Utility functions
@@ -163,7 +164,9 @@ def matches_idc_pattern(char, selected_comp, idc_filter):
     if selected_comp in radical_variants:
         effective_comp.append(radical_variants[selected_comp])
     # Check if decomposition starts with the IDC and contains the component or its variant
-    return decomposition.startswith(idc_filter) and any(comp in decomposition for comp in effective_comp)
+    idc_match = decomposition.startswith(idc_filter)
+    comp_match = any(comp in decomposition for comp in effective_comp)
+    return idc_match and comp_match
 
 # Build component map
 @st.cache_data
@@ -172,13 +175,12 @@ def build_component_map(max_depth):
     radical_variants = {'⺌': '小', '小': '⺌'}
     
     for char in char_decomp:
-        components = set()
+        components = set([char])  # Include the character itself
         decomposition = char_decomp.get(char, {}).get("decomposition", "")
         for comp in decomposition:
             if is_valid_char(comp):
                 components.add(comp)
                 components.update(get_all_components(comp, max_depth))
-        components.add(char)
         
         for comp in components:
             component_map[comp].append(char)
@@ -263,18 +265,20 @@ def render_char_card(char, compounds):
         <p class='details'>{details}</p>
     """, unsafe_allow_html=True)
     
-    # Debug information for characters with missing or problematic decompositions
+    # Debug information for all characters
     decomposition = FALLBACK_DECOMPS.get(char, {}).get('decomposition', char_decomp.get(char, {}).get("decomposition", "No decomposition"))
     source = "FALLBACK_DECOMPS" if char in FALLBACK_DECOMPS else "strokes1.json"
-    if not matches_idc_pattern(char, st.session_state.selected_comp, st.session_state.idc_filter) or char in FALLBACK_DECOMPS:
-        st.markdown(f"""
-        <div class='debug-section'>
-            <strong>Debug for {char}:</strong> Decomposition: {decomposition}, 
-            Stroke Count: {get_stroke_count(char)}, 
-            Matches IDC Filter: {matches_idc_pattern(char, st.session_state.selected_comp, st.session_state.idc_filter)},
-            Source: {source}
-        </div>
-        """, unsafe_allow_html=True)
+    idc_match = decomposition.startswith(st.session_state.idc_filter) if st.session_state.idc_filter != "Any" else True
+    comp_match = any(comp in decomposition for comp in [st.session_state.selected_comp, '小' if st.session_state.selected_comp == '⺌' else '⺌'])
+    st.markdown(f"""
+    <div class='debug-section'>
+        <strong>Debug for {char}:</strong> Decomposition: {decomposition}, 
+        Stroke Count: {get_stroke_count(char)}, 
+        IDC Match: {idc_match}, 
+        Component Match: {comp_match}, 
+        Source: {source}
+    </div>
+    """, unsafe_allow_html=True)
     
     if compounds and st.session_state.display_mode != "Single Character":
         compounds_text = " ".join(sorted(compounds, key=lambda x: x[0]))
