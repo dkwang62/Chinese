@@ -274,8 +274,8 @@ def main():
     
     # Dropdown for selecting output characters
     if filtered_chars:
-        options = ["Narrow the list by selecting a character from results..."] + sorted(filtered_chars, key=get_stroke_count)
-        st.selectbox("Select a character from results:", options=options,
+        options = ["Select a character from the list below"] + sorted(filtered_chars, key=get_stroke_count)
+        st.selectbox("Select a character from the list below:", options=options,
                      key="output_char_select", on_change=on_output_char_select)
 
     st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.selected_comp} — {len(filtered_chars)} result(s)</h2>", unsafe_allow_html=True)
@@ -285,7 +285,7 @@ def main():
 
     # --- Auto Copy to Clipboard ---
     if filtered_chars:
-        export_text = "Give me the full hanyu pinyin and meaning of each compound word\n\n"
+        export_text = "Give me the full hanyu pinyin and meaning of each compound phrase in one line a phrase in a word format\n\n"
         export_text += "\n".join(
             f"{compound}"
             for char in filtered_chars
