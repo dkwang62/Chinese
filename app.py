@@ -64,6 +64,19 @@ st.markdown("""
         .char-title { font-size: 1.2em; }
         .compounds-title { font-size: 1em; }
     }
+    /* Optional: Style for button-based approach */
+    .stButton > button {
+        background: none;
+        border: none;
+        color: #e74c3c;
+        font-size: 1.4em;
+        padding: 0;
+        cursor: pointer;
+    }
+    .stButton > button:hover {
+        color: #c0392b;
+        text-decoration: underline;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -90,7 +103,7 @@ def init_session_state():
         "selected_idc": "No Filter",
         "idc_refresh": False,
         "clicked_char": "",
-        "text_input_comp": selected_config["selected_comp"]  # Initialize text_input_comp
+        "text_input_comp": selected_config["selected_comp"]
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -164,14 +177,13 @@ def build_component_map(max_depth):
 
 # --- Handle text input ---
 def on_text_input_change(component_map):
-    # Safely access text_input_comp
     text_value = st.session_state.get("text_input_comp", "").strip()
-    if not text_value:  # If still empty, use selected_comp as fallback
+    if not text_value:
         text_value = st.session_state.selected_comp
     if text_value in component_map or text_value in char_decomp or is_valid_char(text_value):
         st.session_state.selected_comp = text_value
         st.session_state.idc_refresh = not st.session_state.idc_refresh
-        st.session_state.text_input_comp = text_value  # Ensure it's set
+        st.session_state.text_input_comp = text_value
         st.experimental_rerun()
     elif text_value:
         st.warning("Invalid character. Please enter a valid component.")
@@ -180,7 +192,7 @@ def on_text_input_change(component_map):
 def on_char_click(component_map):
     if "clicked_char" in st.session_state and st.session_state.clicked_char:
         char = st.session_state.clicked_char
-        st.write(f"Clicked character: {char}")  # Debugging
+        st.write(f"Clicked character: {char}")
         st.write(f"Valid char: {is_valid_char(char)}, In component_map: {char in component_map}, In char_decomp: {char in char_decomp}")
         if is_valid_char(char):
             st.session_state.selected_comp = char
@@ -252,10 +264,18 @@ def render_char_card(char, compounds):
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
     
     char_id = f"char_{char}_{random.randint(10000, 99999)}"
+    # JavaScript-based approach
     st.markdown(
         f"""<div class='char-card'><h3 class='char-title'><span class='clickable-char' id='{char_id}' onclick='handleCharClick("{char}")'>{char}</span></h3><p class='details'>{details}</p>""",
         unsafe_allow_html=True
     )
+    
+    # Alternative button-based approach (uncomment to use instead)
+    # if st.button(char, key=f"btn_{char}_{char_id}"):
+    #     st.session_state.selected_comp = char
+    #     st.session_state.idc_refresh = not st.session_state.idc_refresh
+    #     st.experimental_rerun()
+    # st.markdown(f"<div class='char-card'><p class='details'>{details}</p>", unsafe_allow_html=True)
     
     if compounds and st.session_state.display_mode != "Single Character":
         compounds_text = " ".join(sorted(compounds, key=lambda x: x[0]))
@@ -269,6 +289,28 @@ def render_char_card(char, compounds):
 def main():
     st.markdown("<h1>🧩 Character Decomposition Explorer</h1>", unsafe_allow_html=True)
     
+    # Load JavaScript at the top to ensure it's available
+    components.html(
+        """
+        <script>
+        function handleCharClick(char) {
+            console.log('Clicked char: ' + char);
+            if (window.Streamlit) {
+                window.Streamlit.setComponentValue(char);
+            } else {
+                console.error('Streamlit API not available');
+                window.parent.postMessage({
+                    type: 'streamlit:setComponentValue',
+                    value: char,
+                    key: 'clicked_char'
+                }, '*');
+            }
+        }
+        </script>
+        """,
+        height=0
+    )
+
     # Clear cache if max_depth changes
     if "prev_max_depth" not in st.session_state:
         st.session_state.prev_max_depth = st.session_state.max_depth
@@ -278,7 +320,6 @@ def main():
 
     component_map = build_component_map(st.session_state.max_depth)
     
-    # Debugging: Show map sizes
     st.write(f"component_map size: {len(component_map)}, char_decomp size: {len(char_decomp)}")
     # st.write(f"Sample component_map keys: {list(component_map.keys())[:5]}")
 
@@ -298,29 +339,22 @@ def main():
     st.write(f"Current clicked_char: {st.session_state.clicked_char}")
     st.write(f"Current selected_comp: {st.session_state.selected_comp}")
 
-    on_char_click(component_map)
-
-    components.html(
-        """
-        <script>
-        function handleCharClick(char) {
-            console.log('Clicked char: ' + char);
+    # Test JavaScript execution
+    if st.button("Test JS"):
+        components.html(
+            """
+            <script>
+            console.log('Button JS executed');
             if (window.Streamlit) {
-                window.Streamlit.setComponentValue(char, 'clicked_char');
-            } else {
-                console.error('Streamlit API not available, trying postMessage');
-                window.parent.postMessage({
-                    type: 'streamlit:setComponentValue',
-                    value: char,
-                    dataType: 'string',
-                    key: 'clicked_char'
-                }, '*');
+                window.Streamlit.setComponentValue('test');
             }
-        }
-        </script>
-        """,
-        height=0
-    )
+            </script>
+            """,
+            height=0
+        )
+    st.write(f"After Test JS, clicked_char: {st.session_state.clicked_char}")
+
+    on_char_click(component_map)
 
     if not st.session_state.selected_comp:
         st.info("Please select or type a component to begin.")
@@ -339,10 +373,18 @@ def main():
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
     
     char_id = f"selected_char_{random.randint(10000, 99999)}"
+    # JavaScript-based approach
     st.markdown(
         f"""<div class='selected-card'><h2 class='selected-char'><span class='clickable-char' id='{char_id}' onclick='handleCharClick("{st.session_state.selected_comp}")'>{st.session_state.selected_comp}</span></h2><p class='details'>{details}</p></div>""",
         unsafe_allow_html=True
     )
+    
+    # Alternative button-based approach (uncomment to use instead)
+    # if st.button(st.session_state.selected_comp, key=f"btn_selected_{char_id}"):
+    #     st.session_state.selected_comp = st.session_state.selected_comp
+    #     st.session_state.idc_refresh = not st.session_state.idc_refresh
+    #     st.experimental_rerun()
+    # st.markdown(f"<div class='selected-card'><p class='details'>{details}</p></div>", unsafe_allow_html=True)
 
     min_strokes, max_strokes = st.session_state.stroke_range
     chars = [c for c in component_map.get(st.session_state.selected_comp, [])
