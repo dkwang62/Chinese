@@ -273,11 +273,17 @@ def main():
     filtered_chars = [c for c in chars if not char_compounds[c] == [] or st.session_state.display_mode == "Single Character"]
     
     # Dropdown for selecting output characters
+# Dropdown for selecting output characters
     if filtered_chars:
         options = ["Select a character from the list below"] + sorted(filtered_chars, key=get_stroke_count)
-        st.selectbox("Select a character from the list below:", options=options,
-                     key="output_char_select", on_change=on_output_char_select)
-
+        st.selectbox(
+            "Select a character from the list below:",
+            options=options,
+            key="output_char_select",
+            on_change=on_output_char_select,
+            format_func=lambda c: c if c == "Select a character from the list below" else f"{c} ({get_stroke_count(c)} strokes, {clean_field(char_decomp.get(c, {}).get('definition', 'No definition available'))})"
+        )    
+    
     st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.selected_comp} — {len(filtered_chars)} result(s)</h2>", unsafe_allow_html=True)
 
     for char in sorted(filtered_chars, key=get_stroke_count):
