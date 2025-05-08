@@ -89,7 +89,8 @@ def init_session_state():
         "display_mode": "Single Character",
         "selected_idc": "No Filter",
         "idc_refresh": False,
-        "clicked_char": ""
+        "clicked_char": "",
+        "text_input_comp": selected_config["selected_comp"]  # Initialize text_input_comp
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -163,10 +164,14 @@ def build_component_map(max_depth):
 
 # --- Handle text input ---
 def on_text_input_change(component_map):
-    text_value = st.session_state.text_input_comp.strip()
+    # Safely access text_input_comp
+    text_value = st.session_state.get("text_input_comp", "").strip()
+    if not text_value:  # If still empty, use selected_comp as fallback
+        text_value = st.session_state.selected_comp
     if text_value in component_map or text_value in char_decomp or is_valid_char(text_value):
         st.session_state.selected_comp = text_value
         st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.session_state.text_input_comp = text_value  # Ensure it's set
         st.experimental_rerun()
     elif text_value:
         st.warning("Invalid character. Please enter a valid component.")
@@ -176,8 +181,8 @@ def on_char_click(component_map):
     if "clicked_char" in st.session_state and st.session_state.clicked_char:
         char = st.session_state.clicked_char
         st.write(f"Clicked character: {char}")  # Debugging
-        st.write(f"Valid char: {is_valid_char(char)}, In component_map: {char in component_map}, In char_decomp: {char in char_decomp}")  # Debugging
-        if is_valid_char(char):  # Relaxed validation
+        st.write(f"Valid char: {is_valid_char(char)}, In component_map: {char in component_map}, In char_decomp: {char in char_decomp}")
+        if is_valid_char(char):
             st.session_state.selected_comp = char
             st.session_state.idc_refresh = not st.session_state.idc_refresh
             st.session_state.clicked_char = ""
@@ -299,7 +304,7 @@ def main():
         """
         <script>
         function handleCharClick(char) {
-            console.log('Clicked char: ' + char);  // Debugging
+            console.log('Clicked char: ' + char);
             if (window.Streamlit) {
                 window.Streamlit.setComponentValue(char, 'clicked_char');
             } else {
