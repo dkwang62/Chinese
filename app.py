@@ -250,7 +250,7 @@ def main():
 
         # Append compound words and their definitions
         export_text += "\n".join(
-            f"Compound: {compound}"  # Only show compound words
+            f"{compound}"  # Only show compound words
             for char in filtered_chars
             for compound in char_compounds.get(char, [])
         )
