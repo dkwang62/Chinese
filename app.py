@@ -251,7 +251,7 @@ def main():
             for char in filtered_chars
         )
 
-        st.markdown("### 📋 Auto-Copied Text Output")
+        st.markdown("Give me the full hanyu pinyin and meaning of each compund words")
         st.text_area("Copied to Clipboard", export_text, height=300, key="export_text")
 
         components.html(f"""
