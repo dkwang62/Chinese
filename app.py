@@ -332,7 +332,7 @@ def main():
 
     # Dropdown for selecting output characters
     if paginated_chars:
-        options = ["Select a character..."] + paginated_chars
+        options = ["Select a character from the results..."] + paginated_chars
         st.selectbox("Select a character from results:", options=options,
                      key="output_char_select", on_change=on_output_char_select)
 
@@ -364,7 +364,14 @@ def main():
             for char in filtered_chars
             for compound in char_compounds.get(char, [])
         )
-        st.text_area("Right click, Select all, copy; paste to ChatGPT", export_text, height=300, key="export_text")
+        st.text_area("Right click, Select all, copy; paste to ChatGPT", export_text, height=300, key="export_text", on_change=lambda: st.markdown(f"""
+            <textarea id="copyTarget" style="opacity:0;position:absolute;left:-9999px;">{export_text}</textarea>
+            <script>
+            const copyText = document.getElementById("copyTarget");
+            copyText.select();
+            document.execCommand("copy");
+            </script>
+        """, unsafe_allow_html=True))
 
 if __name__ == "__main__":
     main()
