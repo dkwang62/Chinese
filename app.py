@@ -99,8 +99,8 @@ def init_session_state():
         "idc_refresh": False,
         "text_input_comp": selected_config["selected_comp"],
         "button_counter": 0,
-        "page": 1,  # For pagination
-        "results_per_page": 50  # Limit number of results per page
+        "page": 1,
+        "results_per_page": 50
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -131,7 +131,6 @@ if not char_decomp:
 
 # --- Utility functions ---
 def is_valid_char(c):
-    # Check if the character is a single Chinese character in the valid range
     if len(c) != 1:
         return False
     return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or '㐀' <= c <= '䶿' or '𠀀' <= c <= '𪛟')
@@ -184,7 +183,7 @@ def on_text_input_change(component_map):
         st.session_state.internal_selected_comp = text_value
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.session_state.text_input_comp = text_value
-        st.session_state.page = 1  # Reset to first page
+        st.session_state.page = 1
     else:
         st.warning("Please enter a valid Chinese character.")
         st.session_state.text_input_comp = st.session_state.internal_selected_comp
@@ -193,7 +192,7 @@ def on_text_input_change(component_map):
 def on_selectbox_change():
     st.session_state.internal_selected_comp = st.session_state.selected_comp
     st.session_state.idc_refresh = not st.session_state.idc_refresh
-    st.session_state.page = 1  # Reset to first page
+    st.session_state.page = 1
 
 # --- Render controls ---
 def render_controls(component_map):
@@ -260,15 +259,12 @@ def render_char_card(char, compounds):
     char_id = f"char_{char}_{st.session_state.button_counter}"
     st.write(f"Rendering button for {char} with key: {char_id}")
     st.markdown("<div class='char-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 class='char-title'>", unsafe_allow_html=True)
-    st.button(char, key=char_id)  # Move button outside markdown
-    if char_id in st.session_state and st.session_state[char_id]:
+    st.markdown(f"<h3 class='char-title'>{char}</h3>", unsafe_allow_html=True)
+    if st.button("Select", key=char_id):
         st.write(f"Button clicked for character: {char}")
         st.session_state.internal_selected_comp = char
         st.session_state.idc_refresh = not st.session_state.idc_refresh
-        st.session_state.page = 1  # Reset to first page
-        # No need for st.rerun() as Streamlit will rerun automatically
-    st.markdown("</h3>", unsafe_allow_html=True)
+        st.session_state.page = 1
     st.markdown(f"<p class='details'>{details}</p>", unsafe_allow_html=True)
     
     if compounds and st.session_state.display_mode != "Single Character":
@@ -315,7 +311,7 @@ def main():
         if is_valid_char("Test"):
             st.session_state.internal_selected_comp = "Test"
         else:
-            st.session_state.internal_selected_comp = "爫"  # Fallback to a valid character
+            st.session_state.internal_selected_comp = "爫"
             st.warning("Selected component is not a valid Chinese character. Reverted to default.")
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.session_state.page = 1
@@ -333,7 +329,7 @@ def main():
     # Validate selected component
     if not is_valid_char(st.session_state.internal_selected_comp):
         st.warning(f"'{st.session_state.internal_selected_comp}' is not a valid Chinese character.")
-        st.session_state.internal_selected_comp = "爫"  # Fallback
+        st.session_state.internal_selected_comp = "爫"
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.session_state.page = 1
         st.rerun()
@@ -381,7 +377,7 @@ def main():
     total_results = len(filtered_chars)
     results_per_page = st.session_state.results_per_page
     total_pages = (total_results + results_per_page - 1) // results_per_page
-    page = max(1, min(st.session_state.page, total_pages))  # Ensure page is within bounds
+    page = max(1, min(st.session_state.page, total_pages))
     st.session_state.page = page
 
     start_idx = (page - 1) * results_per_page
