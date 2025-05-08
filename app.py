@@ -134,7 +134,7 @@ def build_component_map(max_depth):
     return component_map
 
 # Component selection handler
-def on_text_input_change():
+def on_text_input_change(component_map):
     text_value = st.session_state.text_input_comp.strip()
     if text_value in component_map or text_value in char_decomp:
         st.session_state.selected_comp = text_value
@@ -174,11 +174,12 @@ def render_controls(component_map):
             "Or type a component:",
             value=st.session_state.selected_comp,
             key="text_input_comp",
-            on_change=on_text_input_change
+            on_change=on_text_input_change,
+            args=(component_map,)
         )
     with col3:
         st.selectbox(
-            "IDC Character structure:",
+            "Result filtered by IDC Character structure:",
             options=idc_options,
             index=idc_options.index(st.session_state.selected_idc) if st.session_state.selected_idc in idc_options else 0,
             key="selected_idc"
@@ -228,8 +229,8 @@ def render_char_card(char, compounds):
 
 # Main rendering
 def main():
-    st.markdown("<h1>🧩 Character Decomposition Explorer</h1>", unsafe_allow_html=True)
     component_map = build_component_map(st.session_state.max_depth)
+    st.markdown("<h1>🧩 Character Decomposition Explorer</h1>", unsafe_allow_html=True)
     render_controls(component_map)
     
     if not st.session_state.selected_comp:
