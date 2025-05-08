@@ -57,15 +57,53 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Initialize session state ---
+
+# def init_session_state():
+    # defaults = {
+        # "selected_comp": "⺌",
+        # "max_depth": 0,
+        # "stroke_range": (3, 14),
+        # "display_mode": "Single Character",
+        # "selected_idc": "No Filter",
+        # "idc_refresh": False
+    # }
+    # for key, value in defaults.items():
+        # if key not in st.session_state:
+            # st.session_state[key] = value
+
+# init_session_state()
+
+import random
+
 def init_session_state():
+    # Define the two sets of values
+    config_options = [
+        {
+            "selected_comp": "爫",
+            "max_depth": 1,
+            "stroke_range": (4, 14)
+        },
+        {
+            "selected_comp": "⺌",
+            "max_depth": 0,
+            "stroke_range": (3, 14)
+        }
+    ]
+    
+    # Randomly select one configuration
+    selected_config = random.choice(config_options)
+    
+    # Define defaults with the randomly selected values
     defaults = {
-        "selected_comp": "⺌",
-        "max_depth": 0,
-        "stroke_range": (3, 14),
+        "selected_comp": selected_config["selected_comp"],
+        "max_depth": selected_config["max_depth"],
+        "stroke_range": selected_config["stroke_range"],
         "display_mode": "Single Character",
         "selected_idc": "No Filter",
         "idc_refresh": False
     }
+    
+    # Initialize session state if keys don't exist
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
