@@ -54,24 +54,6 @@ st.markdown("""
         .char-title { font-size: 1.2em; }
         .compounds-title { font-size: 1em; }
     }
-    .stButton > button {
-        background: none;
-        border: none;
-        color: #e74c3c;
-        font-size: 1.4em;
-        padding: 0;
-        cursor: pointer;
-        margin: 0;
-        display: inline;
-    }
-    .stButton > button:hover {
-        color: #c0392b;
-        text-decoration: underline;
-    }
-    .stButton > button:focus {
-        outline: none;
-        box-shadow: none;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -98,7 +80,6 @@ def init_session_state():
         "selected_idc": "No Filter",
         "idc_refresh": False,
         "text_input_comp": selected_config["selected_comp"],
-        "button_counter": 0,
         "page": 1,
         "results_per_page": 50
     }
@@ -188,11 +169,19 @@ def on_text_input_change(component_map):
         st.warning("Please enter a valid Chinese character.")
         st.session_state.text_input_comp = st.session_state.internal_selected_comp
 
-# --- Handle selectbox change ---
+# --- Handle selectbox change for initial component ---
 def on_selectbox_change():
     st.session_state.internal_selected_comp = st.session_state.selected_comp
     st.session_state.idc_refresh = not st.session_state.idc_refresh
     st.session_state.page = 1
+
+# --- Handle output character selection ---
+def on_output_char_select():
+    selected_char = st.session_state.output_char_select
+    if selected_char != "Select a character...":
+        st.session_state.internal_selected_comp = selected_char
+        st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.session_state.page = 1
 
 # --- Render controls ---
 def render_controls(component_map):
@@ -239,7 +228,7 @@ def render_controls(component_map):
     st.radio("Display Mode:", options=["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"],
              key="display_mode")
 
-# --- Render character card ---
+# --- Render character card (without buttons) ---
 def render_char_card(char, compounds):
     entry = char_decomp.get(char, {})
     idc_chars = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
@@ -255,16 +244,8 @@ def render_char_card(char, compounds):
     }
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
     
-    st.session_state.button_counter += 1
-    char_id = f"char_{char}_{st.session_state.button_counter}"
-    st.write(f"Rendering button for {char} with key: {char_id}")
     st.markdown("<div class='char-card'>", unsafe_allow_html=True)
     st.markdown(f"<h3 class='char-title'>{char}</h3>", unsafe_allow_html=True)
-    if st.button("Select", key=char_id):
-        st.write(f"Button clicked for character: {char}")
-        st.session_state.internal_selected_comp = char
-        st.session_state.idc_refresh = not st.session_state.idc_refresh
-        st.session_state.page = 1
     st.markdown(f"<p class='details'>{details}</p>", unsafe_allow_html=True)
     
     if compounds and st.session_state.display_mode != "Single Character":
@@ -350,8 +331,6 @@ def main():
     }
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
     
-    st.session_state.button_counter += 1
-    char_id = f"selected_char_{st.session_state.button_counter}"
     st.markdown("<div class='selected-card'><h2 class='selected-char'>", unsafe_allow_html=True)
     st.markdown(f"{st.session_state.internal_selected_comp}", unsafe_allow_html=True)
     st.markdown(f"</h2><p class='details'>{details}</p></div>", unsafe_allow_html=True)
@@ -383,6 +362,12 @@ def main():
     start_idx = (page - 1) * results_per_page
     end_idx = min(start_idx + results_per_page, total_results)
     paginated_chars = sorted(filtered_chars, key=get_stroke_count)[start_idx:end_idx]
+
+    # Dropdown for selecting output characters
+    if paginated_chars:
+        options = ["Select a character..."] + paginated_chars
+        st.selectbox("Select a character from results:", options=options,
+                     key="output_char_select", on_change=on_output_char_select)
 
     st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.internal_selected_comp} — {total_results} result(s) (Showing {start_idx + 1}-{end_idx})</h2>", unsafe_allow_html=True)
 
