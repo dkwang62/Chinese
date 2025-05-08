@@ -274,7 +274,7 @@ def main():
     
     # Dropdown for selecting output characters
     if filtered_chars:
-        options = ["Select a character..."] + sorted(filtered_chars, key=get_stroke_count)
+        options = ["Narrow the list by selecting a character from results..."] + sorted(filtered_chars, key=get_stroke_count)
         st.selectbox("Select a character from results:", options=options,
                      key="output_char_select", on_change=on_output_char_select)
 
