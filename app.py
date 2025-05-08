@@ -253,8 +253,8 @@ def main():
             for char in filtered_chars
             for compound in char_compounds.get(char, [])
         )
-        st.markdown("Give me the full hanyu pinyin and meaning of each compound word")
-        st.text_area("Copied to Clipboard", export_text, height=300, key="export_text")
+        st.markdown("Right Click, Select all, copy; paste to ChatGPT")
+        st.text_area("To copy", export_text, height=300, key="export_text")
 
         components.html(f"""
             <textarea id="copyTarget" style="opacity:0;position:absolute;left:-9999px;">{export_text}</textarea>
