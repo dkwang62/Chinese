@@ -2,7 +2,7 @@ import json
 import random
 from collections import defaultdict
 import streamlit as st
-import streamlit.components.v1 as components
+import os
 
 st.set_page_config(layout="wide")
 
@@ -58,18 +58,13 @@ st.markdown("""<style>
 
 # --- Initialize session state ---
 def init_session_state():
-    config_options = [
-        {"selected_comp": "爫", "max_depth": 1, "stroke_range": (4, 14)},
-        {"selected_comp": "⺌", "max_depth": 0, "stroke_range": (3, 14)}
-    ]
-    selected_config = random.choice(config_options)
     defaults = {
-        "selected_comp": selected_config["selected_comp"],
-        "max_depth": selected_config["max_depth"],
-        "stroke_range": selected_config["stroke_range"],
+        "selected_comp": "⺌",
+        "max_depth": 1,
+        "stroke_range": (3, 14),
         "display_mode": "Single Character",
         "selected_idc": "No Filter",
-        "idc_refresh": False
+        "text_input_comp": "⺌"
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -89,7 +84,7 @@ def load_char_decomp():
 char_decomp = load_char_decomp()
 
 def is_valid_char(c):
-    return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or '㐀' <= c <= '䶿' or '𠀀' <= c <= '𪛟')
+    return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or '㐀' <= c <= '䶿' or '𠀀' <= c <= '𪛟') and len(c) == 1
 
 def get_stroke_count(char):
     return char_decomp.get(char, {}).get("strokes", -1)
@@ -134,26 +129,24 @@ def on_text_input_change(component_map):
     text_value = st.session_state.text_input_comp.strip()
     if text_value in component_map or text_value in char_decomp:
         st.session_state.selected_comp = text_value
-        st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.session_state.text_input_comp = text_value
+        st.rerun()
     elif text_value:
         st.warning("Invalid character. Please enter a valid component.")
 
-def render_controls(component_map):
-    min_strokes, max_strokes = st.session_state.stroke_range
-    filtered_components = [
-        comp for comp in component_map
-        if min_strokes <= get_stroke_count(comp) <= max_strokes
-    ]
-    sorted_components = sorted(filtered_components, key=get_stroke_count)
-    if st.session_state.selected_comp not in sorted_components:
-        sorted_components.insert(0, st.session_state.selected_comp)
+def on_output_char_select():
+    selected_char = st.session_state.output_char_select
+    if selected_char != "Select a character...":
+        st.session_state.selected_comp = selected_char
+        st.session_state.text_input_comp = selected_char
+        st.rerun()
 
 component_map = build_component_map(st.session_state.max_depth)
 
 # --- Input box for character ---
 st.text_input("Enter a Chinese character component:",
               key="text_input_comp",
-              value=st.session_state.selected_comp,
+              value=st.session_state.text_input_comp,
               on_change=on_text_input_change, args=(component_map,))
 
 # --- Display Selected Character Info ---
@@ -181,10 +174,9 @@ for char in sorted(related_chars):
     </div>
     """, unsafe_allow_html=True)
 
-# --- Dropdown to select a single character from results ---
+# --- Dropdown for selecting a single character from results ---
 single_chars_only = sorted(set([c for c in related_chars if len(c) == 1 and is_valid_char(c)]))
-selected_from_dropdown = st.selectbox("🔍 Choose a character to search again:", [""] + single_chars_only)
-if selected_from_dropdown:
-    st.session_state.selected_comp = selected_from_dropdown
-    st.session_state.text_input_comp = selected_from_dropdown
-    st.rerun()
+if single_chars_only:
+    options = ["Select a character..."] + single_chars_only
+    st.selectbox("🔍 Choose a character from results:", options=options,
+                 key="output_char_select", on_change=on_output_char_select)
