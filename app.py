@@ -98,7 +98,9 @@ def init_session_state():
         "selected_idc": "No Filter",
         "idc_refresh": False,
         "text_input_comp": selected_config["selected_comp"],
-        "button_counter": 0
+        "button_counter": 0,
+        "page": 1,  # For pagination
+        "results_per_page": 50  # Limit number of results per page
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -129,6 +131,9 @@ if not char_decomp:
 
 # --- Utility functions ---
 def is_valid_char(c):
+    # Check if the character is a single Chinese character in the valid range
+    if len(c) != 1:
+        return False
     return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or '㐀' <= c <= '䶿' or '𠀀' <= c <= '𪛟')
 
 def get_stroke_count(char):
@@ -175,17 +180,20 @@ def on_text_input_change(component_map):
     text_value = st.session_state.get("text_input_comp", "").strip()
     if not text_value:
         text_value = st.session_state.internal_selected_comp
-    if text_value in component_map or text_value in char_decomp or is_valid_char(text_value):
+    if is_valid_char(text_value) and (text_value in component_map or text_value in char_decomp):
         st.session_state.internal_selected_comp = text_value
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.session_state.text_input_comp = text_value
-    elif text_value:
-        st.warning("Invalid character. Please enter a valid component.")
+        st.session_state.page = 1  # Reset to first page
+    else:
+        st.warning("Please enter a valid Chinese character.")
+        st.session_state.text_input_comp = st.session_state.internal_selected_comp
 
 # --- Handle selectbox change ---
 def on_selectbox_change():
     st.session_state.internal_selected_comp = st.session_state.selected_comp
     st.session_state.idc_refresh = not st.session_state.idc_refresh
+    st.session_state.page = 1  # Reset to first page
 
 # --- Render controls ---
 def render_controls(component_map):
@@ -195,7 +203,7 @@ def render_controls(component_map):
         if min_strokes <= get_stroke_count(comp) <= max_strokes
     ]
     sorted_components = sorted(filtered_components, key=get_stroke_count)
-    if st.session_state.internal_selected_comp not in sorted_components:
+    if st.session_state.internal_selected_comp not in sorted_components and is_valid_char(st.session_state.internal_selected_comp):
         sorted_components.insert(0, st.session_state.internal_selected_comp)
 
     st.slider("Max Decomposition Depth", 0, 5, key="max_depth")
@@ -219,7 +227,7 @@ def render_controls(component_map):
     with col1:
         st.selectbox("Select a component:", options=sorted_components,
                      format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
-                     index=sorted_components.index(st.session_state.internal_selected_comp),
+                     index=sorted_components.index(st.session_state.internal_selected_comp) if st.session_state.internal_selected_comp in sorted_components else 0,
                      key="selected_comp",
                      on_change=on_selectbox_change)
     with col2:
@@ -251,12 +259,17 @@ def render_char_card(char, compounds):
     st.session_state.button_counter += 1
     char_id = f"char_{char}_{st.session_state.button_counter}"
     st.write(f"Rendering button for {char} with key: {char_id}")
-    st.markdown("<div class='char-card'><h3 class='char-title'>", unsafe_allow_html=True)
-    if st.button(char, key=char_id):
+    st.markdown("<div class='char-card'>", unsafe_allow_html=True)
+    st.markdown("<h3 class='char-title'>", unsafe_allow_html=True)
+    st.button(char, key=char_id)  # Move button outside markdown
+    if char_id in st.session_state and st.session_state[char_id]:
         st.write(f"Button clicked for character: {char}")
         st.session_state.internal_selected_comp = char
         st.session_state.idc_refresh = not st.session_state.idc_refresh
-    st.markdown(f"</h3><p class='details'>{details}</p>", unsafe_allow_html=True)
+        st.session_state.page = 1  # Reset to first page
+        # No need for st.rerun() as Streamlit will rerun automatically
+    st.markdown("</h3>", unsafe_allow_html=True)
+    st.markdown(f"<p class='details'>{details}</p>", unsafe_allow_html=True)
     
     if compounds and st.session_state.display_mode != "Single Character":
         compounds_text = " ".join(sorted(compounds, key=lambda x: x[0]))
@@ -299,8 +312,13 @@ def main():
     st.write("Rendering Test Button")
     if st.button("Test Button", key="test_button"):
         st.write("Test Button clicked")
-        st.session_state.internal_selected_comp = "Test"
+        if is_valid_char("Test"):
+            st.session_state.internal_selected_comp = "Test"
+        else:
+            st.session_state.internal_selected_comp = "爫"  # Fallback to a valid character
+            st.warning("Selected component is not a valid Chinese character. Reverted to default.")
         st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.session_state.page = 1
 
     # Debug: Display session state
     st.write(f"Current internal_selected_comp: {st.session_state.internal_selected_comp}")
@@ -310,6 +328,14 @@ def main():
 
     if st.button("Clear Cache"):
         st.cache_data.clear()
+        st.rerun()
+
+    # Validate selected component
+    if not is_valid_char(st.session_state.internal_selected_comp):
+        st.warning(f"'{st.session_state.internal_selected_comp}' is not a valid Chinese character.")
+        st.session_state.internal_selected_comp = "爫"  # Fallback
+        st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.session_state.page = 1
         st.rerun()
 
     if not st.session_state.internal_selected_comp:
@@ -350,10 +376,38 @@ def main():
             char_compounds[c] = [comp for comp in compounds if len(comp) == length]
 
     filtered_chars = [c for c in chars if not char_compounds[c] == [] or st.session_state.display_mode == "Single Character"]
-    st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.internal_selected_comp} — {len(filtered_chars)} result(s)</h2>", unsafe_allow_html=True)
+    
+    # Pagination
+    total_results = len(filtered_chars)
+    results_per_page = st.session_state.results_per_page
+    total_pages = (total_results + results_per_page - 1) // results_per_page
+    page = max(1, min(st.session_state.page, total_pages))  # Ensure page is within bounds
+    st.session_state.page = page
 
-    for char in sorted(filtered_chars, key=get_stroke_count):
+    start_idx = (page - 1) * results_per_page
+    end_idx = min(start_idx + results_per_page, total_results)
+    paginated_chars = sorted(filtered_chars, key=get_stroke_count)[start_idx:end_idx]
+
+    st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.internal_selected_comp} — {total_results} result(s) (Showing {start_idx + 1}-{end_idx})</h2>", unsafe_allow_html=True)
+
+    for char in paginated_chars:
         render_char_card(char, char_compounds.get(char, []))
+
+    # Pagination controls
+    if total_pages > 1:
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            if page > 1:
+                if st.button("Previous Page"):
+                    st.session_state.page -= 1
+                    st.rerun()
+        with col2:
+            st.write(f"Page {page} of {total_pages}")
+        with col3:
+            if page < total_pages:
+                if st.button("Next Page"):
+                    st.session_state.page += 1
+                    st.rerun()
 
     if filtered_chars:
         export_text = "Give me the full hanyu pinyin and meaning of each compound word\n\n"
