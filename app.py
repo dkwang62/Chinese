@@ -54,7 +54,6 @@ st.markdown("""
         .char-title { font-size: 1.2em; }
         .compounds-title { font-size: 1em; }
     }
-    /* Style buttons to look like clickable text */
     .stButton > button {
         background: none;
         border: none;
@@ -98,7 +97,8 @@ def init_session_state():
         "display_mode": "Single Character",
         "selected_idc": "No Filter",
         "idc_refresh": False,
-        "text_input_comp": selected_config["selected_comp"]
+        "text_input_comp": selected_config["selected_comp"],
+        "button_counter": 0  # For unique button keys
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -129,7 +129,7 @@ if not char_decomp:
 
 # --- Utility functions ---
 def is_valid_char(c):
-    return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or '㐀' <= c <= '䶿' or '𠀀' <= c <= '𪛟')
+    return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or '�0' <= c <= '䶿' or '𠀀' <= c <= '𪛟')
 
 def get_stroke_count(char):
     return char_decomp.get(char, {}).get("strokes", -1)
@@ -244,9 +244,13 @@ def render_char_card(char, compounds):
     }
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
     
-    char_id = f"char_{char}_{random.randint(10000, 99999)}"
+    # Ensure unique button key
+    st.session_state.button_counter += 1
+    char_id = f"char_{char}_{st.session_state.button_counter}"
+    st.write(f"Button key: {char_id}")  # Debug
     st.markdown("<div class='char-card'><h3 class='char-title'>", unsafe_allow_html=True)
     if st.button(char, key=char_id):
+        st.write(f"Button clicked for character: {char}")  # Debug
         st.session_state.selected_comp = char
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.experimental_rerun()
@@ -274,7 +278,6 @@ def main():
     component_map = build_component_map(st.session_state.max_depth)
     
     st.write(f"component_map size: {len(component_map)}, char_decomp size: {len(char_decomp)}")
-    # st.write(f"Sample component_map keys: {list(component_map.keys())[:5]}")
 
     render_controls(component_map)
 
@@ -287,6 +290,15 @@ def main():
 
     # Debug: Display session state
     st.write(f"Current selected_comp: {st.session_state.selected_comp}")
+
+    # Test button to isolate issue
+    if st.button("Test Button", key="test_button"):
+        st.write("Test Button clicked")
+        st.session_state.selected_comp = "Test"
+        st.experimental_rerun()
+
+    if st.button("Show Session State"):
+        st.write(st.session_state)
 
     if not st.session_state.selected_comp:
         st.info("Please select or type a component to begin.")
@@ -304,9 +316,12 @@ def main():
     }
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
     
-    char_id = f"selected_char_{random.randint(10000, 99999)}"
+    st.session_state.button_counter += 1
+    char_id = f"selected_char_{st.session_state.button_counter}"
+    st.write(f"Selected char button key: {char_id}")  # Debug
     st.markdown("<div class='selected-card'><h2 class='selected-char'>", unsafe_allow_html=True)
     if st.button(st.session_state.selected_comp, key=char_id):
+        st.write(f"Selected char button clicked: {st.session_state.selected_comp}")
         st.session_state.selected_comp = st.session_state.selected_comp
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.experimental_rerun()
