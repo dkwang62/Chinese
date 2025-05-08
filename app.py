@@ -59,9 +59,9 @@ st.markdown("""
 # Initialize session state
 def init_session_state():
     defaults = {
-        "selected_comp": "⺌",
-        "max_depth": 0,
-        "stroke_range": (3, 14),
+        "selected_comp": "爫",
+        "max_depth": 1,
+        "stroke_range": (4, 14),
         "display_mode": "Single Character",
         "selected_idc": "No Filter"  # Default IDC filter
     }
