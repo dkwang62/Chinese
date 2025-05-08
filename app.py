@@ -164,9 +164,10 @@ def build_component_map(max_depth):
 # --- Handle text input ---
 def on_text_input_change(component_map):
     text_value = st.session_state.text_input_comp.strip()
-    if text_value in component_map or text_value in char_decomp:
+    if text_value in component_map or text_value in char_decomp or is_valid_char(text_value):
         st.session_state.selected_comp = text_value
         st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.experimental_rerun()
     elif text_value:
         st.warning("Invalid character. Please enter a valid component.")
 
@@ -174,11 +175,13 @@ def on_text_input_change(component_map):
 def on_char_click(component_map):
     if "clicked_char" in st.session_state and st.session_state.clicked_char:
         char = st.session_state.clicked_char
-        st.write(f"Clicked character: {char}")  # Debugging (remove after confirmation)
-        if char in component_map or char in char_decomp:
+        st.write(f"Clicked character: {char}")  # Debugging
+        st.write(f"Valid char: {is_valid_char(char)}, In component_map: {char in component_map}, In char_decomp: {char in char_decomp}")  # Debugging
+        if is_valid_char(char):  # Relaxed validation
             st.session_state.selected_comp = char
             st.session_state.idc_refresh = not st.session_state.idc_refresh
             st.session_state.clicked_char = ""
+            st.experimental_rerun()
         else:
             st.warning(f"Invalid character clicked: {char}")
 
@@ -261,20 +264,34 @@ def render_char_card(char, compounds):
 def main():
     st.markdown("<h1>🧩 Character Decomposition Explorer</h1>", unsafe_allow_html=True)
     
+    # Clear cache if max_depth changes
+    if "prev_max_depth" not in st.session_state:
+        st.session_state.prev_max_depth = st.session_state.max_depth
+    if st.session_state.max_depth != st.session_state.prev_max_depth:
+        st.cache_data.clear()
+        st.session_state.prev_max_depth = st.session_state.max_depth
+
     component_map = build_component_map(st.session_state.max_depth)
+    
+    # Debugging: Show map sizes
+    st.write(f"component_map size: {len(component_map)}, char_decomp size: {len(char_decomp)}")
+    # st.write(f"Sample component_map keys: {list(component_map.keys())[:5]}")
+
     render_controls(component_map)
 
     if st.button("Reset App"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         init_session_state()
-        st.warning("Please refresh the page to apply reset.")
+        st.cache_data.clear()
+        st.experimental_rerun()
 
     if "clicked_char" not in st.session_state:
         st.session_state.clicked_char = ""
 
-    # Debug: Display current session state (remove after debugging)
-    # st.write(f"Current clicked_char: {st.session_state.clicked_char}")
+    # Debug: Display session state
+    st.write(f"Current clicked_char: {st.session_state.clicked_char}")
+    st.write(f"Current selected_comp: {st.session_state.selected_comp}")
 
     on_char_click(component_map)
 
@@ -282,10 +299,17 @@ def main():
         """
         <script>
         function handleCharClick(char) {
+            console.log('Clicked char: ' + char);  // Debugging
             if (window.Streamlit) {
                 window.Streamlit.setComponentValue(char, 'clicked_char');
             } else {
-                console.error('Streamlit API not available');
+                console.error('Streamlit API not available, trying postMessage');
+                window.parent.postMessage({
+                    type: 'streamlit:setComponentValue',
+                    value: char,
+                    dataType: 'string',
+                    key: 'clicked_char'
+                }, '*');
             }
         }
         </script>
