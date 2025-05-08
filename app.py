@@ -1,7 +1,8 @@
 import json
 from collections import defaultdict
 import streamlit as st
-import streamlit.components.v1 as components
+import random
+import os
 
 st.set_page_config(layout="wide")
 
@@ -57,26 +58,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Initialize session state ---
-
-# def init_session_state():
-    # defaults = {
-        # "selected_comp": "⺌",
-        # "max_depth": 0,
-        # "stroke_range": (3, 14),
-        # "display_mode": "Single Character",
-        # "selected_idc": "No Filter",
-        # "idc_refresh": False
-    # }
-    # for key, value in defaults.items():
-        # if key not in st.session_state:
-            # st.session_state[key] = value
-
-# init_session_state()
-
-import random
-
 def init_session_state():
-    # Define the two sets of values
     config_options = [
         {
             "selected_comp": "爫",
@@ -89,39 +71,45 @@ def init_session_state():
             "stroke_range": (3, 14)
         }
     ]
-    
-    # Randomly select one configuration
     selected_config = random.choice(config_options)
-    
-    # Define defaults with the randomly selected values
     defaults = {
-        "selected_comp": selected_config["selected_comp"],
+        "internal_selected_comp": selected_config["selected_comp"],
         "max_depth": selected_config["max_depth"],
         "stroke_range": selected_config["stroke_range"],
         "display_mode": "Single Character",
         "selected_idc": "No Filter",
-        "idc_refresh": False
+        "idc_refresh": False,
+        "text_input_comp": selected_config["selected_comp"],
+        "page": 1,
+        "results_per_page": 50
     }
-    
-    # Initialize session state if keys don't exist
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
 
 init_session_state()
 
+# --- Load character decomposition data ---
 @st.cache_data
 def load_char_decomp():
-    try:
-        with open("strokes1.json", "r", encoding="utf-8") as f:
-            return {entry["character"]: entry for entry in json.load(f)}
-    except Exception as e:
-        st.error(f"Failed to load strokes1.json: {e}")
+    if not os.path.exists("strokes1.json"):
+        st.error("Error: strokes1.json not found in the app directory.")
         return {}
+    with open("strokes1.json", "r", encoding="utf-8") as f:
+        return {entry["character"]: entry for entry in json.load(f)}
 
 char_decomp = load_char_decomp()
 
+# --- Fallback UI if data is missing ---
+if not char_decomp:
+    st.markdown("<h1>🧩 Character Decomposition Explorer</h1>", unsafe_allow_html=True)
+    st.error("Cannot load character data. Please ensure strokes1.json is available and correctly formatted.")
+    st.stop()
+
+# --- Utility functions ---
 def is_valid_char(c):
+    if len(c) != 1:
+        return False
     return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or '㐀' <= c <= '䶿' or '𠀀' <= c <= '𪛟')
 
 def get_stroke_count(char):
@@ -163,14 +151,35 @@ def build_component_map(max_depth):
             component_map[comp].append(char)
     return component_map
 
+# --- Handle text input ---
 def on_text_input_change(component_map):
-    text_value = st.session_state.text_input_comp.strip()
-    if text_value in component_map or text_value in char_decomp:
-        st.session_state.selected_comp = text_value
+    text_value = st.session_state.get("text_input_comp", "").strip()
+    if not text_value:
+        text_value = st.session_state.internal_selected_comp
+    if is_valid_char(text_value) and (text_value in component_map or text_value in char_decomp):
+        st.session_state.internal_selected_comp = text_value
         st.session_state.idc_refresh = not st.session_state.idc_refresh
-    elif text_value:
-        st.warning("Invalid character. Please enter a valid component.")
+        st.session_state.text_input_comp = text_value
+        st.session_state.page = 1
+    else:
+        st.warning("Please enter a valid Chinese character.")
+        st.session_state.text_input_comp = st.session_state.internal_selected_comp
 
+# --- Handle selectbox change for initial component ---
+def on_selectbox_change():
+    st.session_state.internal_selected_comp = st.session_state.selected_comp
+    st.session_state.idc_refresh = not st.session_state.idc_refresh
+    st.session_state.page = 1
+
+# --- Handle output character selection ---
+def on_output_char_select():
+    selected_char = st.session_state.output_char_select
+    if selected_char != "Select a character...":
+        st.session_state.internal_selected_comp = selected_char
+        st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.session_state.page = 1
+
+# --- Render controls ---
 def render_controls(component_map):
     min_strokes, max_strokes = st.session_state.stroke_range
     filtered_components = [
@@ -178,15 +187,15 @@ def render_controls(component_map):
         if min_strokes <= get_stroke_count(comp) <= max_strokes
     ]
     sorted_components = sorted(filtered_components, key=get_stroke_count)
-    if st.session_state.selected_comp not in sorted_components:
-        sorted_components.insert(0, st.session_state.selected_comp)
+    if st.session_state.internal_selected_comp not in sorted_components and is_valid_char(st.session_state.internal_selected_comp):
+        sorted_components.insert(0, st.session_state.internal_selected_comp)
 
     st.slider("Max Decomposition Depth", 0, 5, key="max_depth")
     st.slider("Strokes Range", 0, 30, key="stroke_range")
 
     idc_chars = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
     chars = [
-        c for c in component_map.get(st.session_state.selected_comp, [])
+        c for c in component_map.get(st.session_state.internal_selected_comp, [])
         if min_strokes <= get_stroke_count(c) <= max_strokes and c in char_decomp
     ]
     dynamic_idc_options = {"No Filter"}
@@ -202,11 +211,11 @@ def render_controls(component_map):
     with col1:
         st.selectbox("Select a component:", options=sorted_components,
                      format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
-                     index=sorted_components.index(st.session_state.selected_comp),
+                     index=sorted_components.index(st.session_state.internal_selected_comp) if st.session_state.internal_selected_comp in sorted_components else 0,
                      key="selected_comp",
-                     on_change=lambda: st.session_state.update(idc_refresh=not st.session_state.idc_refresh))
+                     on_change=on_selectbox_change)
     with col2:
-        st.text_input("Or type a component:", value=st.session_state.selected_comp,
+        st.text_input("Or type a component:", value=st.session_state.internal_selected_comp,
                       key="text_input_comp", on_change=on_text_input_change, args=(component_map,))
     with col3:
         st.selectbox("Result filtered by IDC Character structure:", options=idc_options,
@@ -215,6 +224,7 @@ def render_controls(component_map):
     st.radio("Display Mode:", options=["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"],
              key="display_mode")
 
+# --- Render character card ---
 def render_char_card(char, compounds):
     entry = char_decomp.get(char, {})
     idc_chars = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
@@ -229,41 +239,71 @@ def render_char_card(char, compounds):
         "IDC": idc
     }
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
-    st.markdown(f"""<div class='char-card'><h3 class='char-title'>{char}</h3><p class='details'>{details}</p>""", unsafe_allow_html=True)
+    
+    st.markdown("<div class='char-card'>", unsafe_allow_html=True)
+    st.markdown(f"<h3 class='char-title'>{char}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<p class='details'>{details}</p>", unsafe_allow_html=True)
+    
     if compounds and st.session_state.display_mode != "Single Character":
         compounds_text = " ".join(sorted(compounds, key=lambda x: x[0]))
-        st.markdown(f"""<div class='compounds-section'><p class='compounds-title'>{st.session_state.display_mode} for {char}:</p><p class='compounds-list'>{compounds_text}</p></div>""", unsafe_allow_html=True)
+        st.markdown(
+            f"""<div class='compounds-section'><p class='compounds-title'>{st.session_state.display_mode} for {char}:</p><p class='compounds-list'>{compounds_text}</p></div>""",
+            unsafe_allow_html=True
+        )
     st.markdown("</div>", unsafe_allow_html=True)
 
+# --- Main function ---
 def main():
-    component_map = build_component_map(st.session_state.max_depth)
     st.markdown("<h1>🧩 Character Decomposition Explorer</h1>", unsafe_allow_html=True)
+    
+    # Clear cache if max_depth changes
+    if "prev_max_depth" not in st.session_state:
+        st.session_state.prev_max_depth = st.session_state.max_depth
+    if st.session_state.max_depth != st.session_state.prev_max_depth:
+        st.cache_data.clear()
+        st.session_state.prev_max_depth = st.session_state.max_depth
+
+    component_map = build_component_map(st.session_state.max_depth)
+    
     render_controls(component_map)
 
     if st.button("Reset App"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         init_session_state()
-        st.warning("Please refresh the page https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app/ or https://chinese1-mcguwrauq4krutvfkyrbkg.streamlit.app/")
+        st.cache_data.clear()
+        st.rerun()
 
-    if not st.session_state.selected_comp:
+    # Validate selected component
+    if not is_valid_char(st.session_state.internal_selected_comp):
+        st.warning(f"'{st.session_state.internal_selected_comp}' is not a valid Chinese character.")
+        st.session_state.internal_selected_comp = "爫"
+        st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.session_state.page = 1
+        st.rerun()
+
+    if not st.session_state.internal_selected_comp:
+        st.info("Please select or type a component to begin.")
         return
 
-    entry = char_decomp.get(st.session_state.selected_comp, {})
+    entry = char_decomp.get(st.session_state.internal_selected_comp, {})
     fields = {
         "Pinyin": clean_field(entry.get("pinyin", "—")),
         "Definition": clean_field(entry.get("definition", "No definition available")),
         "Radical": clean_field(entry.get("radical", "—")),
         "Hint": clean_field(entry.get("etymology", {}).get("hint", "No hint available")),
-        "Strokes": f"{get_stroke_count(st.session_state.selected_comp)} strokes" if get_stroke_count(st.session_state.selected_comp) != -1 else "unknown strokes",
+        "Strokes": f"{get_stroke_count(st.session_state.internal_selected_comp)} strokes" if get_stroke_count(st.session_state.internal_selected_comp) != -1 else "unknown strokes",
         "Depth": str(st.session_state.max_depth),
         "Stroke Range": f"{st.session_state.stroke_range[0]} – {st.session_state.stroke_range[1]}"
     }
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
-    st.markdown(f"""<div class='selected-card'><h2 class='selected-char'>{st.session_state.selected_comp}</h2><p class='details'>{details}</p></div>""", unsafe_allow_html=True)
+    
+    st.markdown("<div class='selected-card'><h2 class='selected-char'>", unsafe_allow_html=True)
+    st.markdown(f"{st.session_state.internal_selected_comp}", unsafe_allow_html=True)
+    st.markdown(f"</h2><p class='details'>{details}</p></div>", unsafe_allow_html=True)
 
     min_strokes, max_strokes = st.session_state.stroke_range
-    chars = [c for c in component_map.get(st.session_state.selected_comp, [])
+    chars = [c for c in component_map.get(st.session_state.internal_selected_comp, [])
              if min_strokes <= get_stroke_count(c) <= max_strokes]
     if st.session_state.selected_idc != "No Filter":
         chars = [c for c in chars if char_decomp.get(c, {}).get("decomposition", "").startswith(st.session_state.selected_idc)]
@@ -278,12 +318,45 @@ def main():
             char_compounds[c] = [comp for comp in compounds if len(comp) == length]
 
     filtered_chars = [c for c in chars if not char_compounds[c] == [] or st.session_state.display_mode == "Single Character"]
-    st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.selected_comp} — {len(filtered_chars)} result(s)</h2>", unsafe_allow_html=True)
+    
+    # Pagination
+    total_results = len(filtered_chars)
+    results_per_page = st.session_state.results_per_page
+    total_pages = (total_results + results_per_page - 1) // results_per_page
+    page = max(1, min(st.session_state.page, total_pages))
+    st.session_state.page = page
 
-    for char in sorted(filtered_chars, key=get_stroke_count):
+    start_idx = (page - 1) * results_per_page
+    end_idx = min(start_idx + results_per_page, total_results)
+    paginated_chars = sorted(filtered_chars, key=get_stroke_count)[start_idx:end_idx]
+
+    # Dropdown for selecting output characters
+    if paginated_chars:
+        options = ["Select a character..."] + paginated_chars
+        st.selectbox("Select a character from results:", options=options,
+                     key="output_char_select", on_change=on_output_char_select)
+
+    st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.internal_selected_comp} — {total_results} result(s) (Showing {start_idx + 1}-{end_idx})</h2>", unsafe_allow_html=True)
+
+    for char in paginated_chars:
         render_char_card(char, char_compounds.get(char, []))
 
-    # --- Auto Copy to Clipboard ---
+    # Pagination controls
+    if total_pages > 1:
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            if page > 1:
+                if st.button("Previous Page"):
+                    st.session_state.page -= 1
+                    st.rerun()
+        with col2:
+            st.write(f"Page {page} of {total_pages}")
+        with col3:
+            if page < total_pages:
+                if st.button("Next Page"):
+                    st.session_state.page += 1
+                    st.rerun()
+
     if filtered_chars:
         export_text = "Give me the full hanyu pinyin and meaning of each compound word\n\n"
         export_text += "\n".join(
@@ -292,25 +365,6 @@ def main():
             for compound in char_compounds.get(char, [])
         )
         st.text_area("Right click, Select all, copy; paste to ChatGPT", export_text, height=300, key="export_text")
-
-        components.html(f"""
-            <textarea id="copyTarget" style="opacity:0;position:absolute;left:-9999px;">{export_text}</textarea>
-            <script>
-            const copyText = document.getElementById("copyTarget");
-            copyText.select();
-            document.execCommand("copy");
-            </script>
-        """, height=0)
-# --- Dropdown for selecting a single character from results ---
-single_chars_only = sorted(set([c for c in related_chars if len(c) == 1 and is_valid_char(c)]))
-if single_chars_only:
-    options = ["Select a character..."] + single_chars_only
-    selected_char_dropdown = st.selectbox("🔍 Choose a character from results:", options=options, index=0)
-
-    if selected_char_dropdown != "Select a character..." and selected_char_dropdown != st.session_state.selected_comp:
-        st.session_state.selected_comp = selected_char_dropdown
-        st.session_state.text_input_comp = selected_char_dropdown
-        st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
