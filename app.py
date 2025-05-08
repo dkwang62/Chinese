@@ -91,14 +91,14 @@ def init_session_state():
     ]
     selected_config = random.choice(config_options)
     defaults = {
-        "selected_comp": selected_config["selected_comp"],
+        "internal_selected_comp": selected_config["selected_comp"],  # Internal state
         "max_depth": selected_config["max_depth"],
         "stroke_range": selected_config["stroke_range"],
         "display_mode": "Single Character",
         "selected_idc": "No Filter",
         "idc_refresh": False,
         "text_input_comp": selected_config["selected_comp"],
-        "button_counter": 0  # For unique button keys
+        "button_counter": 0
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -129,7 +129,7 @@ if not char_decomp:
 
 # --- Utility functions ---
 def is_valid_char(c):
-    return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or '�0' <= c <= '䶿' or '𠀀' <= c <= '𪛟')
+    return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or '㐀' <= c <= '䶿' or '𠀀' <= c <= '𪛟')
 
 def get_stroke_count(char):
     return char_decomp.get(char, {}).get("strokes", -1)
@@ -174,14 +174,19 @@ def build_component_map(max_depth):
 def on_text_input_change(component_map):
     text_value = st.session_state.get("text_input_comp", "").strip()
     if not text_value:
-        text_value = st.session_state.selected_comp
+        text_value = st.session_state.internal_selected_comp
     if text_value in component_map or text_value in char_decomp or is_valid_char(text_value):
-        st.session_state.selected_comp = text_value
+        st.session_state.internal_selected_comp = text_value
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.session_state.text_input_comp = text_value
-        st.experimental_rerun()
     elif text_value:
         st.warning("Invalid character. Please enter a valid component.")
+
+# --- Handle selectbox change ---
+def on_selectbox_change():
+    # Sync internal_selected_comp with the selectbox value
+    st.session_state.internal_selected_comp = st.session_state.selected_comp
+    st.session_state.idc_refresh = not st.session_state.idc_refresh
 
 # --- Render controls ---
 def render_controls(component_map):
@@ -191,15 +196,15 @@ def render_controls(component_map):
         if min_strokes <= get_stroke_count(comp) <= max_strokes
     ]
     sorted_components = sorted(filtered_components, key=get_stroke_count)
-    if st.session_state.selected_comp not in sorted_components:
-        sorted_components.insert(0, st.session_state.selected_comp)
+    if st.session_state.internal_selected_comp not in sorted_components:
+        sorted_components.insert(0, st.session_state.internal_selected_comp)
 
     st.slider("Max Decomposition Depth", 0, 5, key="max_depth")
     st.slider("Strokes Range", 0, 30, key="stroke_range")
 
     idc_chars = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
     chars = [
-        c for c in component_map.get(st.session_state.selected_comp, [])
+        c for c in component_map.get(st.session_state.internal_selected_comp, [])
         if min_strokes <= get_stroke_count(c) <= max_strokes and c in char_decomp
     ]
     dynamic_idc_options = {"No Filter"}
@@ -213,13 +218,14 @@ def render_controls(component_map):
 
     col1, col2, col3 = st.columns(3)
     with col1:
+        # Set the selectbox value to internal_selected_comp and update via callback
         st.selectbox("Select a component:", options=sorted_components,
                      format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
-                     index=sorted_components.index(st.session_state.selected_comp),
+                     index=sorted_components.index(st.session_state.internal_selected_comp),
                      key="selected_comp",
-                     on_change=lambda: st.session_state.update(idc_refresh=not st.session_state.idc_refresh))
+                     on_change=on_selectbox_change)
     with col2:
-        st.text_input("Or type a component:", value=st.session_state.selected_comp,
+        st.text_input("Or type a component:", value=st.session_state.internal_selected_comp,
                       key="text_input_comp", on_change=on_text_input_change, args=(component_map,))
     with col3:
         st.selectbox("Result filtered by IDC Character structure:", options=idc_options,
@@ -244,16 +250,14 @@ def render_char_card(char, compounds):
     }
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
     
-    # Ensure unique button key
     st.session_state.button_counter += 1
     char_id = f"char_{char}_{st.session_state.button_counter}"
-    st.write(f"Button key: {char_id}")  # Debug
+    st.write(f"Button key: {char_id}")
     st.markdown("<div class='char-card'><h3 class='char-title'>", unsafe_allow_html=True)
     if st.button(char, key=char_id):
-        st.write(f"Button clicked for character: {char}")  # Debug
-        st.session_state.selected_comp = char
+        st.write(f"Button clicked for character: {char}")
+        st.session_state.internal_selected_comp = char
         st.session_state.idc_refresh = not st.session_state.idc_refresh
-        st.experimental_rerun()
     st.markdown(f"</h3><p class='details'>{details}</p>", unsafe_allow_html=True)
     
     if compounds and st.session_state.display_mode != "Single Character":
@@ -289,28 +293,28 @@ def main():
         st.experimental_rerun()
 
     # Debug: Display session state
-    st.write(f"Current selected_comp: {st.session_state.selected_comp}")
+    st.write(f"Current internal_selected_comp: {st.session_state.internal_selected_comp}")
 
-    # Test button to isolate issue
+    # Test button
     if st.button("Test Button", key="test_button"):
         st.write("Test Button clicked")
-        st.session_state.selected_comp = "Test"
-        st.experimental_rerun()
+        st.session_state.internal_selected_comp = "Test"
+        st.session_state.idc_refresh = not st.session_state.idc_refresh
 
     if st.button("Show Session State"):
         st.write(st.session_state)
 
-    if not st.session_state.selected_comp:
+    if not st.session_state.internal_selected_comp:
         st.info("Please select or type a component to begin.")
         return
 
-    entry = char_decomp.get(st.session_state.selected_comp, {})
+    entry = char_decomp.get(st.session_state.internal_selected_comp, {})
     fields = {
         "Pinyin": clean_field(entry.get("pinyin", "—")),
         "Definition": clean_field(entry.get("definition", "No definition available")),
         "Radical": clean_field(entry.get("radical", "—")),
         "Hint": clean_field(entry.get("etymology", {}).get("hint", "No hint available")),
-        "Strokes": f"{get_stroke_count(st.session_state.selected_comp)} strokes" if get_stroke_count(st.session_state.selected_comp) != -1 else "unknown strokes",
+        "Strokes": f"{get_stroke_count(st.session_state.internal_selected_comp)} strokes" if get_stroke_count(st.session_state.internal_selected_comp) != -1 else "unknown strokes",
         "Depth": str(st.session_state.max_depth),
         "Stroke Range": f"{st.session_state.stroke_range[0]} – {st.session_state.stroke_range[1]}"
     }
@@ -318,17 +322,14 @@ def main():
     
     st.session_state.button_counter += 1
     char_id = f"selected_char_{st.session_state.button_counter}"
-    st.write(f"Selected char button key: {char_id}")  # Debug
+    st.write(f"Selected char button key: {char_id}")
     st.markdown("<div class='selected-card'><h2 class='selected-char'>", unsafe_allow_html=True)
-    if st.button(st.session_state.selected_comp, key=char_id):
-        st.write(f"Selected char button clicked: {st.session_state.selected_comp}")
-        st.session_state.selected_comp = st.session_state.selected_comp
-        st.session_state.idc_refresh = not st.session_state.idc_refresh
-        st.experimental_rerun()
+    # Display the character as text since clicking it doesn't change the selection
+    st.markdown(f"{st.session_state.internal_selected_comp}", unsafe_allow_html=True)
     st.markdown(f"</h2><p class='details'>{details}</p></div>", unsafe_allow_html=True)
 
     min_strokes, max_strokes = st.session_state.stroke_range
-    chars = [c for c in component_map.get(st.session_state.selected_comp, [])
+    chars = [c for c in component_map.get(st.session_state.internal_selected_comp, [])
              if min_strokes <= get_stroke_count(c) <= max_strokes]
     if st.session_state.selected_idc != "No Filter":
         chars = [c for c in chars if char_decomp.get(c, {}).get("decomposition", "").startswith(st.session_state.selected_idc)]
@@ -343,7 +344,7 @@ def main():
             char_compounds[c] = [comp for comp in compounds if len(comp) == length]
 
     filtered_chars = [c for c in chars if not char_compounds[c] == [] or st.session_state.display_mode == "Single Character"]
-    st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.selected_comp} — {len(filtered_chars)} result(s)</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.internal_selected_comp} — {len(filtered_chars)} result(s)</h2>", unsafe_allow_html=True)
 
     for char in sorted(filtered_chars, key=get_stroke_count):
         render_char_card(char, char_compounds.get(char, []))
