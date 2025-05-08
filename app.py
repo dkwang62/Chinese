@@ -238,7 +238,7 @@ def main():
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         init_session_state()
-        st.warning("App reset. Please rerun the app by refreshing the page or visiting https://chinese1-mcguwrauq4krutvfkyrbkg.streamlit.app/ again.")
+        st.warning("App reset. Please rerun the app by refreshing the page or visiting https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app/ again.")
 
     if not st.session_state.selected_comp:
         return
