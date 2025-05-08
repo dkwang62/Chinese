@@ -1,7 +1,6 @@
 import json
 from collections import defaultdict
 import streamlit as st
-import streamlit.components.v1 as components
 import random
 import os
 
@@ -22,15 +21,6 @@ st.markdown("""
         border-left: 5px solid #3498db;
     }
     .selected-char { font-size: 2.5em; color: #e74c3c; margin: 0; }
-    .clickable-char {
-        cursor: pointer;
-        color: #e74c3c;
-        transition: color 0.2s;
-    }
-    .clickable-char:hover {
-        color: #c0392b;
-        text-decoration: underline;
-    }
     .details { font-size: 1.1em; color: #34495e; margin: 0; }
     .details strong { color: #2c3e50; }
     .results-header { font-size: 1.5em; color: #2c3e50; margin: 20px 0 10px; }
@@ -64,7 +54,7 @@ st.markdown("""
         .char-title { font-size: 1.2em; }
         .compounds-title { font-size: 1em; }
     }
-    /* Optional: Style for button-based approach */
+    /* Style buttons to look like clickable text */
     .stButton > button {
         background: none;
         border: none;
@@ -72,10 +62,16 @@ st.markdown("""
         font-size: 1.4em;
         padding: 0;
         cursor: pointer;
+        margin: 0;
+        display: inline;
     }
     .stButton > button:hover {
         color: #c0392b;
         text-decoration: underline;
+    }
+    .stButton > button:focus {
+        outline: none;
+        box-shadow: none;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -102,7 +98,6 @@ def init_session_state():
         "display_mode": "Single Character",
         "selected_idc": "No Filter",
         "idc_refresh": False,
-        "clicked_char": "",
         "text_input_comp": selected_config["selected_comp"]
     }
     for key, value in defaults.items():
@@ -188,20 +183,6 @@ def on_text_input_change(component_map):
     elif text_value:
         st.warning("Invalid character. Please enter a valid component.")
 
-# --- Handle character click ---
-def on_char_click(component_map):
-    if "clicked_char" in st.session_state and st.session_state.clicked_char:
-        char = st.session_state.clicked_char
-        st.write(f"Clicked character: {char}")
-        st.write(f"Valid char: {is_valid_char(char)}, In component_map: {char in component_map}, In char_decomp: {char in char_decomp}")
-        if is_valid_char(char):
-            st.session_state.selected_comp = char
-            st.session_state.idc_refresh = not st.session_state.idc_refresh
-            st.session_state.clicked_char = ""
-            st.experimental_rerun()
-        else:
-            st.warning(f"Invalid character clicked: {char}")
-
 # --- Render controls ---
 def render_controls(component_map):
     min_strokes, max_strokes = st.session_state.stroke_range
@@ -264,18 +245,12 @@ def render_char_card(char, compounds):
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
     
     char_id = f"char_{char}_{random.randint(10000, 99999)}"
-    # JavaScript-based approach
-    st.markdown(
-        f"""<div class='char-card'><h3 class='char-title'><span class='clickable-char' id='{char_id}' onclick='handleCharClick("{char}")'>{char}</span></h3><p class='details'>{details}</p>""",
-        unsafe_allow_html=True
-    )
-    
-    # Alternative button-based approach (uncomment to use instead)
-    # if st.button(char, key=f"btn_{char}_{char_id}"):
-    #     st.session_state.selected_comp = char
-    #     st.session_state.idc_refresh = not st.session_state.idc_refresh
-    #     st.experimental_rerun()
-    # st.markdown(f"<div class='char-card'><p class='details'>{details}</p>", unsafe_allow_html=True)
+    st.markdown("<div class='char-card'><h3 class='char-title'>", unsafe_allow_html=True)
+    if st.button(char, key=char_id):
+        st.session_state.selected_comp = char
+        st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.experimental_rerun()
+    st.markdown(f"</h3><p class='details'>{details}</p>", unsafe_allow_html=True)
     
     if compounds and st.session_state.display_mode != "Single Character":
         compounds_text = " ".join(sorted(compounds, key=lambda x: x[0]))
@@ -289,28 +264,6 @@ def render_char_card(char, compounds):
 def main():
     st.markdown("<h1>🧩 Character Decomposition Explorer</h1>", unsafe_allow_html=True)
     
-    # Load JavaScript at the top to ensure it's available
-    components.html(
-        """
-        <script>
-        function handleCharClick(char) {
-            console.log('Clicked char: ' + char);
-            if (window.Streamlit) {
-                window.Streamlit.setComponentValue(char);
-            } else {
-                console.error('Streamlit API not available');
-                window.parent.postMessage({
-                    type: 'streamlit:setComponentValue',
-                    value: char,
-                    key: 'clicked_char'
-                }, '*');
-            }
-        }
-        </script>
-        """,
-        height=0
-    )
-
     # Clear cache if max_depth changes
     if "prev_max_depth" not in st.session_state:
         st.session_state.prev_max_depth = st.session_state.max_depth
@@ -332,29 +285,8 @@ def main():
         st.cache_data.clear()
         st.experimental_rerun()
 
-    if "clicked_char" not in st.session_state:
-        st.session_state.clicked_char = ""
-
     # Debug: Display session state
-    st.write(f"Current clicked_char: {st.session_state.clicked_char}")
     st.write(f"Current selected_comp: {st.session_state.selected_comp}")
-
-    # Test JavaScript execution
-    if st.button("Test JS"):
-        components.html(
-            """
-            <script>
-            console.log('Button JS executed');
-            if (window.Streamlit) {
-                window.Streamlit.setComponentValue('test');
-            }
-            </script>
-            """,
-            height=0
-        )
-    st.write(f"After Test JS, clicked_char: {st.session_state.clicked_char}")
-
-    on_char_click(component_map)
 
     if not st.session_state.selected_comp:
         st.info("Please select or type a component to begin.")
@@ -373,18 +305,12 @@ def main():
     details = " ".join(f"<strong>{k}:</strong> {v}  " for k, v in fields.items())
     
     char_id = f"selected_char_{random.randint(10000, 99999)}"
-    # JavaScript-based approach
-    st.markdown(
-        f"""<div class='selected-card'><h2 class='selected-char'><span class='clickable-char' id='{char_id}' onclick='handleCharClick("{st.session_state.selected_comp}")'>{st.session_state.selected_comp}</span></h2><p class='details'>{details}</p></div>""",
-        unsafe_allow_html=True
-    )
-    
-    # Alternative button-based approach (uncomment to use instead)
-    # if st.button(st.session_state.selected_comp, key=f"btn_selected_{char_id}"):
-    #     st.session_state.selected_comp = st.session_state.selected_comp
-    #     st.session_state.idc_refresh = not st.session_state.idc_refresh
-    #     st.experimental_rerun()
-    # st.markdown(f"<div class='selected-card'><p class='details'>{details}</p></div>", unsafe_allow_html=True)
+    st.markdown("<div class='selected-card'><h2 class='selected-char'>", unsafe_allow_html=True)
+    if st.button(st.session_state.selected_comp, key=char_id):
+        st.session_state.selected_comp = st.session_state.selected_comp
+        st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.experimental_rerun()
+    st.markdown(f"</h2><p class='details'>{details}</p></div>", unsafe_allow_html=True)
 
     min_strokes, max_strokes = st.session_state.stroke_range
     chars = [c for c in component_map.get(st.session_state.selected_comp, [])
@@ -416,14 +342,14 @@ def main():
         )
         st.text_area("Right click, Select all, copy; paste to ChatGPT", export_text, height=300, key="export_text")
 
-        components.html(f"""
+        st.markdown(f"""
             <textarea id="copyTarget" style="opacity:0;position:absolute;left:-9999px;">{export_text}</textarea>
             <script>
             const copyText = document.getElementById("copyTarget");
             copyText.select();
             document.execCommand("copy");
             </script>
-        """, height=0)
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     try:
