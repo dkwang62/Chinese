@@ -1,6 +1,7 @@
 import json
 from collections import defaultdict
 import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide")
 
@@ -81,8 +82,7 @@ def load_char_decomp():
 char_decomp = load_char_decomp()
 
 def is_valid_char(c):
-    return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or
-            '㐀' <= c <= '䶿' or '𠀀' <= c <= '𪛟')
+    return ('一' <= c <= '鿿' or '⺀' <= c <= '⻿' or '㐀' <= c <= '䶿' or '𠀀' <= c <= '𪛟')
 
 def get_stroke_count(char):
     return char_decomp.get(char, {}).get("strokes", -1)
@@ -110,7 +110,6 @@ def get_all_components(char, max_depth, depth=0, seen=None):
 
 @st.cache_data
 def build_component_map(max_depth):
-    from collections import defaultdict
     component_map = defaultdict(list)
     for char in char_decomp:
         components = set()
@@ -243,6 +242,26 @@ def main():
 
     for char in sorted(filtered_chars, key=get_stroke_count):
         render_char_card(char, char_compounds.get(char, []))
+
+    # --- Auto Copy to Clipboard ---
+    if filtered_chars:
+        export_text = "\n".join(
+            f"{char}: {char_decomp.get(char, {}).get('definition', 'No definition')}" +
+            (f" | Compounds: {' '.join(char_compounds[char])}" if char_compounds[char] else "")
+            for char in filtered_chars
+        )
+
+        st.markdown("### 📋 Auto-Copied Text Output")
+        st.text_area("Copied to Clipboard", export_text, height=300, key="export_text")
+
+        components.html(f"""
+            <textarea id=\"copyTarget\" style=\"opacity:0;position:absolute;left:-9999px;\">{export_text}</textarea>
+            <script>
+            const copyText = document.getElementById("copyTarget");
+            copyText.select();
+            document.execCommand("copy");
+            </script>
+        """, height=0)
 
 if __name__ == "__main__":
     main()
