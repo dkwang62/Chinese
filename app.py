@@ -91,14 +91,15 @@ def init_session_state():
     ]
     selected_config = random.choice(config_options)
     defaults = {
-        "internal_selected_comp": selected_config["selected_comp"],  # Internal state
+        "internal_selected_comp": selected_config["selected_comp"],
         "max_depth": selected_config["max_depth"],
         "stroke_range": selected_config["stroke_range"],
         "display_mode": "Single Character",
         "selected_idc": "No Filter",
         "idc_refresh": False,
         "text_input_comp": selected_config["selected_comp"],
-        "button_counter": 0
+        "button_counter": 0,
+        "force_rerun": False  # Flag to force rerun after button click
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -179,14 +180,15 @@ def on_text_input_change(component_map):
         st.session_state.internal_selected_comp = text_value
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.session_state.text_input_comp = text_value
+        st.session_state.force_rerun = True
     elif text_value:
         st.warning("Invalid character. Please enter a valid component.")
 
 # --- Handle selectbox change ---
 def on_selectbox_change():
-    # Sync internal_selected_comp with the selectbox value
     st.session_state.internal_selected_comp = st.session_state.selected_comp
     st.session_state.idc_refresh = not st.session_state.idc_refresh
+    st.session_state.force_rerun = True
 
 # --- Render controls ---
 def render_controls(component_map):
@@ -218,7 +220,6 @@ def render_controls(component_map):
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        # Set the selectbox value to internal_selected_comp and update via callback
         st.selectbox("Select a component:", options=sorted_components,
                      format_func=lambda c: f"{c} ({get_stroke_count(c)} strokes)",
                      index=sorted_components.index(st.session_state.internal_selected_comp),
@@ -252,12 +253,13 @@ def render_char_card(char, compounds):
     
     st.session_state.button_counter += 1
     char_id = f"char_{char}_{st.session_state.button_counter}"
-    st.write(f"Button key: {char_id}")
+    st.write(f"Rendering button for {char} with key: {char_id}")
     st.markdown("<div class='char-card'><h3 class='char-title'>", unsafe_allow_html=True)
     if st.button(char, key=char_id):
         st.write(f"Button clicked for character: {char}")
         st.session_state.internal_selected_comp = char
         st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.session_state.force_rerun = True
     st.markdown(f"</h3><p class='details'>{details}</p>", unsafe_allow_html=True)
     
     if compounds and st.session_state.display_mode != "Single Character":
@@ -272,6 +274,11 @@ def render_char_card(char, compounds):
 def main():
     st.markdown("<h1>🧩 Character Decomposition Explorer</h1>", unsafe_allow_html=True)
     
+    # Standalone test button to isolate issue
+    st.write("Rendering Standalone Test Button")
+    if st.button("Standalone Test", key="standalone_test"):
+        st.write("Standalone Test clicked")
+
     # Clear cache if max_depth changes
     if "prev_max_depth" not in st.session_state:
         st.session_state.prev_max_depth = st.session_state.max_depth
@@ -292,17 +299,28 @@ def main():
         st.cache_data.clear()
         st.experimental_rerun()
 
-    # Debug: Display session state
-    st.write(f"Current internal_selected_comp: {st.session_state.internal_selected_comp}")
-
     # Test button
+    st.write("Rendering Test Button")
     if st.button("Test Button", key="test_button"):
         st.write("Test Button clicked")
         st.session_state.internal_selected_comp = "Test"
         st.session_state.idc_refresh = not st.session_state.idc_refresh
+        st.session_state.force_rerun = True
+
+    # Debug: Display session state
+    st.write(f"Current internal_selected_comp: {st.session_state.internal_selected_comp}")
 
     if st.button("Show Session State"):
         st.write(st.session_state)
+
+    if st.button("Clear Cache"):
+        st.cache_data.clear()
+        st.experimental_rerun()
+
+    # Force rerun if flagged
+    if st.session_state.force_rerun:
+        st.session_state.force_rerun = False
+        st.experimental_rerun()
 
     if not st.session_state.internal_selected_comp:
         st.info("Please select or type a component to begin.")
@@ -322,9 +340,7 @@ def main():
     
     st.session_state.button_counter += 1
     char_id = f"selected_char_{st.session_state.button_counter}"
-    st.write(f"Selected char button key: {char_id}")
     st.markdown("<div class='selected-card'><h2 class='selected-char'>", unsafe_allow_html=True)
-    # Display the character as text since clicking it doesn't change the selection
     st.markdown(f"{st.session_state.internal_selected_comp}", unsafe_allow_html=True)
     st.markdown(f"</h2><p class='details'>{details}</p></div>", unsafe_allow_html=True)
 
