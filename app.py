@@ -98,8 +98,7 @@ def init_session_state():
         "selected_idc": "No Filter",
         "idc_refresh": False,
         "text_input_comp": selected_config["selected_comp"],
-        "button_counter": 0,
-        "force_rerun": False  # Flag to force rerun after button click
+        "button_counter": 0
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -180,7 +179,6 @@ def on_text_input_change(component_map):
         st.session_state.internal_selected_comp = text_value
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.session_state.text_input_comp = text_value
-        st.session_state.force_rerun = True
     elif text_value:
         st.warning("Invalid character. Please enter a valid component.")
 
@@ -188,7 +186,6 @@ def on_text_input_change(component_map):
 def on_selectbox_change():
     st.session_state.internal_selected_comp = st.session_state.selected_comp
     st.session_state.idc_refresh = not st.session_state.idc_refresh
-    st.session_state.force_rerun = True
 
 # --- Render controls ---
 def render_controls(component_map):
@@ -259,7 +256,6 @@ def render_char_card(char, compounds):
         st.write(f"Button clicked for character: {char}")
         st.session_state.internal_selected_comp = char
         st.session_state.idc_refresh = not st.session_state.idc_refresh
-        st.session_state.force_rerun = True
     st.markdown(f"</h3><p class='details'>{details}</p>", unsafe_allow_html=True)
     
     if compounds and st.session_state.display_mode != "Single Character":
@@ -274,7 +270,7 @@ def render_char_card(char, compounds):
 def main():
     st.markdown("<h1>🧩 Character Decomposition Explorer</h1>", unsafe_allow_html=True)
     
-    # Standalone test button to isolate issue
+    # Standalone test button
     st.write("Rendering Standalone Test Button")
     if st.button("Standalone Test", key="standalone_test"):
         st.write("Standalone Test clicked")
@@ -297,7 +293,7 @@ def main():
             del st.session_state[key]
         init_session_state()
         st.cache_data.clear()
-        st.experimental_rerun()
+        st.rerun()
 
     # Test button
     st.write("Rendering Test Button")
@@ -305,7 +301,6 @@ def main():
         st.write("Test Button clicked")
         st.session_state.internal_selected_comp = "Test"
         st.session_state.idc_refresh = not st.session_state.idc_refresh
-        st.session_state.force_rerun = True
 
     # Debug: Display session state
     st.write(f"Current internal_selected_comp: {st.session_state.internal_selected_comp}")
@@ -315,12 +310,7 @@ def main():
 
     if st.button("Clear Cache"):
         st.cache_data.clear()
-        st.experimental_rerun()
-
-    # Force rerun if flagged
-    if st.session_state.force_rerun:
-        st.session_state.force_rerun = False
-        st.experimental_rerun()
+        st.rerun()
 
     if not st.session_state.internal_selected_comp:
         st.info("Please select or type a component to begin.")
