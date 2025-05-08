@@ -81,7 +81,8 @@ def init_session_state():
         "idc_refresh": False,
         "text_input_comp": selected_config["selected_comp"],
         "page": 1,
-        "results_per_page": 50
+        "results_per_page": 50,
+        "previous_selected_comp": selected_config["selected_comp"]  # New: Store previous character
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -145,6 +146,7 @@ def build_component_map(max_depth):
 def on_text_input_change(component_map):
     text_value = st.session_state.text_input_comp.strip()
     if text_value in component_map or text_value in char_decomp:
+        st.session_state.previous_selected_comp = st.session_state.selected_comp  # Store current as previous
         st.session_state.selected_comp = text_value
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.session_state.page = 1
@@ -153,15 +155,27 @@ def on_text_input_change(component_map):
         st.session_state.text_input_comp = st.session_state.selected_comp
 
 def on_selectbox_change():
+    st.session_state.previous_selected_comp = st.session_state.selected_comp  # Store current as previous
     st.session_state.idc_refresh = not st.session_state.idc_refresh
     st.session_state.page = 1
 
-def on_output_char_select():
+def on_output_char_select(component_map):
     selected_char = st.session_state.output_char_select
-    if selected_char != "Select a character...":
+    if selected_char != "Select a character..." and selected_char in component_map:
+        # Valid selection: update selected component
+        st.session_state.previous_selected_comp = st.session_state.selected_comp  # Store current as previous
         st.session_state.selected_comp = selected_char
         st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.session_state.text_input_comp = selected_char
+        st.session_state.page = 1
+    else:
+        # Invalid selection: revert to previous character
+        if selected_char != "Select a character...":
+            st.warning("Invalid character selected. Reverting to previous character.")
+        st.session_state.selected_comp = st.session_state.previous_selected_comp
+        st.session_state.text_input_comp = st.session_state.previous_selected_comp
+        st.session_state.output_char_select = "Select a character..."
+        st.session_state.idc_refresh = not st.session_state.idc_refresh
         st.session_state.page = 1
 
 def render_controls(component_map):
@@ -271,19 +285,24 @@ def main():
             char_compounds[c] = [comp for comp in compounds if len(comp) == length]
 
     filtered_chars = [c for c in chars if not char_compounds[c] == [] or st.session_state.display_mode == "Single Character"]
-    
+
     # Dropdown for selecting output characters
-# Dropdown for selecting output characters
     if filtered_chars:
-        options = ["Select a character from the list below"] + sorted(filtered_chars, key=get_stroke_count)
+        options = ["Select a character..."] + sorted(filtered_chars, key=get_stroke_count)
+        # Include previous character in options if it exists and isn't already in filtered_chars
+        if (st.session_state.previous_selected_comp and 
+            st.session_state.previous_selected_comp != st.session_state.selected_comp and 
+            st.session_state.previous_selected_comp not in filtered_chars and 
+            st.session_state.previous_selected_comp in component_map):
+            options.insert(1, st.session_state.previous_selected_comp)  # Add after placeholder
         st.selectbox(
             "Select a character from the list below:",
             options=options,
             key="output_char_select",
-            on_change=on_output_char_select,
-            format_func=lambda c: c if c == "Select a character from the list below" else f"{c} ({get_stroke_count(c)} strokes, {clean_field(char_decomp.get(c, {}).get('definition', 'No definition available'))})"
-        )    
-    
+            on_change=lambda: on_output_char_select(component_map),
+            format_func=lambda c: c if c == "Select a character..." else f"{c} ({get_stroke_count(c)} strokes, {clean_field(char_decomp.get(c, {}).get('definition', 'No definition available'))})"
+        )
+
     st.markdown(f"<h2 class='results-header'>🧬 Characters with {st.session_state.selected_comp} — {len(filtered_chars)} result(s)</h2>", unsafe_allow_html=True)
 
     for char in sorted(filtered_chars, key=get_stroke_count):
