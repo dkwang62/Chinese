@@ -21,7 +21,7 @@ st.markdown("""
         border-left: 5px solid #3498db;
     }
     .selected-char { font-size: 2.5em; color: #e74c3c; margin: 0; }
-    .details { font-size: 1.1em; color: #34495e; margin: 0; }
+    .details { font-size: 1.5em; color: #34495e; margin: 0; }
     .details strong { color: #2c3e50; }
     .results-header { font-size: 1.5em; color: #2c3e50; margin: 20px 0 10px; }
     .char-card {
