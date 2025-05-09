@@ -241,9 +241,7 @@ def main():
         render_char_card(char, char_compounds.get(char, []))
 
     if filtered_chars:
-        export_text = "Give me the hanyu pinyin and meaning of each compound phrase in one line a phrase in a downloadable word file
-
-"
+        export_text = "Give me the hanyu pinyin and meaning of each compound phrase in one line a phrase in a downloadable word file"
         export_text += "\n".join(
             f"{compound}"
             for char in filtered_chars
