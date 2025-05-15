@@ -9,79 +9,85 @@ st.set_page_config(layout="wide")
 # Global IDC characters
 IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
 
-# Custom CSS (identical to reference code, with font scaling support)
-st.markdown("""
-<style>
-    .selected-card {
-        background-color: #e8f4f8;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        border-left: 5px solid #3498db;
-    }
-    .selected-char { font-size: calc(2.5em * {font_scale}); color: #e74c3c; margin: 0; }
-    .details { font-size: calc(1.5em * {font_scale}); color: #34495e; margin: 0; }
-    .details strong { color: #2c3e50; }
-    .results-header { font-size: calc(1.5em * {font_scale}); color: #2c3e50; margin: 20px 0 10px; }
-    .char-card {
-        background-color: #ffffff;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        transition: transform 0.2s;
-    }
-    .char-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-    }
-    .char-title { font-size: calc(1.4em * {font_scale}); color: #e74c3c; margin: 0; display: inline; }
-    .compounds-section {
-        background-color: #f1f8e9;
-        padding: 10px;
-        border-radius: 5px;
-        margin-top: 10px;
-    }
-    .compounds-title { font-size: calc(1.1em * {font_scale}); color: #558b2f; margin: 0 0 5px; }
-    .compounds-list { font-size: calc(1em * {font_scale}); color: #34495e; margin: 0; }
-    .stContainer {
-        padding: 10px;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        margin-bottom: 15px;
-    }
-    .stButton button {
-        background-color: #3498db;
-        color: white;
-        border-radius: 5px;
-        font-size: calc(0.9em * {font_scale});
-    }
-    .stButton button:hover {
-        background-color: #2980b9;
-    }
-    .debug-section {
-        background-color: #f5f5f5;
-        padding: 10px;
-        border-radius: 5px;
-        margin-top: 20px;
-    }
-    .diagnostic-message.error { color: #c0392b; }
-    .diagnostic-message.warning { color: #e67e22; }
-    @media (max-width: 768px) {
-        .selected-card { flex-direction: column; align-items: flex-start; padding: 10px; }
-        .selected-char { font-size: calc(2em * {font_scale}); }
-        .details, .compounds-list { font-size: calc(0.95em * {font_scale}); line-height: 1.5; }
-        .results-header { font-size: calc(1.3em * {font_scale}); }
-        .char-card { padding: 10px; }
-        .char-title { font-size: calc(1.2em * {font_scale}); }
-        .compounds-title { font-size: calc(1em * {font_scale}); }
-    }
-</style>
-""".replace("{font_scale}", "{st.session_state.font_scale}"), unsafe_allow_html=True)
+# Dynamic CSS with font scaling
+def apply_dynamic_css():
+    font_scale = st.session_state.get('font_scale', 1.0)
+    css = f"""
+    <style>
+        .selected-card {{
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-left: 5px solid #3498db;
+        }}
+        .selected-char {{ font-size: calc(2.5em * {font_scale}); color: #e74c3c; margin: 0; }}
+        .details {{ font-size: calc(1.5em * {font_scale}); color: #34495e; margin: 0; }}
+        .details strong {{ color: #2c3e50; }}
+        .results-header {{ font-size: calc(1.5em * {font_scale}); color: #2c3e50; margin: 20px 0 10px; }}
+        .char-card {{
+            background-color: #ffffff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }}
+        .char-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+        }}
+        .char-title {{ font-size: calc(1.4em * {font_scale}); color: #e74c3c; margin: 0; display: inline; }}
+        .compounds-section {{
+            background-color: #f1f8e9;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }}
+        .compounds-title {{ font-size: calc(1.1em * {font_scale}); color: #558b2f; margin: 0 0 5px; }}
+        .compounds-list {{ font-size: calc(1em * {font_scale}); color: #34495e; margin: 0; }}
+        .stContainer {{
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }}
+        .stButton button {{
+            background-color: #3498db;
+            color: white;
+            border-radius: 5px;
+            font-size: calc(0.9em * {font_scale});
+        }}
+        .stButton button:hover {{
+            background-color: #2980b9;
+        }}
+        .debug-section {{
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }}
+        .diagnostic-message.error {{ color: #c0392b; }}
+        .diagnostic-message.warning {{ color: #e67e22; }}
+        .stSelectbox, .stTextInput, .stRadio, .stSlider {{
+            font-size: calc(0.9em * {font_scale});
+        }}
+        @media (max-width: 768px) {{
+            .selected-card {{ flex-direction: column; align-items: flex-start; padding: 10px; }}
+            .selected-char {{ font-size: calc(2em * {font_scale}); }}
+            .details, .compounds-list {{ font-size: calc(0.95em * {font_scale}); line-height: 1.5; }}
+            .results-header {{ font-size: calc(1.3em * {font_scale}); }}
+            .char-card {{ padding: 10px; }}
+            .char-title {{ font-size: calc(1.2em * {font_scale}); }}
+            .compounds-title {{ font-size: calc(1em * {font_scale}); }}
+        }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
 
 # Load component map
 @st.cache_data
@@ -179,7 +185,7 @@ def init_session_state():
         "debug_info": "",
         "last_processed_input": "",
         "diagnostic_messages": [],
-        "font_scale": 1.0  # Added for font size adjustment
+        "font_scale": 1.0
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
@@ -301,16 +307,6 @@ def render_controls(component_map):
         "⿺": "Bottom Left Corner",
         "⿻": "Overlaid"
     }
-
-    # Font scale slider
-    st.slider("Adjust Font Size:", 0.7, 1.3, st.session_state.font_scale, 0.1, key="font_scale")
-    st.markdown(f"""
-        <style>
-            .stSelectbox, .stTextInput, .stRadio, .stSlider {{
-                font-size: calc(0.9em * {st.session_state.font_scale});
-            }}
-        </style>
-    """, unsafe_allow_html=True)
 
     # Filter row for component input filters
     with st.container():
@@ -529,6 +525,9 @@ def main():
         st.session_state.diagnostic_messages.append({"type": "error", "message": error_msg})
         return
 
+    # Apply dynamic CSS
+    apply_dynamic_css()
+
     st.markdown("<h1>🧩 汉字 Radix</h1>", unsafe_allow_html=True)
     render_controls(component_map)
 
@@ -616,10 +615,11 @@ def main():
                 </script>
             """, height=0)
 
-    # Render debug information and diagnostics at the end
+    # Render debug information, font slider, and diagnostics
     radicals = {c for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical", "") == c}
     with st.expander("Debug Information (For Developers)", expanded=False):
         st.markdown("<div class='debug-section'>", unsafe_allow_html=True)
+        st.slider("Adjust Font Size:", 0.7, 1.3, st.session_state.font_scale, 0.1, key="font_scale")
         st.write(f"Total components: {len(component_map)}, Radicals: {len(radicals)}")
         st.write(f"Current text_input_comp: '{st.session_state.text_input_comp}'")
         st.write(f"Current selected_comp: '{st.session_state.selected_comp}'")
