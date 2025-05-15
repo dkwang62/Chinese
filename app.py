@@ -9,7 +9,7 @@ st.set_page_config(layout="wide")
 # Global IDC characters
 IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
 
-# Custom CSS
+# Custom CSS (identical to provided code)
 st.markdown("""
 <style>
     .selected-card {
@@ -198,8 +198,9 @@ def process_text_input(component_map):
         st.session_state.debug_info += f"; {len(radicals)} radicals in component_map"
 
         if len(text_value) != 1:
-            st.session_state.text_input_warning = "Please enter exactly one character."
-            st.session_state.diagnostic_messages.append({"type": "warning", "message": "Please enter exactly one character."})
+            warning_msg = "Please enter exactly one character."
+            st.session_state.text_input_warning = warning_msg
+            st.session_state.diagnostic_messages.append({"type": "warning", "message": warning_msg})
             st.session_state.debug_info += "; Invalid length"
             st.session_state.text_input_comp = ""
             st.session_state.last_processed_input = text_value
@@ -354,7 +355,7 @@ def render_controls(component_map):
                 comp for comp in component_map
                 if isinstance(comp, str) and len(comp) == 1 and
                 (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count) and
-                (st.session_state.radical == "No Filter" or component_map.get(c, {}).get("meta", {}).get("radical", "") == st.session_state.radical)
+                (st.session_state.radical == "No Filter" or component_map.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.radical)
             ]
             component_idcs = {"No Filter"} | {
                 component_map.get(c, {}).get("meta", {}).get("decomposition", "")[0]
