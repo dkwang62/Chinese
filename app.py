@@ -9,7 +9,7 @@ st.set_page_config(layout="wide")
 # Global IDC characters
 IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
 
-# Custom CSS (identical to provided code)
+# Custom CSS (identical to reference code, with font scaling support)
 st.markdown("""
 <style>
     .selected-card {
@@ -23,10 +23,10 @@ st.markdown("""
         gap: 15px;
         border-left: 5px solid #3498db;
     }
-    .selected-char { font-size: 2.5em; color: #e74c3c; margin: 0; }
-    .details { font-size: 1.5em; color: #34495e; margin: 0; }
+    .selected-char { font-size: calc(2.5em * {font_scale}); color: #e74c3c; margin: 0; }
+    .details { font-size: calc(1.5em * {font_scale}); color: #34495e; margin: 0; }
     .details strong { color: #2c3e50; }
-    .results-header { font-size: 1.5em; color: #2c3e50; margin: 20px 0 10px; }
+    .results-header { font-size: calc(1.5em * {font_scale}); color: #2c3e50; margin: 20px 0 10px; }
     .char-card {
         background-color: #ffffff;
         padding: 15px;
@@ -39,15 +39,15 @@ st.markdown("""
         transform: translateY(-2px);
         box-shadow: 0 3px 8px rgba(0,0,0,0.15);
     }
-    .char-title { font-size: 1.4em; color: #e74c3c; margin: 0; display: inline; }
+    .char-title { font-size: calc(1.4em * {font_scale}); color: #e74c3c; margin: 0; display: inline; }
     .compounds-section {
         background-color: #f1f8e9;
         padding: 10px;
         border-radius: 5px;
         margin-top: 10px;
     }
-    .compounds-title { font-size: 1.1em; color: #558b2f; margin: 0 0 5px; }
-    .compounds-list { font-size: 1em; color: #34495e; margin: 0; }
+    .compounds-title { font-size: calc(1.1em * {font_scale}); color: #558b2f; margin: 0 0 5px; }
+    .compounds-list { font-size: calc(1em * {font_scale}); color: #34495e; margin: 0; }
     .stContainer {
         padding: 10px;
         border: 1px solid #e0e0e0;
@@ -58,6 +58,7 @@ st.markdown("""
         background-color: #3498db;
         color: white;
         border-radius: 5px;
+        font-size: calc(0.9em * {font_scale});
     }
     .stButton button:hover {
         background-color: #2980b9;
@@ -72,15 +73,15 @@ st.markdown("""
     .diagnostic-message.warning { color: #e67e22; }
     @media (max-width: 768px) {
         .selected-card { flex-direction: column; align-items: flex-start; padding: 10px; }
-        .selected-char { font-size: 2em; }
-        .details, .compounds-list { font-size: 0.95em; line-height: 1.5; }
-        .results-header { font-size: 1.3em; }
+        .selected-char { font-size: calc(2em * {font_scale}); }
+        .details, .compounds-list { font-size: calc(0.95em * {font_scale}); line-height: 1.5; }
+        .results-header { font-size: calc(1.3em * {font_scale}); }
         .char-card { padding: 10px; }
-        .char-title { font-size: 1.2em; }
-        .compounds-title { font-size: 1em; }
+        .char-title { font-size: calc(1.2em * {font_scale}); }
+        .compounds-title { font-size: calc(1em * {font_scale}); }
     }
 </style>
-""", unsafe_allow_html=True)
+""".replace("{font_scale}", "{st.session_state.font_scale}"), unsafe_allow_html=True)
 
 # Load component map
 @st.cache_data
@@ -177,7 +178,8 @@ def init_session_state():
         "text_input_warning": None,
         "debug_info": "",
         "last_processed_input": "",
-        "diagnostic_messages": []  # Store errors and warnings
+        "diagnostic_messages": [],
+        "font_scale": 1.0  # Added for font size adjustment
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
@@ -299,6 +301,16 @@ def render_controls(component_map):
         "⿺": "Bottom Left Corner",
         "⿻": "Overlaid"
     }
+
+    # Font scale slider
+    st.slider("Adjust Font Size:", 0.7, 1.3, st.session_state.font_scale, 0.1, key="font_scale")
+    st.markdown(f"""
+        <style>
+            .stSelectbox, .stTextInput, .stRadio, .stSlider {{
+                font-size: calc(0.9em * {st.session_state.font_scale});
+            }}
+        </style>
+    """, unsafe_allow_html=True)
 
     # Filter row for component input filters
     with st.container():
@@ -614,6 +626,7 @@ def main():
         st.write(f"Current stroke_count: {st.session_state.stroke_count}")
         st.write(f"Current radical: {st.session_state.radical}")
         st.write(f"Current component_idc: {st.session_state.component_idc}")
+        st.write(f"Font scale: {st.session_state.font_scale}")
         st.write(f"Debug log: {st.session_state.debug_info}")
         st.markdown("### Errors and Warnings")
         for msg in st.session_state.diagnostic_messages:
