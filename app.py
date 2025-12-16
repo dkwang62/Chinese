@@ -22,7 +22,7 @@ bootstrap_session_state()
 
 
 # -------------------------------
-# Dynamic CSS with font scaling + hide controls
+# Dynamic CSS with font scaling + conditional hide
 # -------------------------------
 def apply_dynamic_css():
     font_scale = st.session_state.get("font_scale", 1.0)
@@ -113,8 +113,8 @@ def apply_dynamic_css():
             font-size: calc(0.9em * var(--fontScale));
         }}
 
-        /* Hide controls when component is selected */
-        .controls-section {{ {hide_controls} }}
+        /* Hide the entire controls block when component is selected */
+        .controls-block {{ {hide_controls} }}
 
         @media (max-width: 768px) {{
             .selected-card {{ flex-direction: column; align-items: flex-start; padding: 10px; }}
@@ -367,139 +367,143 @@ def render_controls(component_map_arg):
         "⿻": "Overlaid"
     }
 
-    # Always render filters (with keys) but hide via CSS when not needed
-    with st.container(css_class="controls-section"):
-        st.markdown("### Component Filters")
-        st.caption("Filter components by stroke count, radical, or structure.")
-        col1, col2, col3 = st.columns([0.4, 0.4, 0.4])
+    # Wrap all controls in a div that can be hidden
+    st.markdown('<div class="controls-block">', unsafe_allow_html=True)
 
-        with col1:
-            stroke_counts = sorted(set(
-                sc for sc in (get_stroke_count(comp) for comp in component_map_arg if isinstance(comp, str) and len(comp) == 1)
-                if isinstance(sc, int) and sc > 0
-            ))
-            st.selectbox(
-                "Filter by Strokes:",
-                options=[0] + stroke_counts if stroke_counts else [0],
-                key="stroke_count",
-                format_func=lambda x: "No Filter" if x == 0 else str(x),
-                on_change=on_filter_change
-            )
+    st.markdown("### Component Filters")
+    st.caption("Filter components by stroke count, radical, or structure.")
+    col1, col2, col3 = st.columns([0.4, 0.4, 0.4])
 
-        with col2:
-            pre_filtered = [comp for comp in component_map_arg if isinstance(comp, str) and len(comp) == 1 and
-                            (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count)]
-            radicals = {"No Filter"} | {component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") for comp in pre_filtered
-                                       if component_map_arg.get(comp, {}).get("meta", {}).get("radical", "")}
-            radical_options = ["No Filter"] + sorted(radicals - {"No Filter"})
-            if st.session_state.radical not in radical_options:
-                st.session_state.radical = "No Filter"
-            st.selectbox(
-                "Filter by Radical:",
-                options=radical_options,
-                index=radical_options.index(st.session_state.radical),
-                key="radical",
-                on_change=on_filter_change
-            )
+    with col1:
+        stroke_counts = sorted(set(
+            sc for sc in (get_stroke_count(comp) for comp in component_map_arg if isinstance(comp, str) and len(comp) == 1)
+            if isinstance(sc, int) and sc > 0
+        ))
+        st.selectbox(
+            "Filter by Strokes:",
+            options=[0] + stroke_counts if stroke_counts else [0],
+            key="stroke_count",
+            format_func=lambda x: "No Filter" if x == 0 else str(x),
+            on_change=on_filter_change
+        )
 
-        with col3:
-            pre_filtered = [comp for comp in component_map_arg if isinstance(comp, str) and len(comp) == 1 and
-                            (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count) and
-                            (st.session_state.radical == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.radical)]
-            component_idcs = {"No Filter"} | {component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "")[0]
-                                              for comp in pre_filtered
-                                              if component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "") and
-                                                 component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "")[0] in IDC_CHARS}
-            component_idc_options = ["No Filter"] + sorted(component_idcs - {"No Filter"})
-            if st.session_state.component_idc not in component_idc_options:
-                st.session_state.component_idc = "No Filter"
-            st.selectbox(
-                "Filter by Structure IDC:",
-                options=component_idc_options,
-                format_func=lambda x: f"{x} ({idc_descriptions.get(x, x)})" if x != "No Filter" else x,
-                index=component_idc_options.index(st.session_state.component_idc),
-                key="component_idc",
-                on_change=on_filter_change
-            )
+    with col2:
+        pre_filtered = [comp for comp in component_map_arg if isinstance(comp, str) and len(comp) == 1 and
+                        (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count)]
+        radicals = {"No Filter"} | {component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") for comp in pre_filtered
+                                   if component_map_arg.get(comp, {}).get("meta", {}).get("radical", "")}
+        radical_options = ["No Filter"] + sorted(radicals - {"No Filter"})
+        if st.session_state.radical not in radical_options:
+            st.session_state.radical = "No Filter"
+        st.selectbox(
+            "Filter by Radical:",
+            options=radical_options,
+            index=radical_options.index(st.session_state.radical),
+            key="radical",
+            on_change=on_filter_change
+        )
 
-        st.markdown("### Select Input Component")
-        st.caption("Click a character to preview details. Click again to select it.")
+    with col3:
+        pre_filtered = [comp for comp in component_map_arg if isinstance(comp, str) and len(comp) == 1 and
+                        (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count) and
+                        (st.session_state.radical == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.radical)]
+        component_idcs = {"No Filter"} | {component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "")[0]
+                                          for comp in pre_filtered
+                                          if component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "") and
+                                             component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "")[0] in IDC_CHARS}
+        component_idc_options = ["No Filter"] + sorted(component_idcs - {"No Filter"})
+        if st.session_state.component_idc not in component_idc_options:
+            st.session_state.component_idc = "No Filter"
+        st.selectbox(
+            "Filter by Structure IDC:",
+            options=component_idc_options,
+            format_func=lambda x: f"{x} ({idc_descriptions.get(x, x)})" if x != "No Filter" else x,
+            index=component_idc_options.index(st.session_state.component_idc),
+            key="component_idc",
+            on_change=on_filter_change
+        )
 
-        col4, col5 = st.columns([1.5, 0.2])
+    st.markdown("### Select Input Component")
+    st.caption("Click a character to preview details. Click again to select it.")
 
-        with col4:
-            filtered_components = [
-                comp for comp in component_map_arg
-                if isinstance(comp, str) and len(comp) == 1 and
-                (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count) and
-                (st.session_state.radical == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.radical) and
-                (st.session_state.component_idc == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
-            ]
+    col4, col5 = st.columns([1.5, 0.2])
 
-            selected_char_components = get_all_components(st.session_state.get("selected_comp", ""), max_depth=5)
-            filtered_components.extend([comp for comp in selected_char_components if comp not in filtered_components and comp in component_map_arg])
+    with col4:
+        filtered_components = [
+            comp for comp in component_map_arg
+            if isinstance(comp, str) and len(comp) == 1 and
+            (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count) and
+            (st.session_state.radical == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.radical) and
+            (st.session_state.component_idc == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
+        ]
 
-            sorted_components = sorted(filtered_components, key=lambda c: get_stroke_count(c) or 0)
+        selected_char_components = get_all_components(st.session_state.get("selected_comp", ""), max_depth=5)
+        filtered_components.extend([comp for comp in selected_char_components if comp not in filtered_components and comp in component_map_arg])
 
-            if not sorted_components:
-                warning_msg = "No components match the current filters. Adjust filters and try again."
-                st.warning(warning_msg)
-                return []
+        sorted_components = sorted(filtered_components, key=lambda c: get_stroke_count(c) or 0)
 
-            # Show preview card if active
-            if st.session_state.get("preview_active") and st.session_state.get("preview_comp"):
-                render_preview_card(st.session_state.preview_comp)
+        if not sorted_components:
+            warning_msg = "No components match the current filters. Adjust filters and try again."
+            st.warning(warning_msg)
+            st.markdown('</div>', unsafe_allow_html=True)  # Close early if no components
+            return []
 
-            # Grid pagination
-            PAGE_SIZE = 96
-            GRID_COLS = 12
-            total = len(sorted_components)
-            max_page = max(1, math.ceil(total / PAGE_SIZE))
-            st.session_state.page = max(1, min(st.session_state.page, max_page))
+        # Show preview card if active
+        if st.session_state.get("preview_active") and st.session_state.get("preview_comp"):
+            render_preview_card(st.session_state.preview_comp)
 
-            p1, p2, p3 = st.columns([1, 2, 1])
-            with p1:
-                if st.button("◀ Prev", disabled=(st.session_state.page <= 1), key="comp_prev"):
-                    st.session_state.page -= 1
-            with p2:
-                start_i = (st.session_state.page - 1) * PAGE_SIZE + 1
-                end_i = min(st.session_state.page * PAGE_SIZE, total)
-                st.caption(f"Showing {start_i}–{end_i} of {total} components")
-            with p3:
-                if st.button("Next ▶", disabled=(st.session_state.page >= max_page), key="comp_next"):
-                    st.session_state.page += 1
+        # Grid pagination
+        PAGE_SIZE = 96
+        GRID_COLS = 12
+        total = len(sorted_components)
+        max_page = max(1, math.ceil(total / PAGE_SIZE))
+        st.session_state.page = max(1, min(st.session_state.page, max_page))
 
-            start = (st.session_state.page - 1) * PAGE_SIZE
-            end = min(start + PAGE_SIZE, total)
-            page_components = sorted_components[start:end]
+        p1, p2, p3 = st.columns([1, 2, 1])
+        with p1:
+            if st.button("◀ Prev", disabled=(st.session_state.page <= 1), key="comp_prev"):
+                st.session_state.page -= 1
+        with p2:
+            start_i = (st.session_state.page - 1) * PAGE_SIZE + 1
+            end_i = min(st.session_state.page * PAGE_SIZE, total)
+            st.caption(f"Showing {start_i}–{end_i} of {total} components")
+        with p3:
+            if st.button("Next ▶", disabled=(st.session_state.page >= max_page), key="comp_next"):
+                st.session_state.page += 1
 
-            st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
-            cols = st.columns(GRID_COLS)
-            for i, ch in enumerate(page_components):
-                with cols[i % GRID_COLS]:
-                    is_selected = (st.session_state.get("selected_comp") == ch)
-                    is_preview = (st.session_state.get("preview_comp") == ch and st.session_state.get("preview_active"))
-                    st.button(
-                        ch,
-                        key=f"comp_tile_{ch}_{st.session_state.page}",
-                        use_container_width=True,
-                        type="primary" if (is_selected or is_preview) else "secondary",
-                        on_click=on_component_tile_click,
-                        args=(ch,),
-                    )
-            st.markdown("</div>", unsafe_allow_html=True)
+        start = (st.session_state.page - 1) * PAGE_SIZE
+        end = min(start + PAGE_SIZE, total)
+        page_components = sorted_components[start:end]
 
-        with col5:
-            if st.session_state.text_input_warning:
-                st.warning(st.session_state.text_input_warning)
-            st.text_input(
-                "Or type:",
-                value=st.session_state.text_input_comp,
-                key="text_input_comp",
-                on_change=process_text_input,
-                args=(component_map_arg,),
-                placeholder="Enter one Chinese character"
-            )
+        st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+        cols = st.columns(GRID_COLS)
+        for i, ch in enumerate(page_components):
+            with cols[i % GRID_COLS]:
+                is_selected = (st.session_state.get("selected_comp") == ch)
+                is_preview = (st.session_state.get("preview_comp") == ch and st.session_state.get("preview_active"))
+                st.button(
+                    ch,
+                    key=f"comp_tile_{ch}_{st.session_state.page}",
+                    use_container_width=True,
+                    type="primary" if (is_selected or is_preview) else "secondary",
+                    on_click=on_component_tile_click,
+                    args=(ch,),
+                )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col5:
+        if st.session_state.text_input_warning:
+            st.warning(st.session_state.text_input_warning)
+        st.text_input(
+            "Or type:",
+            value=st.session_state.text_input_comp,
+            key="text_input_comp",
+            on_change=process_text_input,
+            args=(component_map_arg,),
+            placeholder="Enter one Chinese character"
+        )
+
+    st.markdown('</div>', unsafe_allow_html=True)  # Close controls-block
 
     # Back / Reset buttons (shown only when a component is selected)
     if not st.session_state.show_inputs:
