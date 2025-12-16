@@ -321,7 +321,7 @@ except Exception as e:
 def clean_field(field):
     """Clean and format field data"""
     return field,[object Object], if isinstance(field, list) and field else field or "—"
-
+    
 def get_stroke_count(char):
     """Get stroke count for a character"""
     strokes = component_map.get(char, {}).get("meta", {}).get("strokes", None)
