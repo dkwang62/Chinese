@@ -246,9 +246,9 @@ def main():
         if st.session_state.component_idc != "none":
             filter_parts.append(f"Structure: {st.session_state.component_idc}")
 
-        filter_summary = " · ".join(filter_parts) if filter_parts else "nones applied"
+        filter_summary = " · ".join(filter_parts) if filter_parts else "none"
         instruction = "Click TILE twice to see characters built on this component" if st.session_state.preview_active else "Click a TILE to preview"
-        st.markdown(f"<div class='status-line'>List filtered {filter_summary} — {instruction}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='status-line'>Filtered: {filter_summary} — {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
