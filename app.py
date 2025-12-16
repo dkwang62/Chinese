@@ -147,74 +147,15 @@ def reset():
 
 def render_preview(c):
     meta = component_map.get(c, {}).get("meta", {})
-    
-    # 1. Get the raw values
-    val_pinyin = clean_field(meta.get("pinyin", "—"))
-    val_strokes = f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else ""
-    val_radical = clean_field(meta.get("radical", "—"))
-    val_decomp = format_decomposition(c)
-    val_def = clean_field(meta.get("definition", "—"))
-    val_etym = get_etymology_text(meta)
-
-    # 2. Build the list of parts to display
-    parts = []
-
-    # No Label: Pinyin
-    if val_pinyin != "—": 
-        parts.append(val_pinyin)
-
-    # No Label: Strokes
-    if val_strokes: 
-        parts.append(val_strokes)
-
-    # Label: Radical (Usually helpful to distinguish from the main char)
-    if val_radical != "—": 
-        parts.append(f"<strong>Radical:</strong> {val_radical}")
-
-    # Label: Decomposition
-    if val_decomp != "—": 
-        parts.append(f"<strong>Decomposition:</strong> {val_decomp}")
-
-    # No Label: Definition
-    if val_def != "—": 
-        parts.append(val_def)
-
-    # Label: Etymology
-    if val_etym: 
-        parts.append(f"<strong>Etymology:</strong> {val_etym}")
-
-    # 3. Join them with the separator
-    details = " · ".join(parts)
-    
-    # 4. Render
-    with st.container():
-        c1, c2 = st.columns([1, 8], vertical_alignment="center")
-        
-        with c1:
-            st.markdown(f'''
-                <div style="
-                    font-size: 3.5em; 
-                    font-weight: bold; 
-                    color: #e74c3c; 
-                    text-align: center; 
-                    line-height: 1;
-                ">
-                    {c}
-                </div>
-            ''', unsafe_allow_html=True)
-            
-        with c2:
-            st.markdown(f'''
-                <div style="
-                    font-size: 1.1em; 
-                    color: #2c3e50; 
-                    line-height: 1.5;
-                ">
-                    {details}
-                </div>
-            ''', unsafe_allow_html=True)
-            
-    st.markdown("---")
+    f = {
+        "Pinyin": clean_field(meta.get("pinyin", "—")),
+        "Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else "unknown",
+        "Radical": clean_field(meta.get("radical", "—")),
+        "Decomposition": format_decomposition(c),
+        "Definition": clean_field(meta.get("definition", "—")),
+        "Etymology": get_etymology_text(meta),
+    }
+    details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
     
     # --- NEW LAYOUT: Side-by-Side and Proportional ---
     # Create a container with a border for the preview area
