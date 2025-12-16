@@ -9,21 +9,13 @@ IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹
 def apply_dynamic_css():
     css = """
     <style>
-        .selected-card {
-            background-color: #e8f4f8;
-            padding: 20px;
-            border-radius: 12px;
-            margin: 20px 0;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            border-left: 6px solid #3498db;
+        .results-header-sidebar {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 20px 0 10px 0;
+            text-align: center;
         }
-        .selected-char { font-size: 3em; color: #e74c3c; }
-        .details { font-size: 1.6em; color: #2c3e50; }
-        .details strong { color: #34495e; }
-        .results-header { font-size: 1.8em; color: #2c3e50; margin: 30px 0 15px; }
         .char-card {
             background: white;
             padding: 18px;
@@ -50,9 +42,6 @@ def apply_dynamic_css():
             margin: 20px 0;
             text-align: center;
             font-weight: 500;
-        }
-        @media (max-width: 768px) {
-            .selected-card { flex-direction: column; text-align: center; }
         }
     </style>
     """
@@ -181,7 +170,8 @@ def render_preview(c):
         "Etymology": get_etymology_text(meta),
     }
     details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
-    st.markdown(f'<div class="selected-card"><h2 class="selected-char">{c}</h2><div class="details">{details}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<h2 style="text-align:center; font-size:3em; color:#e74c3c; margin:30px 0;">{c}</h2>', unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align:center; font-size:1.6em; color:#2c3e50;">{details}</div>', unsafe_allow_html=True)
 
 def main():
     if not component_map:
@@ -189,7 +179,7 @@ def main():
 
     apply_dynamic_css()
 
-    # === SIDEBAR — App Home ===
+    # === SIDEBAR — App control center ===
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
@@ -226,6 +216,15 @@ def main():
             modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
             st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
 
+            # Results count in sidebar
+            related = component_map[st.session_state.selected_comp].get("related_characters", [])
+            chars = [c for c in related if len(c)==1]
+            n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
+            compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
+            valid_chars = [c for c in chars if n==0 or compounds[c]]
+            st.markdown(f"<div class='results-header-sidebar'>🧬 Results — {len(valid_chars)}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; font-size:1.8em; color:#e74c3c; margin:20px 0;'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
+
     # === MAIN CONTENT ===
     if st.session_state.show_inputs:
         # Browsing / Preview
@@ -234,7 +233,7 @@ def main():
         if st.session_state.radical != "No Filter": parts.append(f"Radical: {st.session_state.radical}")
         if st.session_state.component_idc != "No Filter": parts.append(f"Structure: {st.session_state.component_idc}")
         filter_text = " · ".join(parts) if parts else "No filters applied"
-        instruction = "Click tile to preview → click again to confirm" if st.session_state.preview_active else "Click a tile to preview"
+        instruction = "Click again to confirm" if st.session_state.preview_active else "Click a tile to preview"
         st.markdown(f"<div class='status-line'>{filter_text} — {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
@@ -280,29 +279,13 @@ def main():
         st.markdown("</div>", unsafe_allow_html=True)
 
     else:
-        # Results mode
-        if st.session_state.selected_comp not in component_map:
-            st.stop()
-
-        meta = component_map[st.session_state.selected_comp]["meta"]
-        f = {
-            "Pinyin": clean_field(meta.get("pinyin", "—")),
-            "Strokes": f"{get_stroke_count(st.session_state.selected_comp)} strokes" if get_stroke_count(st.session_state.selected_comp) else "unknown",
-            "Radical": clean_field(meta.get("radical", "—")),
-            "Decomposition": format_decomposition(st.session_state.selected_comp),
-            "Definition": clean_field(meta.get("definition", "—")),
-            "Etymology": get_etymology_text(meta),
-        }
-        details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
-        st.markdown(f'<div class="selected-card"><h2 class="selected-char">{st.session_state.selected_comp}</h2><div class="details">{details}</div></div>', unsafe_allow_html=True)
-
+        # Results mode — main screen only shows result characters
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         chars = [c for c in related if len(c)==1]
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
         chars = [c for c in chars if n==0 or compounds[c]]
 
-        st.markdown(f"<div class='results-header'>🧬 Results — {len(chars)}</div>", unsafe_allow_html=True)
         for c in sorted(chars, key=lambda x: get_stroke_count(x) or 999):
             meta = component_map.get(c, {}).get("meta", {})
             fd = {
@@ -317,7 +300,7 @@ def main():
             st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,))
             st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
             if compounds.get(c):
-                st.markdown(f"<div class='compounds-section'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:8px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
 
         if chars and n:
             with st.expander("Export Compounds"):
