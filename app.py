@@ -9,51 +9,22 @@ IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹
 def apply_dynamic_css():
     css = """
     <style>
-        .results-header-sidebar {
-            font-size: 1.4em;
-            font-weight: bold;
-            color: #2c3e50;
-            margin: 20px 0 10px 0;
-            text-align: center;
-        }
-        .selected-char-sidebar {
-            font-size: 2.2em;
-            text-align: center;
-            color: #e74c3c;
-            margin: 20px 0;
-            font-weight: bold;
-        }
-        .char-card {
-            background: white;
-            padding: 18px;
-            border-radius: 10px;
-            margin-bottom: 0px;  /* Changed from 12px to 0px */
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            height: 100%; 
-            display: flex;
-            align-items: center;
-        }
-        /* --- UPDATED BUTTON STYLES FOR LARGER TILES --- */
-        .comp-grid .stButton button {
-            font-size: 2em;       /* Larger font for better visibility */
-            height: 80px;         /* Taller button */
-            background: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 12px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-        }
-        .comp-grid .stButton button:hover {
-            background: #fff5f5;
-            border-color: #f2c6c6;
-            color: #c0392b;
-        }
+        /* ... keep your other existing styles (buttons, headers, etc.) ... */
+
+        /* UPDATED: Make instructions prominent */
         .status-line {
-            font-size: 1.2em;
-            color: #444;
-            margin: 20px 0;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #0f5132;
+            background-color: #d1e7dd; /* Light green background for visibility */
+            border: 1px solid #badbcc;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0 30px 0;
             text-align: center;
-            font-weight: 500;
         }
+
+        /* ... keep other styles ... */
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -185,8 +156,46 @@ def render_preview(c):
         "Etymology": get_etymology_text(meta),
     }
     details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
-    st.markdown(f'<h2 style="text-align:center; font-size:3em; color:#e74c3c; margin:30px 0;">{c}</h2>', unsafe_allow_html=True)
-    st.markdown(f'<div style="text-align:center; font-size:1.6em; color:#2c3e50;">{details}</div>', unsafe_allow_html=True)
+    
+    # --- NEW LAYOUT: Side-by-Side and Proportional ---
+    # Create a container with a border for the preview area
+    with st.container():
+        # Use columns: Narrow column for Char, Wide column for Text
+        # vertical_alignment="center" ensures the text aligns with the character
+        c1, c2 = st.columns([1, 8], vertical_alignment="center")
+        
+        with c1:
+            # Character: Smaller, contained, red
+            st.markdown(f'''
+                <div style="
+                    font-size: 3.5em; 
+                    font-weight: bold; 
+                    color: #e74c3c; 
+                    text-align: center; 
+                    line-height: 1;
+                    padding: 10px;
+                    border: 1px solid #eee;
+                    border-radius: 8px;
+                    background: white;
+                ">
+                    {c}
+                </div>
+            ''', unsafe_allow_html=True)
+            
+        with c2:
+            # Description: Normal readable size, left-aligned
+            st.markdown(f'''
+                <div style="
+                    font-size: 1.1em; 
+                    color: #2c3e50; 
+                    line-height: 1.5;
+                ">
+                    {details}
+                </div>
+            ''', unsafe_allow_html=True)
+            
+    # Add a divider or spacer after the preview to separate it from the grid below
+    st.markdown("---")
 
 def main():
     if not component_map:
