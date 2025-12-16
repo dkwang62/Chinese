@@ -17,6 +17,17 @@ def bootstrap_session_state():
     st.session_state.setdefault("diagnostic_messages", [])
     st.session_state.setdefault("font_scale", 1.0)
     st.session_state.setdefault("debug_info", "")
+    
+    # Filter States
+    st.session_state.setdefault("stroke_count", 0)
+    st.session_state.setdefault("radical", "No Filter")
+    st.session_state.setdefault("component_idc", "No Filter")
+    
+    # Navigation States
+    st.session_state.setdefault("selected_comp", "")
+    st.session_state.setdefault("page", 1)
+    st.session_state.setdefault("show_inputs", True)
+    st.session_state.setdefault("display_mode", "Single Character")
 
 bootstrap_session_state()
 
@@ -106,7 +117,7 @@ def apply_dynamic_css():
             font-weight: 500;
         }
 
-        /* --- CLEAN GRID TILES (The fix for "Unacceptable" UI) --- */
+        /* --- CLEAN GRID TILES --- */
         .comp-grid .stButton button {
             background: #ffffff;
             color: #2c3e50;
@@ -114,7 +125,7 @@ def apply_dynamic_css():
             border-radius: 8px;
             font-size: calc(1.6em * var(--fontScale));
             padding: 0px; 
-            min-height: 56px; /* Enforce square-ish shape */
+            min-height: 56px;
             line-height: 1;
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
             transition: all 0.2s ease;
@@ -131,7 +142,6 @@ def apply_dynamic_css():
             transform: translateY(0);
             box-shadow: none;
         }
-        /* Highlight selected tile in grid (if applicable) */
         .comp-grid .stButton button[kind="primary"] {
              border: 2px solid #3498db;
              background-color: #e8f4f8;
@@ -166,7 +176,6 @@ def apply_dynamic_css():
 # -------------------------------
 @st.cache_data
 def load_component_map():
-    # Ensure this file exists in your directory
     with open("enhanced_component_map_with_etymology.json", "r", encoding="utf-8") as f:
         data = json.load(f)
     return data
@@ -209,54 +218,13 @@ def format_decomposition(char):
         return "—"
     return decomposition
 
-def get_all_components(char, max_depth, depth=0, seen=None):
-    if seen is None:
-        seen = set()
-    if char in seen or depth > max_depth or not isinstance(char, str) or len(char) != 1:
-        return set()
-    seen.add(char)
-
-    components_set = set()
-    decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
-    if decomposition:
-        for comp in decomposition:
-            if comp in IDC_CHARS or comp == '?' or not isinstance(comp, str) or len(comp) != 1:
-                continue
-            components_set.add(comp)
-            components_set.update(get_all_components(comp, max_depth, depth + 1, seen.copy()))
-    return components_set
-
 
 # -------------------------------
 # Session state initialization
 # -------------------------------
 def init_session_state():
-    defaults = {
-        "selected_comp": "",
-        "stroke_count": 0,
-        "radical": "No Filter",
-        "display_mode": "Single Character",
-        "selected_idc": "No Filter",
-        "component_idc": "No Filter",
-        "output_radical": "No Filter",
-        "text_input_comp": "",
-        "page": 1,
-        "previous_selected_comp": "",
-        "text_input_warning": None,
-        "debug_info": st.session_state.get("debug_info", ""),
-        "last_processed_input": "",
-        "diagnostic_messages": st.session_state.get("diagnostic_messages", []),
-        "font_scale": st.session_state.get("font_scale", 1.0),
-        "clicked_char": None,
-        "show_inputs": True, # Controls Grid View vs Detail View
-        "rerender_trigger": 0,
-        "last_valid_selected_comp": ""
-    }
-    for key, value in defaults.items():
-        st.session_state.setdefault(key, value)
-    
-    # Default selected_comp initialization
-    if not st.session_state.selected_comp:
+    # Only set if not already present
+    if "selected_comp" not in st.session_state:
         first_key = next(iter(component_map), '') if component_map else ''
         st.session_state.selected_comp = first_key
         st.session_state.last_valid_selected_comp = first_key
@@ -271,7 +239,7 @@ init_session_state()
 def on_filter_change():
     """Resets pagination when filters change, stays on Grid View."""
     st.session_state.page = 1
-    st.session_state.rerender_trigger += 1
+    # Do NOT reset filters here; Streamlit updates the session_state key automatically via the widget
     st.session_state.show_inputs = True
 
 def on_reset_filters():
@@ -279,7 +247,6 @@ def on_reset_filters():
     st.session_state.stroke_count = 0
     st.session_state.radical = "No Filter"
     st.session_state.component_idc = "No Filter"
-    st.session_state.selected_idc = "No Filter"
     st.session_state.output_radical = "No Filter"
     st.session_state.display_mode = "Single Character"
     st.session_state.page = 1
@@ -287,13 +254,10 @@ def on_reset_filters():
     st.session_state.text_input_comp = ""
     st.session_state.show_inputs = True
     
-    # Reset selection to first available or last valid
     if st.session_state.last_valid_selected_comp in component_map:
         st.session_state.selected_comp = st.session_state.last_valid_selected_comp
     else:
         st.session_state.selected_comp = next(iter(component_map), '') if component_map else ''
-    
-    st.session_state.rerender_trigger += 1
 
 def on_char_button_click(char):
     """
@@ -307,22 +271,18 @@ def on_char_button_click(char):
         st.session_state.selected_comp = char
         st.session_state.last_valid_selected_comp = char
         
-        # KEY CHANGE: Do not reset filters here. Just switch view.
-        # st.session_state.stroke_count = 0  <-- Removed to preserve state
-        
+        # Do not reset filters here. 
         st.session_state.text_input_warning = None
         st.session_state.text_input_comp = char
         st.session_state.show_inputs = False # Switch to Detail View
-        st.session_state.rerender_trigger += 1
 
 def on_back_to_search():
     """
     User clicks 'Back to Search':
     1. Shows the Grid (show_inputs = True).
-    2. Keeps all current filters intact.
+    2. Filters remain as they were in session_state.
     """
     st.session_state.show_inputs = True
-    st.session_state.rerender_trigger += 1
 
 def process_text_input(component_map_arg):
     val = st.session_state.text_input_comp.strip()
@@ -344,7 +304,7 @@ def render_controls(component_map_arg):
         "⿻": "Overlaid"
     }
 
-    # 1. Filter Logic (Always runs to determine what matches)
+    # 1. Calculate Filter Matches
     filtered_components = [
         comp for comp in component_map_arg
         if isinstance(comp, str) and len(comp) == 1 and
@@ -364,20 +324,29 @@ def render_controls(component_map_arg):
 
             with col1:
                 # Stroke Filter
-                all_strokes = sorted(set(
+                all_strokes_raw = sorted(set(
                     sc for sc in (get_stroke_count(comp) for comp in component_map_arg)
                     if isinstance(sc, int) and sc > 0
                 ))
+                stroke_options = [0] + all_strokes_raw
+                # FIX: Set index based on session_state to persist selection after 'Back'
+                try:
+                    s_idx = stroke_options.index(st.session_state.stroke_count)
+                except ValueError:
+                    s_idx = 0
+                
                 st.selectbox(
                     "Filter by Strokes:",
-                    options=[0] + all_strokes,
+                    options=stroke_options,
+                    index=s_idx,
                     key="stroke_count",
                     format_func=lambda x: "No Filter" if x == 0 else str(x),
                     on_change=on_filter_change
                 )
 
             with col2:
-                # Radical Filter (Dynamic based on pre-filter)
+                # Radical Filter
+                # Note: We compute available radicals based on the stroke filter to be helpful
                 pre_filtered = [c for c in component_map_arg 
                                 if (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count)]
                 radicals = {"No Filter"} | {
@@ -385,13 +354,16 @@ def render_controls(component_map_arg):
                 }
                 rad_options = ["No Filter"] + sorted([r for r in radicals if r and r != "No Filter"])
                 
-                # Safety check if current selection is invalid
-                if st.session_state.radical not in rad_options:
-                    st.session_state.radical = "No Filter"
+                # FIX: Ensure current radical is in options, otherwise reset to No Filter
+                current_rad = st.session_state.radical
+                if current_rad not in rad_options:
+                    current_rad = "No Filter"
+                    # We don't force write to session_state here to avoid loop, just correct visual index
                     
                 st.selectbox(
                     "Filter by Radical:",
                     options=rad_options,
+                    index=rad_options.index(current_rad),
                     key="radical",
                     on_change=on_filter_change
                 )
@@ -399,9 +371,17 @@ def render_controls(component_map_arg):
             with col3:
                 # IDC Filter
                 idc_options = ["No Filter"] + sorted([k for k in idc_descriptions if k in IDC_CHARS])
+                
+                # FIX: Set index based on session_state
+                try:
+                    idc_idx = idc_options.index(st.session_state.component_idc)
+                except ValueError:
+                    idc_idx = 0
+
                 st.selectbox(
                     "Filter by Structure:",
                     options=idc_options,
+                    index=idc_idx,
                     format_func=lambda x: f"{x} {idc_descriptions.get(x,'')}" if x != "No Filter" else x,
                     key="component_idc",
                     on_change=on_filter_change
@@ -412,48 +392,48 @@ def render_controls(component_map_arg):
             
             if not sorted_components:
                 st.warning("No characters match your filters.")
-                return
+                # We still render the grid container so layout doesn't jump too much
+            else:
+                # Pagination
+                PAGE_SIZE = 96
+                GRID_COLS = 12
+                total = len(sorted_components)
+                max_page = max(1, math.ceil(total / PAGE_SIZE))
+                st.session_state.page = max(1, min(st.session_state.page, max_page))
 
-            # Pagination
-            PAGE_SIZE = 96
-            GRID_COLS = 12
-            total = len(sorted_components)
-            max_page = max(1, math.ceil(total / PAGE_SIZE))
-            st.session_state.page = max(1, min(st.session_state.page, max_page))
+                c_prev, c_info, c_next = st.columns([1, 4, 1])
+                with c_prev:
+                    if st.button("◀ Prev", disabled=(st.session_state.page <= 1)):
+                        st.session_state.page -= 1
+                        st.rerun()
+                with c_info:
+                    start_i = (st.session_state.page - 1) * PAGE_SIZE + 1
+                    end_i = min(st.session_state.page * PAGE_SIZE, total)
+                    st.markdown(f"<div style='text-align:center; padding-top:5px; color:#666;'>Showing {start_i}–{end_i} of {total}</div>", unsafe_allow_html=True)
+                with c_next:
+                    if st.button("Next ▶", disabled=(st.session_state.page >= max_page)):
+                        st.session_state.page += 1
+                        st.rerun()
 
-            c_prev, c_info, c_next = st.columns([1, 4, 1])
-            with c_prev:
-                if st.button("◀ Prev", disabled=(st.session_state.page <= 1)):
-                    st.session_state.page -= 1
-                    st.rerun()
-            with c_info:
-                start_i = (st.session_state.page - 1) * PAGE_SIZE + 1
-                end_i = min(st.session_state.page * PAGE_SIZE, total)
-                st.markdown(f"<div style='text-align:center; padding-top:5px; color:#666;'>Showing {start_i}–{end_i} of {total}</div>", unsafe_allow_html=True)
-            with c_next:
-                if st.button("Next ▶", disabled=(st.session_state.page >= max_page)):
-                    st.session_state.page += 1
-                    st.rerun()
+                # Render Grid
+                start = (st.session_state.page - 1) * PAGE_SIZE
+                end = min(start + PAGE_SIZE, total)
+                page_components = sorted_components[start:end]
 
-            # Render Grid
-            start = (st.session_state.page - 1) * PAGE_SIZE
-            end = min(start + PAGE_SIZE, total)
-            page_components = sorted_components[start:end]
-
-            st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
-            cols = st.columns(GRID_COLS)
-            for i, ch in enumerate(page_components):
-                with cols[i % GRID_COLS]:
-                    is_active = (ch == st.session_state.selected_comp)
-                    st.button(
-                        ch,
-                        key=f"btn_{ch}_{i}",
-                        use_container_width=True,
-                        type="primary" if is_active else "secondary",
-                        on_click=on_char_button_click,
-                        args=(ch,)
-                    )
-            st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+                cols = st.columns(GRID_COLS)
+                for i, ch in enumerate(page_components):
+                    with cols[i % GRID_COLS]:
+                        is_active = (ch == st.session_state.selected_comp)
+                        st.button(
+                            ch,
+                            key=f"btn_{ch}_{i}",
+                            use_container_width=True,
+                            type="primary" if is_active else "secondary",
+                            on_click=on_char_button_click,
+                            args=(ch,)
+                        )
+                st.markdown("</div>", unsafe_allow_html=True)
             
             # Text Input fallback
             st.text_input("Or type a character directly:", key="text_input_comp", on_change=process_text_input, args=(component_map_arg,))
@@ -470,13 +450,13 @@ def render_controls(component_map_arg):
             with c_reset:
                 st.button("Reset All Filters", on_click=on_reset_filters, use_container_width=True)
 
-        # Show Display Mode Selector (always useful)
+        # Show Display Mode Selector
         st.radio(
             "Display Mode:",
             ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"],
             key="display_mode",
             horizontal=True,
-            on_change=lambda: st.session_state.update(rerender_trigger=st.session_state.rerender_trigger+1)
+            # No manual rerun trigger needed, radio change auto-reruns
         )
 
 
@@ -550,11 +530,8 @@ def main():
         
         # --- Related Results ---
         related = component_map.get(target_char, {}).get("related_characters", [])
-        # Include self in results? usually related chars are children/compounds. 
-        # Let's filter to valid single chars
         filtered_chars = [c for c in related if isinstance(c, str) and len(c) == 1]
         
-        # If the list is empty, at least show the char itself
         if not filtered_chars:
             filtered_chars = [target_char]
             
@@ -574,11 +551,6 @@ def main():
         valid_display_chars = [c for c in filtered_chars if c in char_compounds]
         
         for char in sorted(valid_display_chars, key=lambda c: get_stroke_count(c) or 0):
-            # Make the small button clickable to "jump" to that character?
-            # For now, let's just render the card. 
-            # If we want to jump, we'd use on_click=on_char_button_click args=(char,)
-            
-            # Simple wrapper to render standard card
             render_char_card(char, char_compounds[char])
 
         # --- Export Tool ---
