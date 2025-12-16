@@ -308,9 +308,8 @@ def main():
         # Results mode
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         
-        # --- FIX 2: REMOVE DUPLICATES (Fixes StreamlitDuplicateElementKey) ---
-        chars = list(set([c for c in related if len(c)==1]))
-        
+        # Deduplicate and filter
+        chars = list(set([c for c in related if len(c)==1])) 
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
         chars = [c for c in chars if n==0 or compounds[c]]
@@ -327,18 +326,20 @@ def main():
             }
             det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
             
-            # --- FIX 3: USE COLUMNS FOR SIDE-BY-SIDE LAYOUT ---
-            # Create two columns: Button (left/small), Details (right/wide)
-            c1, c2 = st.columns([1, 10], vertical_alignment="center")
+            # --- LAYOUT FIX ---
+            # 1. Use default vertical alignment (top) so button aligns with the description
+            c1, c2 = st.columns([1, 10]) 
             
             with c1:
                 st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,), use_container_width=True)
             
             with c2:
+                # 2. Render Description FIRST (The white box)
                 st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
+                
+                # 3. Render Phrases SECOND (The green box)
                 if compounds.get(c):
                     st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:8px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
-
         if chars and n:
             with st.expander("Export Compounds"):
                 st.text_area("Copy list", "\n".join(w for c in chars for w in compounds[c]), height=150)
