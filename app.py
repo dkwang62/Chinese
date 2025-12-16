@@ -9,22 +9,66 @@ IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹
 def apply_dynamic_css():
     css = """
     <style>
-        /* ... keep your other existing styles (buttons, headers, etc.) ... */
+        /* 1. SIDEBAR: Results Count Header */
+        .results-header-sidebar {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 20px 0 10px 0;
+            text-align: center;
+        }
 
-        /* UPDATED: Make instructions prominent */
+        /* 2. SIDEBAR: The Big Red Selected Character */
+        .selected-char-sidebar {
+            font-size: 3em; 
+            text-align: center;
+            color: #e74c3c; 
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        /* 3. RESULTS: The White Description Card */
+        .char-card {
+            background: white;
+            padding: 18px;
+            border-radius: 10px;
+            /* margin-bottom: 0px ensures it sits tight with the phrases box */
+            margin-bottom: 0px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            height: 100%; 
+            display: flex;
+            align-items: center;
+        }
+
+        /* 4. BROWSING GRID: Large Tiles */
+        .comp-grid .stButton button {
+            font-size: 2em;       /* Large font */
+            height: 80px;         /* Tall button */
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            padding: 0;
+            line-height: 80px;
+        }
+        .comp-grid .stButton button:hover {
+            background: #fff5f5;
+            border-color: #f2c6c6;
+            color: #c0392b;
+        }
+
+        /* 5. INSTRUCTIONS: The Green Status Line */
         .status-line {
             font-size: 1.1em;
             font-weight: 600;
             color: #0f5132;
-            background-color: #d1e7dd; /* Light green background for visibility */
+            background-color: #d1e7dd; /* Light green background */
             border: 1px solid #badbcc;
             padding: 15px;
             border-radius: 8px;
             margin: 20px 0 30px 0;
             text-align: center;
         }
-
-        /* ... keep other styles ... */
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
