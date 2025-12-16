@@ -3,33 +3,21 @@ import math
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Set page configuration
 st.set_page_config(layout="wide")
 
-# Global IDC characters
 IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
 
-
-# -------------------------------
-# Session bootstrap
-# -------------------------------
 def bootstrap_session_state():
     st.session_state.setdefault("diagnostic_messages", [])
     st.session_state.setdefault("font_scale", 1.0)
 
 bootstrap_session_state()
 
-
-# -------------------------------
-# Dynamic CSS
-# -------------------------------
 def apply_dynamic_css():
     font_scale = st.session_state.get("font_scale", 1.0)
-
     css = f"""
     <style>
         :root {{ --fontScale: __FONTSCALE__; }}
-
         .selected-card {{
             background-color: #e8f4f8;
             padding: 15px;
@@ -41,28 +29,23 @@ def apply_dynamic_css():
             gap: 15px;
             border-left: 5px solid #3498db;
         }}
-
-        .selected-char {{ font-size: calc(2.5em * var(--fontScale)); color: #e74c3c; margin: 0; }}
-        .details {{ font-size: calc(1.5em * var(--fontScale)); color: #34495e; margin: 0; }}
+        .selected-char {{ font-size: calc(2.5em * var(--fontScale)); color: #e74c3c; }}
+        .details {{ font-size: calc(1.5em * var(--fontScale)); color: #34495e; }}
         .details strong {{ color: #2c3e50; }}
         .results-header {{ font-size: calc(1.5em * var(--fontScale)); color: #2c3e50; margin: 20px 0 10px; }}
-
         .char-card {{
             background-color: #ffffff;
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 10px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
         }}
-
         .compounds-section {{
             background-color: #f1f8e9;
             padding: 10px;
             border-radius: 5px;
             margin-top: 10px;
         }}
-
         .comp-grid .stButton button {{
             background: #ffffff;
             color: #e74c3c;
@@ -77,20 +60,14 @@ def apply_dynamic_css():
             color: #c0392b;
             border-color: #f2c6c6;
         }}
-
         @media (max-width: 768px) {{
             .selected-card {{ flex-direction: column; align-items: flex-start; padding: 10px; }}
             .comp-grid .stButton button {{ font-size: calc(1.15em * var(--fontScale)); }}
         }}
     </style>
     """.replace("__FONTSCALE__", str(font_scale))
-
     st.markdown(css, unsafe_allow_html=True)
 
-
-# -------------------------------
-# Load component map
-# -------------------------------
 @st.cache_data
 def load_component_map():
     with open("enhanced_component_map_with_etymology.json", "r", encoding="utf-8") as f:
@@ -103,10 +80,6 @@ except Exception as e:
     component_map = {}
     st.error(f"Failed to load JSON: {e}")
 
-
-# -------------------------------
-# Utilities
-# -------------------------------
 def clean_field(field):
     return field[0] if isinstance(field, list) and field else field or "—"
 
@@ -149,85 +122,43 @@ def get_all_components(char, max_depth, depth=0, seen=None):
             components_set.update(get_all_components(comp, max_depth, depth + 1, seen.copy()))
     return components_set
 
-
-# -------------------------------
 # State initialization
-# -------------------------------
-if "selected_comp" not in st.session_state:
-    st.session_state.selected_comp = ""
-if "stroke_count" not in st.session_state:
-    st.session_state.stroke_count = 0
-if "radical" not in st.session_state:
-    st.session_state.radical = "No Filter"
-if "component_idc" not in st.session_state:
-    st.session_state.component_idc = "No Filter"
-if "display_mode" not in st.session_state:
-    st.session_state.display_mode = "Single Character"
-if "text_input_comp" not in st.session_state:
-    st.session_state.text_input_comp = ""
-if "page" not in st.session_state:
-    st.session_state.page = 1
-if "text_input_warning" not in st.session_state:
-    st.session_state.text_input_warning = None
-if "show_inputs" not in st.session_state:
-    st.session_state.show_inputs = True
-if "last_valid_selected_comp" not in st.session_state:
-    st.session_state.last_valid_selected_comp = ""
-if "preview_comp" not in st.session_state:
-    st.session_state.preview_comp = None
-if "preview_active" not in st.session_state:
-    st.session_state.preview_active = False
+if "selected_comp" not in st.session_state: st.session_state.selected_comp = ""
+if "stroke_count" not in st.session_state: st.session_state.stroke_count = 0
+if "radical" not in st.session_state: st.session_state.radical = "No Filter"
+if "component_idc" not in st.session_state: st.session_state.component_idc = "No Filter"
+if "display_mode" not in st.session_state: st.session_state.display_mode = "Single Character"
+if "text_input_comp" not in st.session_state: st.session_state.text_input_comp = ""
+if "page" not in st.session_state: st.session_state.page = 1
+if "text_input_warning" not in st.session_state: st.session_state.text_input_warning = None
+if "show_inputs" not in st.session_state: st.session_state.show_inputs = True
+if "last_valid_selected_comp" not in st.session_state: st.session_state.last_valid_selected_comp = ""
+if "preview_comp" not in st.session_state: st.session_state.preview_comp = None
+if "preview_active" not in st.session_state: st.session_state.preview_active = False
 
-
-# -------------------------------
-# Preview card
-# -------------------------------
 def render_preview_card(c: str) -> None:
     meta = component_map.get(c, {}).get("meta", {})
     fields = {
         "Pinyin": clean_field(meta.get("pinyin", "—")),
-        "Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) is not None else "unknown strokes",
+        "Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) is not None else "unknown",
         "Radical": clean_field(meta.get("radical", "—")),
         "Decomposition": format_decomposition(c),
         "Definition": clean_field(meta.get("definition", "No definition available")),
         "Etymology": get_etymology_text(meta),
     }
     details = " ".join(f"<strong>{k}:</strong> {v}" for k, v in fields.items())
+    st.markdown(f'<div class="selected-card"><h2 class="selected-char">{c}</h2><p class="details">{details}</p></div>', unsafe_allow_html=True)
+    st.caption("👆 Click again to confirm and view results.")
 
-    st.markdown(
-        f"""
-        <div class="selected-card">
-          <h2 class="selected-char">{c}</h2>
-          <p class="details">{details}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.caption("👆 Click the same character again to confirm selection and view results.")
-
-
-# -------------------------------
 # Callbacks
-# -------------------------------
-def sync_stroke_count():
-    st.session_state.stroke_count = st.session_state.stroke_count_widget
-    st.session_state.page = 1
-
-def sync_radical():
-    st.session_state.radical = st.session_state.radical_widget
-    st.session_state.page = 1
-
-def sync_component_idc():
-    st.session_state.component_idc = st.session_state.component_idc_widget
-    st.session_state.page = 1
-
-def sync_display_mode():
-    st.session_state.display_mode = st.session_state.display_mode_widget
-
+def sync_stroke_count(): st.session_state.stroke_count = st.session_state.stroke_count_widget; st.session_state.page = 1
+def sync_radical(): st.session_state.radical = st.session_state.radical_widget; st.session_state.page = 1
+def sync_component_idc(): st.session_state.component_idc = st.session_state.component_idc_widget; st.session_state.page = 1
+def sync_display_mode(): st.session_state.display_mode = st.session_state.display_mode_widget
 def sync_text_input():
     value = st.session_state.text_input_widget.strip()
     if len(value) != 1:
-        st.session_state.text_input_warning = "Please enter exactly one character."
+        st.session_state.text_input_warning = "One character only."
         st.session_state.text_input_comp = ""
         return
     if value in component_map:
@@ -244,19 +175,15 @@ def sync_text_input():
 
 def on_component_tile_click(c: str):
     if st.session_state.preview_active and st.session_state.preview_comp == c:
-        # SECOND CLICK → CONFIRM SELECTION
         st.session_state.selected_comp = c
         st.session_state.last_valid_selected_comp = c
         st.session_state.text_input_comp = c
-        st.session_state.text_input_warning = None
         st.session_state.show_inputs = False
         st.session_state.preview_active = False
         st.session_state.preview_comp = None
     else:
-        # FIRST CLICK → PREVIEW ONLY
         st.session_state.preview_active = True
         st.session_state.preview_comp = c
-        # Do NOT set selected_comp here → no results shown yet
 
 def back_to_selection():
     st.session_state.show_inputs = True
@@ -276,90 +203,53 @@ def on_reset_filters():
     if st.session_state.last_valid_selected_comp in component_map:
         st.session_state.selected_comp = st.session_state.last_valid_selected_comp
 
-
-# -------------------------------
-# Controls
-# -------------------------------
 def render_controls():
     if not st.session_state.show_inputs:
-        st.markdown("### Component Selected")
-        st.info("Viewing results below. Return to browse other components.")
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([1, 1])
         with col1:
-            st.button("← Back to component list", on_click=back_to_selection, use_container_width=True)
+            st.button("← Back to list", on_click=back_to_selection, use_container_width=True)
         with col2:
             st.button("Reset Filters", on_click=on_reset_filters, use_container_width=True)
         return
 
-    idc_descriptions = {
-        "No Filter": "No Filter", "⿰": "Left Right", "⿱": "Top Bottom", "⿲": "Left Middle Right",
-        "⿳": "Top Middle Bottom", "⿴": "Surround", "⿵": "Surround Top", "⿶": "Surround Bottom",
-        "⿷": "Surround Left", "⿸": "Top Left Corner", "⿹": "Top Right Corner",
-        "⿺": "Bottom Left Corner", "⿻": "Overlaid"
-    }
+    idc_descriptions = {"No Filter": "No Filter", "⿰": "Left Right", "⿱": "Top Bottom", "⿲": "Left Middle Right", "⿳": "Top Middle Bottom", "⿴": "Surround", "⿵": "Surround Top", "⿶": "Surround Bottom", "⿷": "Surround Left", "⿸": "Top Left Corner", "⿹": "Top Right Corner", "⿺": "Bottom Left Corner", "⿻": "Overlaid"}
 
-    st.markdown("### Component Filters")
-    col1, col2, col3 = st.columns([0.4, 0.4, 0.4])
-
+    st.markdown("### Filters")
+    col1, col2, col3 = st.columns(3)
     with col1:
         stroke_counts = sorted({sc for sc in (get_stroke_count(c) for c in component_map) if sc is not None})
         options = [0] + stroke_counts
         index = options.index(st.session_state.stroke_count) if st.session_state.stroke_count in options else 0
-        st.selectbox(
-            "Filter by Strokes:",
-            options=options,
-            index=index,
-            format_func=lambda x: "No Filter" if x == 0 else str(x),
-            key="stroke_count_widget",
-            on_change=sync_stroke_count
-        )
-
+        st.selectbox("Strokes", options=options, index=index, format_func=lambda x: "No Filter" if x == 0 else str(x), key="stroke_count_widget", on_change=sync_stroke_count)
     with col2:
         all_radicals = {component_map.get(c, {}).get("meta", {}).get("radical", "") for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical")}
         radical_options = ["No Filter"] + sorted(all_radicals)
         index = radical_options.index(st.session_state.radical) if st.session_state.radical in radical_options else 0
-        st.selectbox(
-            "Filter by Radical:",
-            options=radical_options,
-            index=index,
-            key="radical_widget",
-            on_change=sync_radical
-        )
-
+        st.selectbox("Radical", options=radical_options, index=index, key="radical_widget", on_change=sync_radical)
     with col3:
         all_idcs = {d[0] for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d[0] in IDC_CHARS}
         idc_options = ["No Filter"] + sorted(all_idcs)
         index = idc_options.index(st.session_state.component_idc) if st.session_state.component_idc in idc_options else 0
-        st.selectbox(
-            "Filter by Structure IDC:",
-            options=idc_options,
-            index=index,
-            format_func=lambda x: f"{x} ({idc_descriptions.get(x, x)})" if x != "No Filter" else x,
-            key="component_idc_widget",
-            on_change=sync_component_idc
-        )
+        st.selectbox("Structure", options=idc_options, index=index, format_func=lambda x: f"{x} ({idc_descriptions.get(x, x)})" if x != "No Filter" else x, key="component_idc_widget", on_change=sync_component_idc)
 
-    st.markdown("### Select Input Component")
-    st.caption("Click a tile → preview details → click again to confirm and view results.")
+    st.markdown("### Select Component")
+    st.caption("Click tile → preview → click again to confirm")
 
     col4, col5 = st.columns([1.5, 0.2])
-
     with col4:
-        filtered = [
-            c for c in component_map
-            if (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
-               (st.session_state.radical == "No Filter" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
-               (st.session_state.component_idc == "No Filter" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
+        filtered = [c for c in component_map if
+            (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
+            (st.session_state.radical == "No Filter" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
+            (st.session_state.component_idc == "No Filter" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
         ]
         extra = get_all_components(st.session_state.selected_comp, max_depth=5)
         filtered = list(set(filtered) | (extra & set(component_map)))
         sorted_comps = sorted(filtered, key=lambda c: get_stroke_count(c) or 0)
 
         if not sorted_comps:
-            st.warning("No components match the current filters.")
+            st.warning("No matches.")
             return
 
-        # Show preview if active
         if st.session_state.preview_active and st.session_state.preview_comp:
             render_preview_card(st.session_state.preview_comp)
 
@@ -371,48 +261,27 @@ def render_controls():
 
         p1, p2, p3 = st.columns([1, 2, 1])
         with p1:
-            if st.button("◀ Prev", disabled=st.session_state.page <= 1):
-                st.session_state.page -= 1
+            if st.button("◀ Prev", disabled=st.session_state.page <= 1): st.session_state.page -= 1
         with p2:
             start_i = (st.session_state.page - 1) * PAGE_SIZE + 1
             end_i = min(st.session_state.page * PAGE_SIZE, total)
-            st.caption(f"Showing {start_i}–{end_i} of {total}")
+            st.caption(f"{start_i}–{end_i} of {total}")
         with p3:
-            if st.button("Next ▶", disabled=st.session_state.page >= max_page):
-                st.session_state.page += 1
+            if st.button("Next ▶", disabled=st.session_state.page >= max_page): st.session_state.page += 1
 
-        page_comps = sorted_comps[(st.session_state.page - 1) * PAGE_SIZE : st.session_state.page * PAGE_SIZE]
-
+        page_comps = sorted_comps[(st.session_state.page - 1)*PAGE_SIZE : st.session_state.page*PAGE_SIZE]
         st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
         cols = st.columns(GRID_COLS)
         for i, ch in enumerate(page_comps):
             with cols[i % GRID_COLS]:
                 is_preview = st.session_state.preview_active and st.session_state.preview_comp == ch
-                st.button(
-                    ch,
-                    key=f"tile_{ch}_{st.session_state.page}",
-                    use_container_width=True,
-                    type="primary" if is_preview else "secondary",
-                    on_click=on_component_tile_click,
-                    args=(ch,)
-                )
+                st.button(ch, key=f"tile_{ch}_{st.session_state.page}", use_container_width=True, type="primary" if is_preview else "secondary", on_click=on_component_tile_click, args=(ch,))
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col5:
-        if st.session_state.text_input_warning:
-            st.warning(st.session_state.text_input_warning)
-        st.text_input(
-            "Or type one character:",
-            value=st.session_state.text_input_comp,
-            key="text_input_widget",
-            on_change=sync_text_input,
-            placeholder="e.g. 水"
-        )
+        if st.session_state.text_input_warning: st.warning(st.session_state.text_input_warning)
+        st.text_input("Or type:", value=st.session_state.text_input_comp, key="text_input_widget", on_change=sync_text_input, placeholder="e.g. 水")
 
-
-# -------------------------------
-# Result card
-# -------------------------------
 def render_result_card(char, compounds):
     meta = component_map.get(char, {}).get("meta", {})
     fields = {
@@ -430,43 +299,23 @@ def render_result_card(char, compounds):
         st.markdown(f"<div class='compounds-section'><p class='compounds-title'>{st.session_state.display_mode}:</p><p class='compounds-list'>{' '.join(sorted(compounds))}</p></div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-
-# -------------------------------
-# Main
-# -------------------------------
 def main():
     if not component_map:
-        st.error("No data loaded.")
+        st.error("No data.")
         return
 
     apply_dynamic_css()
     st.markdown("<h1>🈑 Radix</h1>", unsafe_allow_html=True)
 
-    # Output type always visible
-    st.markdown("### Output Type")
-    modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
-    index = modes.index(st.session_state.display_mode)
-    st.radio(
-        "Display:",
-        options=modes,
-        index=index,
-        key="display_mode_widget",
-        on_change=sync_display_mode,
-        horizontal=True
-    )
-
     render_controls()
 
-    # === ONLY SHOW RESULTS AFTER FINAL SELECTION (not during preview) ===
     if st.session_state.show_inputs:
-        # Browsing or preview mode → no results yet
         if not st.session_state.preview_active:
-            st.info("👆 Click a character tile to preview → click again to view full results.")
+            st.info("Click a tile to preview → click again to view results.")
         return
 
-    # Final selection confirmed → show everything
+    # === FINAL SELECTION VIEW (minimal & clean) ===
     if st.session_state.selected_comp not in component_map:
-        st.info("Select a component to view results.")
         return
 
     meta = component_map[st.session_state.selected_comp]["meta"]
@@ -479,10 +328,13 @@ def main():
         "Etymology": get_etymology_text(meta)
     }
     details = " ".join(f"<strong>{k}:</strong> {v}" for k, v in fields.items())
-    st.markdown(
-        f'<div class="selected-card"><h2 class="selected-char">{st.session_state.selected_comp}</h2><p class="details">{details}</p></div>',
-        unsafe_allow_html=True
-    )
+    st.markdown(f'<div class="selected-card"><h2 class="selected-char">{st.session_state.selected_comp}</h2><p class="details">{details}</p></div>', unsafe_allow_html=True)
+
+    # Output type selector — only here, after selection
+    st.markdown("### Output Type")
+    modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
+    index = modes.index(st.session_state.display_mode)
+    st.radio("", options=modes, index=index, key="display_mode_widget", on_change=sync_display_mode, horizontal=True)
 
     related = component_map[st.session_state.selected_comp].get("related_characters", [])
     chars = [c for c in related if isinstance(c, str) and len(c) == 1]
@@ -490,16 +342,15 @@ def main():
     compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n] for c in chars} if n else {c: [] for c in chars}
     chars = [c for c in chars if n == 0 or compounds[c]]
 
-    st.markdown(f"<h2 class='results-header'>🧬 Results — {len(chars)} found</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 class='results-header'>🧬 Results — {len(chars)}</h2>", unsafe_allow_html=True)
 
     for char in sorted(chars, key=lambda c: get_stroke_count(c) or 0):
         render_result_card(char, compounds.get(char, []))
 
     if chars and n:
-        with st.expander("Export Compounds for Lookup"):
+        with st.expander("Export Compounds"):
             text = "\n".join(comp for char in chars for comp in compounds[char])
             st.text_area("Copy list:", text, height=200)
-
 
 if __name__ == "__main__":
     main()
