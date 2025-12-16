@@ -402,7 +402,25 @@ def main():
             (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
             (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
         ]
-        sorted_comps = sorted(filtered, key=lambda c: get_stroke_count(c) or 999)
+        def result_count(comp: str) -> int:
+
+            rel = component_map.get(comp, {}).get("related_characters", [])
+
+            return len({x for x in rel if isinstance(x, str) and len(x) == 1})
+
+
+        counts = {c: result_count(c) for c in filtered}
+
+
+        # Sort: most results first, then fewer strokes, then Unicode for stable ties
+
+        sorted_comps = sorted(
+
+            filtered,
+
+            key=lambda c: (-counts.get(c, 0), get_stroke_count(c) or 999, c)
+
+        )
 
         if not sorted_comps:
             st.info("No components match current filters.")
