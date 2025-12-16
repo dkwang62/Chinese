@@ -300,7 +300,7 @@ def main():
             render_preview(st.session_state.preview_comp)
 
         PAGE_SIZE = 120
-        GRID_COLS = 15
+        GRID_COLS = 12
         total = len(sorted_comps)
         max_page = max(1, math.ceil(total / PAGE_SIZE))
         st.session_state.page = max(1, min(st.session_state.page, max_page))
