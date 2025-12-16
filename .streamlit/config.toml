@@ -1,6 +1,12 @@
-[theme]
-base="light"
-primaryColor="#008080"
-backgroundColor="#F9FAFB"
-secondaryBackgroundColor="#FFFFFF"
-textColor="#111827"
+toml[theme]
+base = "light"
+primaryColor = "#e74c3c"          # Your red accent color
+backgroundColor = "#F9FAFB"        # Main app background (keep your current)
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#111827"
+
+# Separate sidebar styling
+[theme.sidebar]
+backgroundColor = "#FFFFFF"       # Light/white sidebar background
+secondaryBackgroundColor = "#edf2f7"  # Darker slate for input fields (selectboxes, text input, radio group)
+textColor = "#2d3748"             # Dark text for good readability
