@@ -45,10 +45,11 @@ def apply_dynamic_css():
             color: #c0392b;
         }
         .status-line {
-            font-size: 1.1em;
-            color: #555;
-            margin: 15px 0;
-            font-style: italic;
+            font-size: 1.2em;
+            color: #444;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: 500;
         }
         @media (max-width: 768px) {
             .selected-card { flex-direction: column; text-align: center; }
@@ -181,17 +182,17 @@ def render_preview(c):
     }
     details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
     st.markdown(f'<div class="selected-card"><h2 class="selected-char">{c}</h2><div class="details">{details}</div></div>', unsafe_allow_html=True)
-    st.caption("Click again to confirm")
 
 def main():
     if not component_map:
         st.stop()
 
     apply_dynamic_css()
-    st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
-    # === DYNAMIC SIDEBAR ===
+    # === SIDEBAR — App Home ===
     with st.sidebar:
+        st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
+
         if st.session_state.show_inputs:
             # Browsing mode
             st.markdown("### Filters")
@@ -223,18 +224,18 @@ def main():
 
             st.markdown("### Output Type")
             modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
-            st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display, horizontal=False)
+            st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
 
     # === MAIN CONTENT ===
     if st.session_state.show_inputs:
-        # Browsing / Preview mode
+        # Browsing / Preview
         parts = []
         if st.session_state.stroke_count > 0: parts.append(f"{st.session_state.stroke_count} strokes")
         if st.session_state.radical != "No Filter": parts.append(f"Radical: {st.session_state.radical}")
         if st.session_state.component_idc != "No Filter": parts.append(f"Structure: {st.session_state.component_idc}")
-        status = " · ".join(parts) or "No filters"
-        st.markdown(f"<div class='status-line'>Filtered: {status}</div>", unsafe_allow_html=True)
-        st.caption("Click tile → preview → click again to confirm")
+        filter_text = " · ".join(parts) if parts else "No filters applied"
+        instruction = "Click tile to preview → click again to confirm" if st.session_state.preview_active else "Click a tile to preview"
+        st.markdown(f"<div class='status-line'>{filter_text} — {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
