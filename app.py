@@ -125,14 +125,22 @@ for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
 # Callbacks
-def sync_stroke(): 
-    new = st.session_state.w_stroke
-    if isinstance(new, str): new = int(new) if new.isdigit() else 0
-    st.session_state.stroke_count = new
+def sync_stroke():
+    val = st.session_state.w_stroke
+    st.session_state.stroke_count = int(val) if val != 0 else 0
     st.session_state.page = 1
-def sync_radical(): st.session_state.radical = st.session_state.w_radical; st.session_state.page = 1
-def sync_idc(): st.session_state.component_idc = st.session_state.w_idc; st.session_state.page = 1
-def sync_display(): st.session_state.display_mode = st.session_state.w_display
+
+def sync_radical():
+    st.session_state.radical = st.session_state.w_radical
+    st.session_state.page = 1
+
+def sync_idc():
+    st.session_state.component_idc = st.session_state.w_idc
+    st.session_state.page = 1
+
+def sync_display():
+    st.session_state.display_mode = st.session_state.w_display
+
 def sync_text():
     v = st.session_state.w_text.strip()
     if len(v) != 1:
@@ -142,6 +150,7 @@ def sync_text():
         st.session_state.selected_comp = v
         st.session_state.last_valid_selected_comp = v
         st.session_state.text_input_comp = v
+        st.session_state.text_input_warning = None
         st.session_state.show_inputs = False
         st.session_state.preview_active = False
     else:
@@ -158,7 +167,11 @@ def tile_click(c):
         st.session_state.preview_active = True
         st.session_state.preview_comp = c
 
-def back(): st.session_state.show_inputs = True; st.session_state.preview_active = False; st.session_state.preview_comp = None
+def back():
+    st.session_state.show_inputs = True
+    st.session_state.preview_active = False
+    st.session_state.preview_comp = None
+
 def reset():
     st.session_state.stroke_count = 0
     st.session_state.radical = "No Filter"
@@ -180,7 +193,7 @@ def render_preview(c):
     }
     details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
     st.markdown(f'<div class="selected-card"><h2 class="selected-char">{c}</h2><div class="details">{details}</div></div>', unsafe_allow_html=True)
-    st.caption("👆 Click again to confirm selection")
+    st.caption("Click again to confirm selection")
 
 def main():
     if not component_map:
@@ -192,31 +205,57 @@ def main():
     # === SIDEBAR CONTROLS ===
     with st.sidebar:
         st.markdown("### Filters")
-        # Force int options for strokes
-        stroke_set = {s for s in (get_stroke_count(c) for c in component_map) if isinstance(s, int)}
+
+        # Strokes: force everything to int
+        raw_strokes = [get_stroke_count(c) for c in component_map]
+        stroke_set = {s for s in raw_strokes if isinstance(s, int)}
         stroke_opts = [0] + sorted(stroke_set)
-        current_stroke = st.session_state.stroke_count if isinstance(st.session_state.stroke_count, int) and st.session_state.stroke_count in stroke_opts else 0
-        st.selectbox("Strokes", options=stroke_opts, index=stroke_opts.index(current_stroke),
-                     format_func=lambda x: "Any" if x==0 else x, key="w_stroke", on_change=sync_stroke)
+        # Ensure current value is valid int
+        current = st.session_state.stroke_count if isinstance(st.session_state.stroke_count, int) and st.session_state.stroke_count in stroke_opts else 0
+        st.selectbox(
+            "Strokes",
+            options=stroke_opts,
+            index=stroke_opts.index(current),
+            format_func=lambda x: "Any" if x == 0 else str(x),
+            key="w_stroke",
+            on_change=sync_stroke
+        )
 
-        rads = ["No Filter"] + sorted(set(component_map.get(c, {}).get("meta", {}).get("radical", "") for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical")))
-        st.selectbox("Radical", options=rads, index=rads.index(st.session_state.radical), key="w_radical", on_change=sync_radical)
+        # Radical
+        rad_set = {component_map.get(c, {}).get("meta", {}).get("radical", "") for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical")}
+        rad_opts = ["No Filter"] + sorted(rad_set)
+        st.selectbox(
+            "Radical",
+            options=rad_opts,
+            index=rad_opts.index(st.session_state.radical),
+            key="w_radical",
+            on_change=sync_radical
+        )
 
-        idcs = ["No Filter"] + sorted(set(d[0] for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d[0] in IDC_CHARS))
-        st.selectbox("Structure", options=idcs, index=idcs.index(st.session_state.component_idc), key="w_idc", on_change=sync_idc)
+        # Structure
+        idc_set = {d[0] for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d[0] in IDC_CHARS}
+        idc_opts = ["No Filter"] + sorted(idc_set)
+        st.selectbox(
+            "Structure",
+            options=idc_opts,
+            index=idc_opts.index(st.session_state.component_idc),
+            key="w_idc",
+            on_change=sync_idc
+        )
 
         st.markdown("---")
-        if st.session_state.text_input_warning: st.warning(st.session_state.text_input_warning)
+        if st.session_state.text_input_warning:
+            st.warning(st.session_state.text_input_warning)
         st.text_input("Jump to character", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="e.g. 水")
 
     # === MAIN AREA ===
     if not st.session_state.show_inputs:
-        # Selected view
         col1, col2 = st.columns([1,1])
         with col1: st.button("← Back", on_click=back, use_container_width=True)
         with col2: st.button("Reset Filters", on_click=reset, use_container_width=True)
 
-        if st.session_state.selected_comp not in component_map: st.stop()
+        if st.session_state.selected_comp not in component_map:
+            st.stop()
 
         meta = component_map[st.session_state.selected_comp]["meta"]
         f = {
@@ -241,7 +280,7 @@ def main():
         chars = [c for c in chars if n==0 or compounds[c]]
 
         st.markdown(f"<div class='results-header'>🧬 Results — {len(chars)}</div>", unsafe_allow_html=True)
-        for c in sorted(chars, key=lambda x: get_stroke_count(x) or 0):
+        for c in sorted(chars, key=lambda x: get_stroke_count(x) or 999):
             meta = component_map.get(c, {}).get("meta", {})
             fd = {
                 "Pinyin": clean_field(meta.get("pinyin", "—")),
