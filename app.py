@@ -17,16 +17,16 @@ def apply_dynamic_css():
         .main {
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         }
-        
+       
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
         }
-        
-        [data-testid="stSidebar"] .stMarkdown, 
+       
+        [data-testid="stSidebar"] .stMarkdown,
         [data-testid="stSidebar"] label {
             color: #ecf0f1 !important;
         }
-        
+       
         .app-header {
             text-align: center;
             padding: 2rem 0;
@@ -35,7 +35,7 @@ def apply_dynamic_css():
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
             margin-bottom: 2rem;
         }
-        
+       
         .app-title {
             font-size: 3em;
             font-weight: 800;
@@ -44,13 +44,13 @@ def apply_dynamic_css():
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.5rem;
         }
-        
+       
         .app-subtitle {
             font-size: 1.2em;
             color: #7f8c8d;
             font-weight: 300;
         }
-        
+       
         .status-line {
             background: white;
             padding: 1.5rem;
@@ -59,20 +59,20 @@ def apply_dynamic_css():
             box-shadow: 0 2px 12px rgba(0,0,0,0.08);
             border-left: 4px solid #3498db;
         }
-        
+       
         .status-filters {
             font-size: 1.1em;
             color: #2c3e50;
             font-weight: 600;
             margin-bottom: 0.5rem;
         }
-        
+       
         .status-instruction {
             font-size: 0.95em;
             color: #7f8c8d;
             font-style: italic;
         }
-        
+       
         .results-header-sidebar {
             font-size: 1.3em;
             font-weight: 700;
@@ -84,7 +84,7 @@ def apply_dynamic_css():
             text-align: center;
             backdrop-filter: blur(10px);
         }
-        
+       
         .selected-char-sidebar {
             font-size: 4em;
             text-align: center;
@@ -96,7 +96,7 @@ def apply_dynamic_css():
             background: white;
             border-radius: 15px;
         }
-        
+       
         .preview-card {
             background: white;
             padding: 2.5rem;
@@ -106,7 +106,7 @@ def apply_dynamic_css():
             border: 2px solid #e74c3c;
             animation: slideIn 0.3s ease-out;
         }
-        
+       
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -117,7 +117,7 @@ def apply_dynamic_css():
                 transform: translateY(0);
             }
         }
-        
+       
         .preview-char {
             font-size: 5em;
             text-align: center;
@@ -126,7 +126,7 @@ def apply_dynamic_css():
             font-weight: bold;
             text-shadow: 3px 3px 10px rgba(231, 76, 60, 0.3);
         }
-        
+       
         .preview-details {
             text-align: center;
             font-size: 1.1em;
@@ -136,7 +136,7 @@ def apply_dynamic_css():
             background: #f8f9fa;
             border-radius: 10px;
         }
-        
+       
         .char-card {
             background: white;
             padding: 1.5rem;
@@ -146,18 +146,18 @@ def apply_dynamic_css():
             transition: all 0.3s ease;
             border-left: 4px solid #3498db;
         }
-        
+       
         .char-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         }
-        
+       
         .char-details {
             font-size: 0.95em;
             color: #555;
             line-height: 1.8;
         }
-        
+       
         .comp-grid .stButton button {
             font-size: 2em !important;
             height: 80px !important;
@@ -168,14 +168,14 @@ def apply_dynamic_css():
             transition: all 0.2s ease !important;
             font-weight: 600 !important;
         }
-        
+       
         .comp-grid .stButton button:hover {
             background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%) !important;
             border-color: #e74c3c !important;
             transform: scale(1.05);
             box-shadow: 0 4px 16px rgba(231, 76, 60, 0.3) !important;
         }
-        
+       
         .pagination-container {
             background: white;
             padding: 1.5rem;
@@ -183,7 +183,7 @@ def apply_dynamic_css():
             box-shadow: 0 2px 12px rgba(0,0,0,0.08);
             margin: 1.5rem 0;
         }
-        
+       
         .pagination-info {
             text-align: center;
             padding: 10px 0;
@@ -191,7 +191,7 @@ def apply_dynamic_css():
             color: #2c3e50;
             font-weight: 600;
         }
-        
+       
         .compounds-box {
             padding: 1.5rem;
             background: linear-gradient(135deg, #f1f8e9 0%, #dcedc8 100%);
@@ -199,20 +199,20 @@ def apply_dynamic_css():
             margin-top: 1rem;
             border-left: 4px solid #8bc34a;
         }
-        
+       
         .compounds-title {
             font-weight: 700;
             color: #558b2f;
             margin-bottom: 0.5rem;
             font-size: 1.1em;
         }
-        
+       
         .compounds-list {
             font-size: 1.3em;
             color: #33691e;
             line-height: 2;
         }
-        
+       
         .filter-section {
             background: rgba(255,255,255,0.05);
             padding: 1.5rem;
@@ -220,7 +220,7 @@ def apply_dynamic_css():
             margin: 1rem 0;
             backdrop-filter: blur(10px);
         }
-        
+       
         .filter-title {
             font-size: 1.4em;
             font-weight: 700;
@@ -228,7 +228,7 @@ def apply_dynamic_css():
             margin-bottom: 1rem;
             text-align: center;
         }
-        
+       
         .info-box {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
             padding: 1.5rem;
@@ -238,7 +238,7 @@ def apply_dynamic_css():
             color: #1565c0;
             font-size: 1.05em;
         }
-        
+       
         .warning-box {
             background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
             padding: 1rem;
@@ -248,28 +248,28 @@ def apply_dynamic_css():
             font-weight: 600;
             margin: 1rem 0;
         }
-        
+       
         .stButton button {
             border-radius: 10px !important;
             font-weight: 600 !important;
             transition: all 0.3s ease !important;
         }
-        
+       
         ::-webkit-scrollbar {
             width: 10px;
             height: 10px;
         }
-        
+       
         ::-webkit-scrollbar-track {
             background: #f1f1f1;
             border-radius: 10px;
         }
-        
+       
         ::-webkit-scrollbar-thumb {
             background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
             border-radius: 10px;
         }
-        
+       
         ::-webkit-scrollbar-thumb:hover {
             background: #c0392b;
         }
@@ -289,13 +289,15 @@ except Exception as e:
     component_map = {}
     st.error("⚠️ Failed to load data. Please ensure 'enhanced_component_map_with_etymology.json' exists.")
 
+# Fix 1: Proper clean_field that handles lists nicely
 def clean_field(field):
-    if isinstance(field, list) and field:
-        return field,[object Object],
-    elif field:
-        return field
-    else:
-        return "—"
+    if isinstance(field, list):
+        if not field:
+            return "—"
+        return " · ".join(str(x) for x in field if x is not None and str(x).strip() != "")
+    if field:
+        return str(field)
+    return "—"
 
 def get_stroke_count(char):
     strokes = component_map.get(char, {}).get("meta", {}).get("strokes", None)
@@ -418,7 +420,7 @@ def render_preview(c):
     meta = component_map.get(c, {}).get("meta", {})
     stroke_info = get_stroke_count(c)
     stroke_text = f"{stroke_info} strokes" if stroke_info else "unknown"
-    
+   
     f = {
         "📌 Pinyin": clean_field(meta.get("pinyin", "—")),
         "✍️ Strokes": stroke_text,
@@ -428,7 +430,7 @@ def render_preview(c):
         "📜 Etymology": get_etymology_text(meta),
     }
     details = "<br>".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
-    
+   
     st.markdown(f"""
         <div class='preview-card'>
             <div class='preview-char'>{c}</div>
@@ -439,9 +441,7 @@ def render_preview(c):
 def main():
     if not component_map:
         st.stop()
-
     apply_dynamic_css()
-
     st.markdown("""
         <div class='app-header'>
             <div class='app-title'>🈑 Radix</div>
@@ -451,13 +451,13 @@ def main():
 
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; color:#ecf0f1; margin-bottom:30px; font-size:2.5em;'>🈑 Radix</h1>", unsafe_allow_html=True)
-
         if st.session_state.show_inputs:
             st.markdown("<div class='filter-section'>", unsafe_allow_html=True)
             st.markdown("<div class='filter-title'>🔍 Filters</div>", unsafe_allow_html=True)
 
+            # Fix 2: stroke_opts
             stroke_set = {s for s in (get_stroke_count(c) for c in component_map) if isinstance(s, int)}
-            stroke_opts = ,[object Object], + sorted(stroke_set)
+            stroke_opts = [0] + sorted(stroke_set)
             current = st.session_state.stroke_count if isinstance(st.session_state.stroke_count, int) and st.session_state.stroke_count in stroke_opts else 0
             st.selectbox("✍️ Stroke Count", options=stroke_opts, index=stroke_opts.index(current),
                          format_func=lambda x: "Any" if x == 0 else f"{x} strokes", key="w_stroke", on_change=sync_stroke)
@@ -467,42 +467,47 @@ def main():
             st.selectbox("🔰 Radical", options=rad_opts, index=rad_opts.index(st.session_state.radical),
                         format_func=lambda x: "Any" if x == "none" else x, key="w_radical", on_change=sync_radical)
 
-            idc_set = {d,[object Object], for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d,[object Object], in IDC_CHARS}
+            # Fix 3: idc_set
+            idc_set = {
+                d[0]
+                for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map)
+                if d and d[0] in IDC_CHARS
+            }
             idc_opts = ["none"] + sorted(idc_set)
             st.selectbox("🧩 Structure (IDC)", options=idc_opts, index=idc_opts.index(st.session_state.component_idc),
                         format_func=lambda x: "Any" if x == "none" else x, key="w_idc", on_change=sync_idc)
-            
+           
             st.markdown("</div>", unsafe_allow_html=True)
-
             st.markdown("---")
             st.markdown("<div style='color:#ecf0f1; font-weight:600; margin-bottom:10px;'>🎯 Quick Jump</div>", unsafe_allow_html=True)
-            
+           
             if st.session_state.text_input_warning:
                 st.markdown(f"<div class='warning-box'>{st.session_state.text_input_warning}</div>", unsafe_allow_html=True)
-            
+           
             st.text_input("Enter a character", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="e.g. 水, 火, 木")
-
         else:
             st.markdown("<div style='color:#ecf0f1; font-weight:700; font-size:1.3em; margin-bottom:15px;'>⚙️ Actions</div>", unsafe_allow_html=True)
             st.button("◀️ Back to Browse", on_click=back, use_container_width=True, type="primary")
             st.button("🔄 Reset All Filters", on_click=reset, use_container_width=True)
-
             st.markdown("---")
-            
+           
             st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
-
             related = component_map[st.session_state.selected_comp].get("related_characters", [])
             chars = [c for c in related if len(c)==1]
-            n = int(st.session_state.display_mode,[object Object],) if st.session_state.display_mode != "Single Character" else 0
-            
+
+            # Fix 4: Extract number from display_mode string
+            if st.session_state.display_mode == "Single Character":
+                n = 0
+            else:
+                n = int(st.session_state.display_mode.split("-")[0])
+           
             if n:
                 compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars}
             else:
                 compounds = {c:[] for c in chars}
-            
+           
             valid_chars = [c for c in chars if n==0 or compounds[c]]
             st.markdown(f"<div class='results-header-sidebar'>🧬 Found {len(valid_chars)} Results</div>", unsafe_allow_html=True)
-
             st.markdown("---")
             st.markdown("<div style='color:#ecf0f1; font-weight:700; font-size:1.3em; margin-bottom:15px;'>📋 Output Type</div>", unsafe_allow_html=True)
             modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
@@ -518,10 +523,9 @@ def main():
             filter_parts.append(f"**Radical:** {st.session_state.radical}")
         if st.session_state.component_idc != "none":
             filter_parts.append(f"**Structure:** {st.session_state.component_idc}")
-
         filter_summary = " · ".join(filter_parts) if filter_parts else "**No filters applied**"
         instruction = "💡 **Click TWICE on a tile** to explore characters built with this component" if st.session_state.preview_active else "💡 **Click a tile** to preview details"
-        
+       
         st.markdown(f"""
             <div class='status-line'>
                 <div class='status-filters'>🔎 Active Filters: {filter_summary}</div>
@@ -576,17 +580,21 @@ def main():
                 st.button(ch, key=f"b_{ch}_{st.session_state.page}", use_container_width=True,
                           type="primary" if preview else "secondary", on_click=tile_click, args=(ch,))
         st.markdown("</div>", unsafe_allow_html=True)
-
     else:
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         chars = [c for c in related if len(c)==1]
-        n = int(st.session_state.display_mode,[object Object],) if st.session_state.display_mode != "Single Character" else 0
-        
+
+        # Fix 4 again (same logic in results view)
+        if st.session_state.display_mode == "Single Character":
+            n = 0
+        else:
+            n = int(st.session_state.display_mode.split("-")[0])
+       
         if n:
             compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars}
         else:
             compounds = {c:[] for c in chars}
-        
+       
         chars = [c for c in chars if n==0 or compounds[c]]
 
         if not chars:
@@ -597,7 +605,7 @@ def main():
             meta = component_map.get(c, {}).get("meta", {})
             stroke_info = get_stroke_count(c)
             stroke_text = f"{stroke_info} strokes" if stroke_info else "unknown"
-            
+           
             fd = {
                 "📌 Pinyin": clean_field(meta.get("pinyin", "—")),
                 "✍️ Strokes": stroke_text,
@@ -606,14 +614,14 @@ def main():
                 "📖 Definition": clean_field(meta.get("definition", "—")),
                 "📜 Etymology": get_etymology_text(meta),
             }
-            
+           
             col1, col2 = st.columns([1, 9])
             with col1:
                 st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,), use_container_width=True, type="primary")
             with col2:
                 det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
                 st.markdown(f"<div class='char-card'><div class='char-details'>{det}</div></div>", unsafe_allow_html=True)
-            
+           
             if compounds.get(c):
                 comp_list = " · ".join(sorted(compounds[c]))
                 st.markdown(f"""
