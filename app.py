@@ -84,9 +84,12 @@ def clean_field(field):
 def get_stroke_count(char):
     strokes = component_map.get(char, {}).get("meta", {}).get("strokes", None)
     try:
-        if isinstance(strokes, (int, float)) and strokes > 0: return int(strokes)
-        if isinstance(strokes, str) and strokes.isdigit(): return int(strokes)
-    except: pass
+        if isinstance(strokes, (int, float)) and strokes > 0:
+            return int(strokes)
+        if isinstance(strokes, str) and strokes.isdigit():
+            return int(strokes)
+    except:
+        pass
     return None
 
 def get_etymology_text(meta):
@@ -122,7 +125,11 @@ for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
 # Callbacks
-def sync_stroke(): st.session_state.stroke_count = st.session_state.w_stroke; st.session_state.page = 1
+def sync_stroke(): 
+    new = st.session_state.w_stroke
+    if isinstance(new, str): new = int(new) if new.isdigit() else 0
+    st.session_state.stroke_count = new
+    st.session_state.page = 1
 def sync_radical(): st.session_state.radical = st.session_state.w_radical; st.session_state.page = 1
 def sync_idc(): st.session_state.component_idc = st.session_state.w_idc; st.session_state.page = 1
 def sync_display(): st.session_state.display_mode = st.session_state.w_display
@@ -185,14 +192,17 @@ def main():
     # === SIDEBAR CONTROLS ===
     with st.sidebar:
         st.markdown("### Filters")
-        stroke_opts = [0] + sorted({s for s in (get_stroke_count(c) for c in component_map) if s})
-        st.selectbox("Strokes", options=stroke_opts, index=stroke_opts.index(st.session_state.stroke_count) if st.session_state.stroke_count in stroke_opts else 0,
+        # Force int options for strokes
+        stroke_set = {s for s in (get_stroke_count(c) for c in component_map) if isinstance(s, int)}
+        stroke_opts = [0] + sorted(stroke_set)
+        current_stroke = st.session_state.stroke_count if isinstance(st.session_state.stroke_count, int) and st.session_state.stroke_count in stroke_opts else 0
+        st.selectbox("Strokes", options=stroke_opts, index=stroke_opts.index(current_stroke),
                      format_func=lambda x: "Any" if x==0 else x, key="w_stroke", on_change=sync_stroke)
 
-        rads = ["No Filter"] + sorted({component_map.get(c, {}).get("meta", {}).get("radical", "") for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical")})
+        rads = ["No Filter"] + sorted(set(component_map.get(c, {}).get("meta", {}).get("radical", "") for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical")))
         st.selectbox("Radical", options=rads, index=rads.index(st.session_state.radical), key="w_radical", on_change=sync_radical)
 
-        idcs = ["No Filter"] + sorted({d[0] for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d[0] in IDC_CHARS})
+        idcs = ["No Filter"] + sorted(set(d[0] for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d[0] in IDC_CHARS))
         st.selectbox("Structure", options=idcs, index=idcs.index(st.session_state.component_idc), key="w_idc", on_change=sync_idc)
 
         st.markdown("---")
@@ -253,9 +263,8 @@ def main():
         return
 
     # === BROWSING MODE ===
-    # Filter status line
     parts = []
-    if st.session_state.stroke_count: parts.append(f"{st.session_state.stroke_count} strokes")
+    if st.session_state.stroke_count > 0: parts.append(f"{st.session_state.stroke_count} strokes")
     if st.session_state.radical != "No Filter": parts.append(f"Radical: {st.session_state.radical}")
     if st.session_state.component_idc != "No Filter": parts.append(f"Structure: {st.session_state.component_idc}")
     status = " · ".join(parts) or "No filters"
