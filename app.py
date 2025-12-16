@@ -9,76 +9,47 @@ IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹
 def apply_dynamic_css():
     css = """
     <style>
-        :root {
-            --primary: #008080;
-            --bg: #F9FAFB;
-            --secondary: #FFFFFF;
-            --text: #111827;
-            --muted: #6B7280;
-            --border: #E5E7EB;
-            --shadow: rgba(0,0,0,0.08);
-            --shadow-strong: rgba(0,0,0,0.12);
-            --primary-soft: rgba(0,128,128,0.10);
-        }
-
-        /* App surface */
-        .stApp {
-            background: var(--bg);
-            color: var(--text);
-        }
-
-        /* Sidebar header / counts */
         .results-header-sidebar {
             font-size: 1.4em;
-            font-weight: 700;
-            color: var(--text);
+            font-weight: bold;
+            color: #2c3e50;
             margin: 20px 0 10px 0;
             text-align: center;
         }
-
         .selected-char-sidebar {
             font-size: 2.2em;
             text-align: center;
-            color: var(--primary);
+            color: #e74c3c;
             margin: 20px 0;
-            font-weight: 800;
+            font-weight: bold;
         }
-
-        /* Result cards */
         .char-card {
-            background: var(--secondary);
+            background: white;
             padding: 18px;
-            border-radius: 12px;
+            border-radius: 10px;
             margin-bottom: 12px;
-            box-shadow: 0 2px 10px var(--shadow);
-            border: 1px solid var(--border);
-            border-left: 4px solid var(--primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            height: 100%; /* Ensure card matches button height visual */
+            display: flex;
+            align-items: center;
         }
-
-        /* Component grid buttons */
+        /* --- UPDATED BUTTON STYLES FOR LARGER TILES --- */
         .comp-grid .stButton button {
-            font-size: 1.4em;
-            height: 60px;
-            background: var(--secondary);
-            border: 1px solid var(--border);
+            font-size: 2em;       /* Larger font for better visibility */
+            height: 80px;         /* Taller button */
+            background: white;
+            border: 1px solid #e0e0e0;
             border-radius: 12px;
-            box-shadow: 0 2px 8px var(--shadow);
-            color: var(--text);
-            font-weight: 700;
-            transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
         }
-
         .comp-grid .stButton button:hover {
-            background: var(--primary-soft);
-            border-color: var(--primary);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 14px var(--shadow-strong);
+            background: #fff5f5;
+            border-color: #f2c6c6;
+            color: #c0392b;
         }
-
-        /* Status text */
         .status-line {
             font-size: 1.2em;
-            color: var(--muted);
+            color: #444;
             margin: 20px 0;
             text-align: center;
             font-weight: 500;
@@ -89,15 +60,19 @@ def apply_dynamic_css():
 
 @st.cache_data
 def load_component_map():
-    with open("enhanced_component_map_with_etymology.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data
+    # Ensure this file exists in your directory
+    try:
+        with open("enhanced_component_map_with_etymology.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data
+    except FileNotFoundError:
+        return {}
 
 try:
     component_map = load_component_map()
 except Exception as e:
     component_map = {}
-    st.error("Failed to load data.")
+    st.error(f"Failed to load data: {e}")
 
 def clean_field(field):
     return field[0] if isinstance(field, list) and field else field or "—"
@@ -210,8 +185,8 @@ def render_preview(c):
         "Etymology": get_etymology_text(meta),
     }
     details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
-    st.markdown(f'<h2 style="text-align:center; font-size:3em; color:#008080; margin:30px 0;">{c}</h2>', unsafe_allow_html=True)
-    st.markdown(f'<div style="text-align:center; font-size:1.6em; color:#111827;">{details}</div>', unsafe_allow_html=True)
+    st.markdown(f'<h2 style="text-align:center; font-size:3em; color:#e74c3c; margin:30px 0;">{c}</h2>', unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align:center; font-size:1.6em; color:#2c3e50;">{details}</div>', unsafe_allow_html=True)
 
 def main():
     if not component_map:
@@ -247,20 +222,23 @@ def main():
             st.text_input("Jump to character", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="e.g. 水")
 
         else:
-            # Results mode
+            # Results mode Sidebar
             st.markdown("### Actions")
             st.button("← Back to list", on_click=back, use_container_width=True)
             st.button("Reset Filters", on_click=reset, use_container_width=True)
 
-            # Selected character prominently before output options
+            # Selected character
             st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
 
-            # Results count
+            # Results count logic (using deduplicated count for display)
             related = component_map[st.session_state.selected_comp].get("related_characters", [])
-            chars = [c for c in related if len(c)==1]
+            chars_raw = [c for c in related if len(c)==1]
+            chars_unique = list(set(chars_raw)) # Deduplicate for count
+            
             n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
-            compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
-            valid_chars = [c for c in chars if n==0 or compounds[c]]
+            compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars_unique} if n else {c:[] for c in chars_unique}
+            valid_chars = [c for c in chars_unique if n==0 or compounds[c]]
+            
             st.markdown(f"<div class='results-header-sidebar'>🧬 Results — {len(valid_chars)}</div>", unsafe_allow_html=True)
 
             # Output Type
@@ -270,7 +248,7 @@ def main():
 
     # === MAIN CONTENT ===
     if st.session_state.show_inputs:
-        # Browsing mode — improved status line
+        # Browsing mode
         filter_parts = []
         if st.session_state.stroke_count > 0:
             filter_parts.append(f"{st.session_state.stroke_count} strokes")
@@ -300,7 +278,8 @@ def main():
             render_preview(st.session_state.preview_comp)
 
         PAGE_SIZE = 120
-        GRID_COLS = 10
+        # --- FIX 1: REDUCE COLUMNS TO MAKE TILES WIDER ---
+        GRID_COLS = 10 
         total = len(sorted_comps)
         max_page = max(1, math.ceil(total / PAGE_SIZE))
         st.session_state.page = max(1, min(st.session_state.page, max_page))
@@ -311,7 +290,7 @@ def main():
         with p2:
             start = (st.session_state.page-1)*PAGE_SIZE + 1
             end = min(st.session_state.page*PAGE_SIZE, total)
-            st.markdown(f"<div style='text-align:center; padding:10px 0; font-size:1.1em; color:#6B7280;'>{start}–{end} of {total}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; padding:10px 0; font-size:1.1em; color:#555;'>{start}–{end} of {total}</div>", unsafe_allow_html=True)
         with p3:
             if st.button("Next ▶", disabled=st.session_state.page>=max_page): st.session_state.page += 1
 
@@ -326,32 +305,12 @@ def main():
         st.markdown("</div>", unsafe_allow_html=True)
 
     else:
-        # Results mode — clean list only
-        related = component_map[st.session_state.selected_comp].get("related_characters", [])
-        chars = [c for c in related if len(c)==1]
-        n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
-        compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
-        chars = [c for c in chars if n==0 or compounds[c]]
-
-        for c in sorted(chars, key=lambda x: get_stroke_count(x) or 999):
-            meta = component_map.get(c, {}).get("meta", {})
-            fd = {
-                "Pinyin": clean_field(meta.get("pinyin", "—")),
-                "Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else "unknown",
-                "Radical": clean_field(meta.get("radical", "—")),
-                "Decomposition": format_decomposition(c),
-                "Definition": clean_field(meta.get("definition", "—")),
-                "Etymology": get_etymology_text(meta),
-            }
-            det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
-else:
         # Results mode
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         
-        # 1. Remove duplicates to prevent the "Duplicate Element Key" error
-        chars = list(set([c for c in related if len(c)==1])) 
+        # --- FIX 2: REMOVE DUPLICATES (Fixes StreamlitDuplicateElementKey) ---
+        chars = list(set([c for c in related if len(c)==1]))
         
-        # Filter compounds based on display mode
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
         chars = [c for c in chars if n==0 or compounds[c]]
@@ -367,32 +326,22 @@ else:
                 "Etymology": get_etymology_text(meta),
             }
             det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
-
-            # --- THIS IS THE LAYOUT FIX ---
-            # Create two columns: small left, big right
+            
+            # --- FIX 3: USE COLUMNS FOR SIDE-BY-SIDE LAYOUT ---
+            # Create two columns: Button (left/small), Details (right/wide)
             c1, c2 = st.columns([1, 10], vertical_alignment="center")
-
+            
             with c1:
-                # The Tile goes in the left column
                 st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,), use_container_width=True)
             
             with c2:
-                # The Details go in the right column
                 st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
                 if compounds.get(c):
                     st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:8px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
-            
-            st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,))
-            st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
-            if compounds.get(c):
-                st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:8px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
 
         if chars and n:
             with st.expander("Export Compounds"):
                 st.text_area("Copy list", "\n".join(w for c in chars for w in compounds[c]), height=150)
-
-
-
 
 if __name__ == "__main__":
     main()
