@@ -344,6 +344,24 @@ def main():
                 "Etymology": get_etymology_text(meta),
             }
             det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
+            # --- NEW CODE START ---
+            # Create two columns: Left (narrow) for tile, Right (wide) for details
+            col_btn, col_details = st.columns([1, 8]) 
+
+            with col_btn:
+                # Render the button in the narrow column
+                # use_container_width=True ensures it fills the column width
+                st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,), use_container_width=True)
+
+            with col_details:
+                # Render the details card in the wide column
+                st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
+                
+                # If there are compounds, render them here too so they align with the details
+                if compounds.get(c):
+                    st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:8px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
+            # --- NEW CODE END ---
+            
             st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,))
             st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
             if compounds.get(c):
@@ -352,6 +370,9 @@ def main():
         if chars and n:
             with st.expander("Export Compounds"):
                 st.text_area("Copy list", "\n".join(w for c in chars for w in compounds[c]), height=150)
+
+
+
 
 if __name__ == "__main__":
     main()
