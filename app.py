@@ -319,47 +319,68 @@ except Exception as e:
     st.error("⚠️ Failed to load data. Please ensure 'enhanced_component_map_with_etymology.json' exists.")
 
 def clean_field(field):
+    """Clean and format field data"""
     return field,[object Object], if isinstance(field, list) and field else field or "—"
 
 def get_stroke_count(char):
+    """Get stroke count for a character"""
     strokes = component_map.get(char, {}).get("meta", {}).get("strokes", None)
     try:
-        if isinstance(strokes, (int, float)) and strokes > 0: return int(strokes)
-        if isinstance(strokes, str) and strokes.isdigit(): return int(strokes)
-    except: pass
+        if isinstance(strokes, (int, float)) and strokes > 0: 
+            return int(strokes)
+        if isinstance(strokes, str) and strokes.isdigit(): 
+            return int(strokes)
+    except: 
+        pass
     return None
 
 def get_etymology_text(meta):
+    """Extract and format etymology information"""
     etymology = meta.get("etymology", {})
     hint = clean_field(etymology.get("hint", "No hint"))
     details = clean_field(etymology.get("details", ""))
     return f"{hint}{'; ' + details if details and details != '—' else ''}"
 
 def format_decomposition(char):
+    """Format decomposition string"""
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     return "—" if not d or '?' in d else d
 
 def get_all_components(char, max_depth=5, depth=0, seen=None):
-    if seen is None: seen = set()
-    if char in seen or depth > max_depth or len(char) != 1: return set()
+    """Recursively get all components of a character"""
+    if seen is None: 
+        seen = set()
+    if char in seen or depth > max_depth or len(char) != 1: 
+        return set()
     seen.add(char)
     s = set()
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     if d:
         for c in d:
-            if c in IDC_CHARS or c == '?' or len(c) != 1: continue
+            if c in IDC_CHARS or c == '?' or len(c) != 1: 
+                continue
             s.add(c)
             s.update(get_all_components(c, max_depth, depth+1, seen.copy()))
     return s
 
 # State initialization
 defaults = {
-    "selected_comp": "", "stroke_count": 0, "radical": "none", "component_idc": "none",
-    "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
-    "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None, "preview_active": False
+    "selected_comp": "", 
+    "stroke_count": 0, 
+    "radical": "none", 
+    "component_idc": "none",
+    "display_mode": "Single Character", 
+    "text_input_comp": "", 
+    "page": 1, 
+    "text_input_warning": None,
+    "show_inputs": True, 
+    "last_valid_selected_comp": "", 
+    "preview_comp": None, 
+    "preview_active": False
 }
 for k, v in defaults.items():
-    if k not in st.session_state: st.session_state[k] = v
+    if k not in st.session_state: 
+        st.session_state[k] = v
 
 # Callbacks
 def sync_stroke():
@@ -420,6 +441,7 @@ def reset():
     st.session_state.text_input_warning = None
 
 def render_preview(c):
+    """Render character preview card"""
     meta = component_map.get(c, {}).get("meta", {})
     f = {
         "📌 Pinyin": clean_field(meta.get("pinyin", "—")),
