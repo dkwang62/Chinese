@@ -18,10 +18,11 @@ def bootstrap_session_state():
     st.session_state.setdefault("font_scale", 1.0)
     st.session_state.setdefault("debug_info", "")
     
-    # Filter States
-    st.session_state.setdefault("stroke_count", 0)
-    st.session_state.setdefault("radical", "No Filter")
-    st.session_state.setdefault("component_idc", "No Filter")
+    # --- PERSISTENT FILTER STATE (The "Shadow" State) ---
+    # These variables survive even when widgets are hidden/destroyed
+    st.session_state.setdefault("filter_strokes", 0)
+    st.session_state.setdefault("filter_radical", "No Filter")
+    st.session_state.setdefault("filter_idc", "No Filter")
     
     # Navigation States
     st.session_state.setdefault("selected_comp", "")
@@ -220,68 +221,62 @@ def format_decomposition(char):
 
 
 # -------------------------------
-# Session state initialization
-# -------------------------------
-def init_session_state():
-    # Only set if not already present
-    if "selected_comp" not in st.session_state:
-        first_key = next(iter(component_map), '') if component_map else ''
-        st.session_state.selected_comp = first_key
-        st.session_state.last_valid_selected_comp = first_key
-
-init_session_state()
-
-
-# -------------------------------
-# Callbacks
+# Callbacks (State Logic)
 # -------------------------------
 
-def on_filter_change():
-    """Resets pagination when filters change, stays on Grid View."""
+def sync_filters():
+    """
+    Called when UI widgets change. 
+    Syncs the temporary 'ui_*' widget values to the persistent 'filter_*' state.
+    """
+    # 1. Update Strokes
+    if "ui_strokes" in st.session_state:
+        st.session_state.filter_strokes = st.session_state.ui_strokes
+    
+    # 2. Update Radical
+    if "ui_radical" in st.session_state:
+        st.session_state.filter_radical = st.session_state.ui_radical
+        
+    # 3. Update IDC
+    if "ui_idc" in st.session_state:
+        st.session_state.filter_idc = st.session_state.ui_idc
+
+    # Reset page on filter change
     st.session_state.page = 1
-    # Do NOT reset filters here; Streamlit updates the session_state key automatically via the widget
     st.session_state.show_inputs = True
 
 def on_reset_filters():
-    """Wipes all filters and returns to default Grid View."""
-    st.session_state.stroke_count = 0
-    st.session_state.radical = "No Filter"
-    st.session_state.component_idc = "No Filter"
-    st.session_state.output_radical = "No Filter"
-    st.session_state.display_mode = "Single Character"
+    """Wipes all persistent filters."""
+    st.session_state.filter_strokes = 0
+    st.session_state.filter_radical = "No Filter"
+    st.session_state.filter_idc = "No Filter"
+    
     st.session_state.page = 1
     st.session_state.text_input_warning = None
     st.session_state.text_input_comp = ""
     st.session_state.show_inputs = True
     
-    if st.session_state.last_valid_selected_comp in component_map:
+    # Force UI widgets to reset by deleting their keys? 
+    # Not strictly necessary if we rely on the Shadow State index logic.
+    
+    if "last_valid_selected_comp" in st.session_state and st.session_state.last_valid_selected_comp in component_map:
         st.session_state.selected_comp = st.session_state.last_valid_selected_comp
     else:
         st.session_state.selected_comp = next(iter(component_map), '') if component_map else ''
 
 def on_char_button_click(char):
-    """
-    User clicks a tile:
-    1. Sets the selected component.
-    2. Hides the Grid (show_inputs = False).
-    3. Shows the Detail Card.
-    """
+    """Selects a char and hides the grid."""
     if char and char in component_map:
         st.session_state.previous_selected_comp = st.session_state.get("selected_comp", "")
         st.session_state.selected_comp = char
         st.session_state.last_valid_selected_comp = char
         
-        # Do not reset filters here. 
         st.session_state.text_input_warning = None
         st.session_state.text_input_comp = char
         st.session_state.show_inputs = False # Switch to Detail View
 
 def on_back_to_search():
-    """
-    User clicks 'Back to Search':
-    1. Shows the Grid (show_inputs = True).
-    2. Filters remain as they were in session_state.
-    """
+    """Shows the grid. Persistent filters remain untouched."""
     st.session_state.show_inputs = True
 
 def process_text_input(component_map_arg):
@@ -304,13 +299,13 @@ def render_controls(component_map_arg):
         "⿻": "Overlaid"
     }
 
-    # 1. Calculate Filter Matches
+    # 1. Filtering Logic (Uses PERSISTENT state)
     filtered_components = [
         comp for comp in component_map_arg
         if isinstance(comp, str) and len(comp) == 1 and
-        (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count) and
-        (st.session_state.radical == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.radical) and
-        (st.session_state.component_idc == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
+        (st.session_state.filter_strokes == 0 or get_stroke_count(comp) == st.session_state.filter_strokes) and
+        (st.session_state.filter_radical == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.filter_radical) and
+        (st.session_state.filter_idc == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.filter_idc))
     ]
     
     sorted_components = sorted(filtered_components, key=lambda c: get_stroke_count(c) or 0)
@@ -323,58 +318,58 @@ def render_controls(component_map_arg):
             col1, col2, col3 = st.columns([0.33, 0.33, 0.34])
 
             with col1:
-                # Stroke Filter
+                # STROKES
                 all_strokes_raw = sorted(set(
                     sc for sc in (get_stroke_count(comp) for comp in component_map_arg)
                     if isinstance(sc, int) and sc > 0
                 ))
                 stroke_options = [0] + all_strokes_raw
-                # FIX: Set index based on session_state to persist selection after 'Back'
+                
+                # Determine Index from Persistent State
                 try:
-                    s_idx = stroke_options.index(st.session_state.stroke_count)
+                    s_idx = stroke_options.index(st.session_state.filter_strokes)
                 except ValueError:
                     s_idx = 0
                 
                 st.selectbox(
                     "Filter by Strokes:",
                     options=stroke_options,
-                    index=s_idx,
-                    key="stroke_count",
+                    index=s_idx, # Force index
+                    key="ui_strokes", # Temporary UI key
                     format_func=lambda x: "No Filter" if x == 0 else str(x),
-                    on_change=on_filter_change
+                    on_change=sync_filters
                 )
 
             with col2:
-                # Radical Filter
-                # Note: We compute available radicals based on the stroke filter to be helpful
+                # RADICAL
                 pre_filtered = [c for c in component_map_arg 
-                                if (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count)]
+                                if (st.session_state.filter_strokes == 0 or get_stroke_count(c) == st.session_state.filter_strokes)]
                 radicals = {"No Filter"} | {
                     component_map_arg.get(c, {}).get("meta", {}).get("radical", "") for c in pre_filtered
                 }
                 rad_options = ["No Filter"] + sorted([r for r in radicals if r and r != "No Filter"])
                 
-                # FIX: Ensure current radical is in options, otherwise reset to No Filter
-                current_rad = st.session_state.radical
+                # Validate Persistent State against new Options
+                current_rad = st.session_state.filter_radical
                 if current_rad not in rad_options:
                     current_rad = "No Filter"
-                    # We don't force write to session_state here to avoid loop, just correct visual index
+                    # We implicitly update persistent state if it's invalid for the current view
+                    st.session_state.filter_radical = "No Filter"
                     
                 st.selectbox(
                     "Filter by Radical:",
                     options=rad_options,
                     index=rad_options.index(current_rad),
-                    key="radical",
-                    on_change=on_filter_change
+                    key="ui_radical", # Temporary UI key
+                    on_change=sync_filters
                 )
 
             with col3:
-                # IDC Filter
+                # IDC (Structure)
                 idc_options = ["No Filter"] + sorted([k for k in idc_descriptions if k in IDC_CHARS])
                 
-                # FIX: Set index based on session_state
                 try:
-                    idc_idx = idc_options.index(st.session_state.component_idc)
+                    idc_idx = idc_options.index(st.session_state.filter_idc)
                 except ValueError:
                     idc_idx = 0
 
@@ -382,9 +377,9 @@ def render_controls(component_map_arg):
                     "Filter by Structure:",
                     options=idc_options,
                     index=idc_idx,
+                    key="ui_idc", # Temporary UI key
                     format_func=lambda x: f"{x} {idc_descriptions.get(x,'')}" if x != "No Filter" else x,
-                    key="component_idc",
-                    on_change=on_filter_change
+                    on_change=sync_filters
                 )
 
         with st.container():
@@ -392,7 +387,6 @@ def render_controls(component_map_arg):
             
             if not sorted_components:
                 st.warning("No characters match your filters.")
-                # We still render the grid container so layout doesn't jump too much
             else:
                 # Pagination
                 PAGE_SIZE = 96
@@ -456,7 +450,6 @@ def render_controls(component_map_arg):
             ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"],
             key="display_mode",
             horizontal=True,
-            # No manual rerun trigger needed, radio change auto-reruns
         )
 
 
@@ -477,7 +470,6 @@ def render_char_card(char, compounds):
     
     details_html = " | ".join(f"<strong>{k}:</strong> {v}" for k, v in fields if v != "—")
     
-    # Header card logic
     st.markdown(f"""
     <div class='char-card'>
         <div style='display:flex; align-items:center; gap:10px;'>
@@ -562,11 +554,10 @@ def main():
                         text_out += f"--- {c} ---\n" + "\n".join(char_compounds[c]) + "\n"
                 st.text_area("Copy content:", text_out, height=150)
 
-    # Debug footer
-    with st.expander("Debug Info", expanded=False):
-        st.write(f"Selected: {st.session_state.selected_comp}")
-        st.write(f"Show Inputs: {st.session_state.show_inputs}")
-        st.write(f"Filters: S={st.session_state.stroke_count}, R={st.session_state.radical}")
+    # Debug footer (Optional)
+    # with st.expander("Debug Info", expanded=False):
+    #     st.write(f"Persistent Filter Strokes: {st.session_state.filter_strokes}")
+    #     st.write(f"Persistent Filter Radical: {st.session_state.filter_radical}")
 
 if __name__ == "__main__":
     main()
