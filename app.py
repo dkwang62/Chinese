@@ -27,9 +27,9 @@ def apply_dynamic_css():
             background: white;
             padding: 18px;
             border-radius: 10px;
-            margin-bottom: 12px;
+            margin-bottom: 0px;  /* Changed from 12px to 0px */
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            height: 100%; /* Ensure card matches button height visual */
+            height: 100%; 
             display: flex;
             align-items: center;
         }
@@ -326,20 +326,23 @@ def main():
             }
             det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
             
-            # --- LAYOUT FIX ---
-            # 1. Use default vertical alignment (top) so button aligns with the description
+            # Create columns for layout
             c1, c2 = st.columns([1, 10]) 
             
             with c1:
                 st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,), use_container_width=True)
             
             with c2:
-                # 2. Render Description FIRST (The white box)
+                # 1. Render Description (White Box)
                 st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
                 
-                # 3. Render Phrases SECOND (The green box)
+                # 2. Render Phrases (Green Box)
+                # Reduced margin-top to 5px so it sits tight against the white box
                 if compounds.get(c):
-                    st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:8px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:5px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
+                
+                # 3. Add Spacer for the NEXT character (The "Blank Row")
+                st.markdown("<div style='height: 30px'></div>", unsafe_allow_html=True)
         if chars and n:
             with st.expander("Export Compounds"):
                 st.text_area("Copy list", "\n".join(w for c in chars for w in compounds[c]), height=150)
