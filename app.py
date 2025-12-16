@@ -246,8 +246,8 @@ def main():
         if st.session_state.component_idc != "No Filter":
             filter_parts.append(f"Structure: {st.session_state.component_idc}")
 
-        filter_summary = " · ".join(filter_parts) if filter_parts else "No filters"
-        instruction = "Click the same character twice to select" if st.session_state.preview_active else "Click a tile to preview"
+        filter_summary = " · ".join(filter_parts) if filter_parts else "No filters applied"
+        instruction = "Click TILE twice to see characters built on this component" if st.session_state.preview_active else "Click a TILE to preview"
         st.markdown(f"<div class='status-line'>Selection list filtered by {filter_summary} — {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
