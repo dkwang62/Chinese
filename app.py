@@ -14,12 +14,10 @@ IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹
 def apply_dynamic_css():
     css = """
     <style>
-        /* Global Styles */
         .main {
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         }
         
-        /* Sidebar Styling */
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
         }
@@ -29,7 +27,6 @@ def apply_dynamic_css():
             color: #ecf0f1 !important;
         }
         
-        /* Header Styles */
         .app-header {
             text-align: center;
             padding: 2rem 0;
@@ -54,7 +51,6 @@ def apply_dynamic_css():
             font-weight: 300;
         }
         
-        /* Status Line */
         .status-line {
             background: white;
             padding: 1.5rem;
@@ -77,7 +73,6 @@ def apply_dynamic_css():
             font-style: italic;
         }
         
-        /* Sidebar Results Header */
         .results-header-sidebar {
             font-size: 1.3em;
             font-weight: 700;
@@ -90,7 +85,6 @@ def apply_dynamic_css():
             backdrop-filter: blur(10px);
         }
         
-        /* Selected Character Display */
         .selected-char-sidebar {
             font-size: 4em;
             text-align: center;
@@ -103,7 +97,6 @@ def apply_dynamic_css():
             border-radius: 15px;
         }
         
-        /* Preview Card */
         .preview-card {
             background: white;
             padding: 2.5rem;
@@ -144,7 +137,6 @@ def apply_dynamic_css():
             border-radius: 10px;
         }
         
-        /* Character Card */
         .char-card {
             background: white;
             padding: 1.5rem;
@@ -160,26 +152,12 @@ def apply_dynamic_css():
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         }
         
-        .char-card-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-        
-        .char-display {
-            font-size: 3em;
-            color: #e74c3c;
-            margin-right: 1rem;
-            font-weight: bold;
-        }
-        
         .char-details {
             font-size: 0.95em;
             color: #555;
             line-height: 1.8;
         }
         
-        /* Component Grid */
         .comp-grid .stButton button {
             font-size: 2em !important;
             height: 80px !important;
@@ -198,7 +176,6 @@ def apply_dynamic_css():
             box-shadow: 0 4px 16px rgba(231, 76, 60, 0.3) !important;
         }
         
-        /* Pagination */
         .pagination-container {
             background: white;
             padding: 1.5rem;
@@ -215,7 +192,6 @@ def apply_dynamic_css():
             font-weight: 600;
         }
         
-        /* Compounds Display */
         .compounds-box {
             padding: 1.5rem;
             background: linear-gradient(135deg, #f1f8e9 0%, #dcedc8 100%);
@@ -237,7 +213,6 @@ def apply_dynamic_css():
             line-height: 2;
         }
         
-        /* Filter Section */
         .filter-section {
             background: rgba(255,255,255,0.05);
             padding: 1.5rem;
@@ -254,7 +229,6 @@ def apply_dynamic_css():
             text-align: center;
         }
         
-        /* Info Box */
         .info-box {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
             padding: 1.5rem;
@@ -265,7 +239,6 @@ def apply_dynamic_css():
             font-size: 1.05em;
         }
         
-        /* Warning Box */
         .warning-box {
             background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
             padding: 1rem;
@@ -276,14 +249,12 @@ def apply_dynamic_css():
             margin: 1rem 0;
         }
         
-        /* Action Buttons */
         .stButton button {
             border-radius: 10px !important;
             font-weight: 600 !important;
             transition: all 0.3s ease !important;
         }
         
-        /* Scrollbar */
         ::-webkit-scrollbar {
             width: 10px;
             height: 10px;
@@ -319,70 +290,73 @@ except Exception as e:
     st.error("⚠️ Failed to load data. Please ensure 'enhanced_component_map_with_etymology.json' exists.")
 
 def clean_field(field):
-    """Clean and format field data"""
-    return field,[object Object], if isinstance(field, list) and field else field or "—"
-    
+    if isinstance(field, list) and field:
+        return field,[object Object],
+    elif field:
+        return field
+    else:
+        return "—"
+
 def get_stroke_count(char):
-    """Get stroke count for a character"""
     strokes = component_map.get(char, {}).get("meta", {}).get("strokes", None)
     try:
-        if isinstance(strokes, (int, float)) and strokes > 0: 
+        if isinstance(strokes, (int, float)) and strokes > 0:
             return int(strokes)
-        if isinstance(strokes, str) and strokes.isdigit(): 
+        if isinstance(strokes, str) and strokes.isdigit():
             return int(strokes)
-    except: 
+    except:
         pass
     return None
 
 def get_etymology_text(meta):
-    """Extract and format etymology information"""
     etymology = meta.get("etymology", {})
     hint = clean_field(etymology.get("hint", "No hint"))
     details = clean_field(etymology.get("details", ""))
-    return f"{hint}{'; ' + details if details and details != '—' else ''}"
+    if details and details != "—":
+        return f"{hint}; {details}"
+    return hint
 
 def format_decomposition(char):
-    """Format decomposition string"""
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
-    return "—" if not d or '?' in d else d
+    if not d or '?' in d:
+        return "—"
+    return d
 
 def get_all_components(char, max_depth=5, depth=0, seen=None):
-    """Recursively get all components of a character"""
-    if seen is None: 
+    if seen is None:
         seen = set()
-    if char in seen or depth > max_depth or len(char) != 1: 
+    if char in seen or depth > max_depth or len(char) != 1:
         return set()
     seen.add(char)
     s = set()
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     if d:
         for c in d:
-            if c in IDC_CHARS or c == '?' or len(c) != 1: 
+            if c in IDC_CHARS or c == '?' or len(c) != 1:
                 continue
             s.add(c)
             s.update(get_all_components(c, max_depth, depth+1, seen.copy()))
     return s
 
-# State initialization
 defaults = {
-    "selected_comp": "", 
-    "stroke_count": 0, 
-    "radical": "none", 
+    "selected_comp": "",
+    "stroke_count": 0,
+    "radical": "none",
     "component_idc": "none",
-    "display_mode": "Single Character", 
-    "text_input_comp": "", 
-    "page": 1, 
+    "display_mode": "Single Character",
+    "text_input_comp": "",
+    "page": 1,
     "text_input_warning": None,
-    "show_inputs": True, 
-    "last_valid_selected_comp": "", 
-    "preview_comp": None, 
+    "show_inputs": True,
+    "last_valid_selected_comp": "",
+    "preview_comp": None,
     "preview_active": False
 }
+
 for k, v in defaults.items():
-    if k not in st.session_state: 
+    if k not in st.session_state:
         st.session_state[k] = v
 
-# Callbacks
 def sync_stroke():
     val = st.session_state.w_stroke
     st.session_state.stroke_count = int(val) if val != 0 else 0
@@ -441,11 +415,13 @@ def reset():
     st.session_state.text_input_warning = None
 
 def render_preview(c):
-    """Render character preview card"""
     meta = component_map.get(c, {}).get("meta", {})
+    stroke_info = get_stroke_count(c)
+    stroke_text = f"{stroke_info} strokes" if stroke_info else "unknown"
+    
     f = {
         "📌 Pinyin": clean_field(meta.get("pinyin", "—")),
-        "✍️ Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else "unknown",
+        "✍️ Strokes": stroke_text,
         "🔰 Radical": clean_field(meta.get("radical", "—")),
         "🧩 Decomposition": format_decomposition(c),
         "📖 Definition": clean_field(meta.get("definition", "—")),
@@ -466,7 +442,6 @@ def main():
 
     apply_dynamic_css()
 
-    # === HEADER ===
     st.markdown("""
         <div class='app-header'>
             <div class='app-title'>🈑 Radix</div>
@@ -474,12 +449,10 @@ def main():
         </div>
     """, unsafe_allow_html=True)
 
-    # === SIDEBAR ===
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; color:#ecf0f1; margin-bottom:30px; font-size:2.5em;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
         if st.session_state.show_inputs:
-            # Browsing mode
             st.markdown("<div class='filter-section'>", unsafe_allow_html=True)
             st.markdown("<div class='filter-title'>🔍 Filters</div>", unsafe_allow_html=True)
 
@@ -510,25 +483,26 @@ def main():
             st.text_input("Enter a character", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="e.g. 水, 火, 木")
 
         else:
-            # Results mode
             st.markdown("<div style='color:#ecf0f1; font-weight:700; font-size:1.3em; margin-bottom:15px;'>⚙️ Actions</div>", unsafe_allow_html=True)
             st.button("◀️ Back to Browse", on_click=back, use_container_width=True, type="primary")
             st.button("🔄 Reset All Filters", on_click=reset, use_container_width=True)
 
             st.markdown("---")
             
-            # Selected character display
             st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
 
-            # Results count
             related = component_map[st.session_state.selected_comp].get("related_characters", [])
             chars = [c for c in related if len(c)==1]
             n = int(st.session_state.display_mode,[object Object],) if st.session_state.display_mode != "Single Character" else 0
-            compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
+            
+            if n:
+                compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars}
+            else:
+                compounds = {c:[] for c in chars}
+            
             valid_chars = [c for c in chars if n==0 or compounds[c]]
             st.markdown(f"<div class='results-header-sidebar'>🧬 Found {len(valid_chars)} Results</div>", unsafe_allow_html=True)
 
-            # Output Type
             st.markdown("---")
             st.markdown("<div style='color:#ecf0f1; font-weight:700; font-size:1.3em; margin-bottom:15px;'>📋 Output Type</div>", unsafe_allow_html=True)
             modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
@@ -536,9 +510,7 @@ def main():
             st.radio("", options=modes, index=modes.index(st.session_state.display_mode),
                     format_func=lambda x: f"{mode_icons[x]} {x}", key="w_display", on_change=sync_display)
 
-    # === MAIN CONTENT ===
     if st.session_state.show_inputs:
-        # Browsing mode
         filter_parts = []
         if st.session_state.stroke_count > 0:
             filter_parts.append(f"**{st.session_state.stroke_count} strokes**")
@@ -582,7 +554,7 @@ def main():
         st.markdown("<div class='pagination-container'>", unsafe_allow_html=True)
         p1, p2, p3 = st.columns([1, 3, 1])
         with p1:
-            if st.button("◀️ Previous", disabled=st.session_state.page<=1, use_container_width=True): 
+            if st.button("◀️ Previous", disabled=st.session_state.page<=1, use_container_width=True):
                 st.session_state.page -= 1
                 st.rerun()
         with p2:
@@ -590,7 +562,7 @@ def main():
             end = min(st.session_state.page*PAGE_SIZE, total)
             st.markdown(f"<div class='pagination-info'>Page {st.session_state.page} of {max_page} · Showing {start}–{end} of {total}</div>", unsafe_allow_html=True)
         with p3:
-            if st.button("Next ▶️", disabled=st.session_state.page>=max_page, use_container_width=True): 
+            if st.button("Next ▶️", disabled=st.session_state.page>=max_page, use_container_width=True):
                 st.session_state.page += 1
                 st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
@@ -606,11 +578,15 @@ def main():
         st.markdown("</div>", unsafe_allow_html=True)
 
     else:
-        # Results mode
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         chars = [c for c in related if len(c)==1]
         n = int(st.session_state.display_mode,[object Object],) if st.session_state.display_mode != "Single Character" else 0
-        compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
+        
+        if n:
+            compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars}
+        else:
+            compounds = {c:[] for c in chars}
+        
         chars = [c for c in chars if n==0 or compounds[c]]
 
         if not chars:
@@ -619,9 +595,12 @@ def main():
 
         for c in sorted(chars, key=lambda x: get_stroke_count(x) or 999):
             meta = component_map.get(c, {}).get("meta", {})
+            stroke_info = get_stroke_count(c)
+            stroke_text = f"{stroke_info} strokes" if stroke_info else "unknown"
+            
             fd = {
                 "📌 Pinyin": clean_field(meta.get("pinyin", "—")),
-                "✍️ Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else "unknown",
+                "✍️ Strokes": stroke_text,
                 "🔰 Radical": clean_field(meta.get("radical", "—")),
                 "🧩 Decomposition": format_decomposition(c),
                 "📖 Definition": clean_field(meta.get("definition", "—")),
