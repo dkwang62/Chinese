@@ -102,7 +102,7 @@ def get_all_components(char, max_depth=5, depth=0, seen=None):
 
 # State init
 defaults = {
-    "selected_comp": "", "stroke_count": 0, "radical": "No Filter", "component_idc": "No Filter",
+    "selected_comp": "", "stroke_count": 0, "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
     "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None, "preview_active": False
 }
@@ -159,8 +159,8 @@ def back():
 
 def reset():
     st.session_state.stroke_count = 0
-    st.session_state.radical = "No Filter"
-    st.session_state.component_idc = "No Filter"
+    st.session_state.radical = "none"
+    st.session_state.component_idc = "none"
     st.session_state.page = 1
     st.session_state.show_inputs = True
     st.session_state.preview_active = False
@@ -201,11 +201,11 @@ def main():
                          format_func=lambda x: "Any" if x == 0 else str(x), key="w_stroke", on_change=sync_stroke)
 
             rad_set = {component_map.get(c, {}).get("meta", {}).get("radical", "") for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical")}
-            rad_opts = ["No Filter"] + sorted(rad_set)
+            rad_opts = ["none"] + sorted(rad_set)
             st.selectbox("Radical", options=rad_opts, index=rad_opts.index(st.session_state.radical), key="w_radical", on_change=sync_radical)
 
             idc_set = {d[0] for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d[0] in IDC_CHARS}
-            idc_opts = ["No Filter"] + sorted(idc_set)
+            idc_opts = ["none"] + sorted(idc_set)
             st.selectbox("Structure", options=idc_opts, index=idc_opts.index(st.session_state.component_idc), key="w_idc", on_change=sync_idc)
 
             st.markdown("---")
@@ -241,19 +241,19 @@ def main():
         filter_parts = []
         if st.session_state.stroke_count > 0:
             filter_parts.append(f"{st.session_state.stroke_count} strokes")
-        if st.session_state.radical != "No Filter":
+        if st.session_state.radical != "none":
             filter_parts.append(f"Radical: {st.session_state.radical}")
-        if st.session_state.component_idc != "No Filter":
+        if st.session_state.component_idc != "none":
             filter_parts.append(f"Structure: {st.session_state.component_idc}")
 
-        filter_summary = " · ".join(filter_parts) if filter_parts else "No filters applied"
+        filter_summary = " · ".join(filter_parts) if filter_parts else "nones applied"
         instruction = "Click TILE twice to see characters built on this component" if st.session_state.preview_active else "Click a TILE to preview"
-        st.markdown(f"<div class='status-line'>Selection list filtered by {filter_summary} — {instruction}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='status-line'>List filtered {filter_summary} — {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
-            (st.session_state.radical == "No Filter" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
-            (st.session_state.component_idc == "No Filter" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
+            (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
+            (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
         ]
         extra = get_all_components(st.session_state.selected_comp, max_depth=5)
         filtered = list(set(filtered) | (extra & set(component_map)))
