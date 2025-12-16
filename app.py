@@ -18,14 +18,23 @@ def apply_dynamic_css():
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         }
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+            background: linear-gradient(180deg, #1a2a3a 0%, #2c3e50 100%);
             color: #ecf0f1;
         }
         [data-testid="stSidebar"] .stMarkdown,
         [data-testid="stSidebar"] label,
-        [data-testid="stSidebar"] .stSelectbox > div > div,
-        [data-testid="stSidebar"] .stTextInput > div > div {
+        [data-testid="stSidebar"] .stSelectbox > div > div > div,
+        [data-testid="stSidebar"] .stTextInput > div > div > input,
+        [data-testid="stSidebar"] .stRadio > div > label,
+        [data-testid="stSidebar"] .stButton > button {
             color: #ecf0f1 !important;
+        }
+        [data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label > div:first-child {
+            background-color: #ecf0f1 !important;
+            border-color: #bdc3c7 !important;
+        }
+        [data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label[data-checked="true"] > div:first-child {
+            background-color: #3498db !important;
         }
         .app-header {
             text-align: center;
