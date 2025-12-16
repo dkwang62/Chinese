@@ -11,18 +11,17 @@ IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹
 
 
 # -------------------------------
-# Session bootstrap (early defaults)
+# Session bootstrap
 # -------------------------------
 def bootstrap_session_state():
     st.session_state.setdefault("diagnostic_messages", [])
     st.session_state.setdefault("font_scale", 1.0)
-    st.session_state.setdefault("debug_info", "")
 
 bootstrap_session_state()
 
 
 # -------------------------------
-# Dynamic CSS (now simpler — no need to hide via CSS)
+# Dynamic CSS
 # -------------------------------
 def apply_dynamic_css():
     font_scale = st.session_state.get("font_scale", 1.0)
@@ -56,10 +55,6 @@ def apply_dynamic_css():
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             transition: transform 0.2s;
         }}
-        .char-card:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-        }}
 
         .compounds-section {{
             background-color: #f1f8e9;
@@ -68,7 +63,6 @@ def apply_dynamic_css():
             margin-top: 10px;
         }}
 
-        /* Grid tiles */
         .comp-grid .stButton button {{
             background: #ffffff;
             color: #e74c3c;
@@ -157,7 +151,7 @@ def get_all_components(char, max_depth, depth=0, seen=None):
 
 
 # -------------------------------
-# One-time state initialization
+# State initialization
 # -------------------------------
 if "selected_comp" not in st.session_state:
     st.session_state.selected_comp = ""
@@ -184,11 +178,6 @@ if "preview_comp" not in st.session_state:
 if "preview_active" not in st.session_state:
     st.session_state.preview_active = False
 
-# Default selected_comp if needed
-if not st.session_state.selected_comp and component_map:
-    st.session_state.selected_comp = next(iter(component_map), '')
-    st.session_state.last_valid_selected_comp = st.session_state.selected_comp
-
 
 # -------------------------------
 # Preview card
@@ -214,11 +203,11 @@ def render_preview_card(c: str) -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.caption("Click the same character again to select it.")
+    st.caption("👆 Click the same character again to confirm selection and view results.")
 
 
 # -------------------------------
-# Sync callbacks (Shadow Key Pattern)
+# Callbacks
 # -------------------------------
 def sync_stroke_count():
     st.session_state.stroke_count = st.session_state.stroke_count_widget
@@ -255,7 +244,7 @@ def sync_text_input():
 
 def on_component_tile_click(c: str):
     if st.session_state.preview_active and st.session_state.preview_comp == c:
-        # SELECT → hide entire input section
+        # SECOND CLICK → CONFIRM SELECTION
         st.session_state.selected_comp = c
         st.session_state.last_valid_selected_comp = c
         st.session_state.text_input_comp = c
@@ -264,9 +253,10 @@ def on_component_tile_click(c: str):
         st.session_state.preview_active = False
         st.session_state.preview_comp = None
     else:
-        # PREVIEW
+        # FIRST CLICK → PREVIEW ONLY
         st.session_state.preview_active = True
         st.session_state.preview_comp = c
+        # Do NOT set selected_comp here → no results shown yet
 
 def back_to_selection():
     st.session_state.show_inputs = True
@@ -288,13 +278,12 @@ def on_reset_filters():
 
 
 # -------------------------------
-# Controls — only shown when browsing
+# Controls
 # -------------------------------
 def render_controls():
     if not st.session_state.show_inputs:
-        # When a component is selected → show only back/reset buttons
         st.markdown("### Component Selected")
-        st.info("Selection complete. Return to browse other components.")
+        st.info("Viewing results below. Return to browse other components.")
         col1, col2 = st.columns(2)
         with col1:
             st.button("← Back to component list", on_click=back_to_selection, use_container_width=True)
@@ -302,7 +291,6 @@ def render_controls():
             st.button("Reset Filters", on_click=on_reset_filters, use_container_width=True)
         return
 
-    # === Full controls when show_inputs == True ===
     idc_descriptions = {
         "No Filter": "No Filter", "⿰": "Left Right", "⿱": "Top Bottom", "⿲": "Left Middle Right",
         "⿳": "Top Middle Bottom", "⿴": "Surround", "⿵": "Surround Top", "⿶": "Surround Bottom",
@@ -352,7 +340,7 @@ def render_controls():
         )
 
     st.markdown("### Select Input Component")
-    st.caption("Click a character tile to preview → click again to select and view results.")
+    st.caption("Click a tile → preview details → click again to confirm and view results.")
 
     col4, col5 = st.columns([1.5, 0.2])
 
@@ -371,6 +359,7 @@ def render_controls():
             st.warning("No components match the current filters.")
             return
 
+        # Show preview if active
         if st.session_state.preview_active and st.session_state.preview_comp:
             render_preview_card(st.session_state.preview_comp)
 
@@ -399,12 +388,11 @@ def render_controls():
         for i, ch in enumerate(page_comps):
             with cols[i % GRID_COLS]:
                 is_preview = st.session_state.preview_active and st.session_state.preview_comp == ch
-                is_selected = st.session_state.selected_comp == ch
                 st.button(
                     ch,
                     key=f"tile_{ch}_{st.session_state.page}",
                     use_container_width=True,
-                    type="primary" if (is_preview or is_selected) else "secondary",
+                    type="primary" if is_preview else "secondary",
                     on_click=on_component_tile_click,
                     args=(ch,)
                 )
@@ -423,7 +411,7 @@ def render_controls():
 
 
 # -------------------------------
-# Result card rendering
+# Result card
 # -------------------------------
 def render_result_card(char, compounds):
     meta = component_map.get(char, {}).get("meta", {})
@@ -454,7 +442,7 @@ def main():
     apply_dynamic_css()
     st.markdown("<h1>🈑 Radix</h1>", unsafe_allow_html=True)
 
-    # Always show output type selector
+    # Output type always visible
     st.markdown("### Output Type")
     modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
     index = modes.index(st.session_state.display_mode)
@@ -469,11 +457,18 @@ def main():
 
     render_controls()
 
-    if not st.session_state.selected_comp or st.session_state.selected_comp not in component_map:
-        st.info("👆 Select a component from the list above to view its details and related characters.")
+    # === ONLY SHOW RESULTS AFTER FINAL SELECTION (not during preview) ===
+    if st.session_state.show_inputs:
+        # Browsing or preview mode → no results yet
+        if not st.session_state.preview_active:
+            st.info("👆 Click a character tile to preview → click again to view full results.")
         return
 
-    # Selected component header
+    # Final selection confirmed → show everything
+    if st.session_state.selected_comp not in component_map:
+        st.info("Select a component to view results.")
+        return
+
     meta = component_map[st.session_state.selected_comp]["meta"]
     fields = {
         "Pinyin": clean_field(meta.get("pinyin", "—")),
@@ -489,14 +484,10 @@ def main():
         unsafe_allow_html=True
     )
 
-    # Results
     related = component_map[st.session_state.selected_comp].get("related_characters", [])
     chars = [c for c in related if isinstance(c, str) and len(c) == 1]
     n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
-    compounds = {
-        c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
-        for c in chars
-    } if n else {c: [] for c in chars}
+    compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n] for c in chars} if n else {c: [] for c in chars}
     chars = [c for c in chars if n == 0 or compounds[c]]
 
     st.markdown(f"<h2 class='results-header'>🧬 Results — {len(chars)} found</h2>", unsafe_allow_html=True)
