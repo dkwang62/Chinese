@@ -344,23 +344,43 @@ def main():
                 "Etymology": get_etymology_text(meta),
             }
             det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
-            # --- NEW CODE START ---
-            # Create two columns: Left (narrow) for tile, Right (wide) for details
-            col_btn, col_details = st.columns([1, 8]) 
+else:
+        # Results mode
+        related = component_map[st.session_state.selected_comp].get("related_characters", [])
+        
+        # 1. Remove duplicates to prevent the "Duplicate Element Key" error
+        chars = list(set([c for c in related if len(c)==1])) 
+        
+        # Filter compounds based on display mode
+        n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
+        compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
+        chars = [c for c in chars if n==0 or compounds[c]]
 
-            with col_btn:
-                # Render the button in the narrow column
-                # use_container_width=True ensures it fills the column width
+        for c in sorted(chars, key=lambda x: get_stroke_count(x) or 999):
+            meta = component_map.get(c, {}).get("meta", {})
+            fd = {
+                "Pinyin": clean_field(meta.get("pinyin", "—")),
+                "Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else "unknown",
+                "Radical": clean_field(meta.get("radical", "—")),
+                "Decomposition": format_decomposition(c),
+                "Definition": clean_field(meta.get("definition", "—")),
+                "Etymology": get_etymology_text(meta),
+            }
+            det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
+
+            # --- THIS IS THE LAYOUT FIX ---
+            # Create two columns: small left, big right
+            c1, c2 = st.columns([1, 10], vertical_alignment="center")
+
+            with c1:
+                # The Tile goes in the left column
                 st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,), use_container_width=True)
-
-            with col_details:
-                # Render the details card in the wide column
+            
+            with c2:
+                # The Details go in the right column
                 st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
-                
-                # If there are compounds, render them here too so they align with the details
                 if compounds.get(c):
                     st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:8px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
-            # --- NEW CODE END ---
             
             st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,))
             st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
