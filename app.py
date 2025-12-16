@@ -173,10 +173,6 @@ def render_preview(c):
                     color: #e74c3c; 
                     text-align: center; 
                     line-height: 1;
-                    padding: 10px;
-                    border: 1px solid #eee;
-                    border-radius: 8px;
-                    background: white;
                 ">
                     {c}
                 </div>
