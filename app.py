@@ -69,6 +69,29 @@ def apply_dynamic_css():
             margin: 20px 0 30px 0;
             text-align: center;
         }
+
+        /* 6. ENLARGE VIEW */
+        .enlarge-canvas {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 10px;
+            min-height: calc(100vh - 180px);
+        }
+        .enlarge-chars {
+            line-height: 1;
+            letter-spacing: 0.08em;
+            user-select: text;
+        }
+        .enlarge-1 { font-size: clamp(180px, 40vw, 560px); }
+        .enlarge-2 { font-size: clamp(140px, 32vw, 460px); }
+        .enlarge-note {
+            text-align: center;
+            color: #666;
+            margin-top: -10px;
+            margin-bottom: 20px;
+        }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -110,11 +133,25 @@ def format_decomposition(char):
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     return "—" if not d or '?' in d else d
 
+def get_all_components(char, max_depth=5, depth=0, seen=None):
+    if seen is None: seen = set()
+    if char in seen or depth > max_depth or len(char) != 1: return set()
+    seen.add(char)
+    s = set()
+    d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
+    if d:
+        for c in d:
+            if c in IDC_CHARS or c == '?' or len(c) != 1: continue
+            s.add(c)
+            s.update(get_all_components(c, max_depth, depth+1, seen.copy()))
+    return s
+
 # State init
 defaults = {
     "selected_comp": "", "stroke_count": 0, "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
-    "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None, "preview_active": False
+    "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None, "preview_active": False,
+    "enlarge_active": False, "enlarge_text": "", "enlarge_warning": None
 }
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
@@ -166,6 +203,9 @@ def back():
     st.session_state.show_inputs = True
     st.session_state.preview_active = False
     st.session_state.preview_comp = None
+    st.session_state.enlarge_active = False
+    st.session_state.enlarge_warning = None
+
 
 def reset():
     st.session_state.stroke_count = 0
@@ -175,6 +215,25 @@ def reset():
     st.session_state.show_inputs = True
     st.session_state.preview_active = False
     st.session_state.preview_comp = None
+    st.session_state.enlarge_active = False
+    st.session_state.enlarge_warning = None
+
+def clear_enlarge_warning():
+    st.session_state.enlarge_warning = None
+
+def start_enlarge():
+    raw = st.session_state.get("w_enlarge", "") or ""
+    s = "".join(ch for ch in raw.strip() if not ch.isspace())
+    if len(s) not in (1, 2):
+        st.session_state.enlarge_warning = "Paste exactly 1 or 2 characters."
+        return
+    st.session_state.enlarge_warning = None
+    st.session_state.enlarge_text = s
+    st.session_state.enlarge_active = True
+
+def end_enlarge():
+    st.session_state.enlarge_active = False
+    st.session_state.enlarge_warning = None
 
 def render_preview(c):
     meta = component_map.get(c, {}).get("meta", {})
@@ -224,6 +283,21 @@ def render_preview(c):
     # Add a divider or spacer after the preview to separate it from the grid below
     st.markdown("---")
 
+def render_enlarge_view(chars: str):
+    chars = chars or ""
+    n = len(chars)
+    if n == 0:
+        st.info("No characters to display.")
+        return
+    if n > 2:
+        chars = chars[:2]
+        n = 2
+    st.markdown("<div class='enlarge-note'>Tip: Use your browser zoom if you need even more detail.</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div class='enlarge-canvas'><div class='enlarge-chars enlarge-{n}'>{chars}</div></div>",
+        unsafe_allow_html=True,
+    )
+
 def main():
     if not component_map:
         st.stop()
@@ -260,8 +334,18 @@ def main():
         else:
             # Results mode Sidebar
             st.markdown("### Actions")
-            st.button("← Back to list", on_click=back, use_container_width=True)
+            if st.session_state.enlarge_active:
+                st.button("← Back", on_click=end_enlarge, use_container_width=True)
+            else:
+                st.button("← Back to list", on_click=back, use_container_width=True)
             st.button("Reset Filters", on_click=reset, use_container_width=True)
+
+            st.markdown("---")
+            st.markdown("### Enlarge")
+            if st.session_state.enlarge_warning:
+                st.warning(st.session_state.enlarge_warning)
+            st.text_input("Paste 1–2 characters", key="w_enlarge", on_change=clear_enlarge_warning, placeholder="e.g. 鬱 or 明月")
+            st.button("Update" if st.session_state.enlarge_active else "Enlarge", on_click=start_enlarge, use_container_width=True)
 
             # Selected character
             st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
@@ -283,6 +367,10 @@ def main():
             st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
 
     # === MAIN CONTENT ===
+    if st.session_state.enlarge_active:
+        render_enlarge_view(st.session_state.enlarge_text)
+        return
+
     if st.session_state.show_inputs:
         # Browsing mode
         filter_parts = []
@@ -302,19 +390,7 @@ def main():
             (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
             (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
         ]
-
-        def result_count(comp: str) -> int:
-            rel = component_map.get(comp, {}).get("related_characters", [])
-            return len({x for x in rel if isinstance(x, str) and len(x) == 1})
-
-        counts = {c: result_count(c) for c in filtered}
-
-        # Sort: most results first, then fewer strokes, then Unicode as stable tie-breaker
-        sorted_comps = sorted(
-            filtered,
-            key=lambda c: (-counts.get(c, 0), get_stroke_count(c) or 999, c)
-        )
-
+        sorted_comps = sorted(filtered, key=lambda c: get_stroke_count(c) or 999)
 
         if not sorted_comps:
             st.info("No components match current filters.")
