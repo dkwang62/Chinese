@@ -16,6 +16,13 @@ def apply_dynamic_css():
             margin: 20px 0 10px 0;
             text-align: center;
         }
+        .selected-char-sidebar {
+            font-size: 2.2em;
+            text-align: center;
+            color: #e74c3c;
+            margin: 20px 0;
+            font-weight: bold;
+        }
         .char-card {
             background: white;
             padding: 18px;
@@ -179,7 +186,7 @@ def main():
 
     apply_dynamic_css()
 
-    # === SIDEBAR — App control center ===
+    # === SIDEBAR ===
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
@@ -212,29 +219,36 @@ def main():
             st.button("← Back to list", on_click=back, use_container_width=True)
             st.button("Reset Filters", on_click=reset, use_container_width=True)
 
-            st.markdown("### Output Type")
-            modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
-            st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
+            # Selected character prominently before output options
+            st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
 
-            # Results count in sidebar
+            # Results count
             related = component_map[st.session_state.selected_comp].get("related_characters", [])
             chars = [c for c in related if len(c)==1]
             n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
             compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
             valid_chars = [c for c in chars if n==0 or compounds[c]]
             st.markdown(f"<div class='results-header-sidebar'>🧬 Results — {len(valid_chars)}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='text-align:center; font-size:1.8em; color:#e74c3c; margin:20px 0;'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
+
+            # Output Type
+            st.markdown("### Output Type")
+            modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
+            st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
 
     # === MAIN CONTENT ===
     if st.session_state.show_inputs:
-        # Browsing / Preview
-        parts = []
-        if st.session_state.stroke_count > 0: parts.append(f"{st.session_state.stroke_count} strokes")
-        if st.session_state.radical != "No Filter": parts.append(f"Radical: {st.session_state.radical}")
-        if st.session_state.component_idc != "No Filter": parts.append(f"Structure: {st.session_state.component_idc}")
-        filter_text = " · ".join(parts) if parts else "No filters applied"
-        instruction = "Click again to confirm" if st.session_state.preview_active else "Click a tile to preview"
-        st.markdown(f"<div class='status-line'>{filter_text} — {instruction}</div>", unsafe_allow_html=True)
+        # Browsing mode — improved status line
+        filter_parts = []
+        if st.session_state.stroke_count > 0:
+            filter_parts.append(f"{st.session_state.stroke_count} strokes")
+        if st.session_state.radical != "No Filter":
+            filter_parts.append(f"Radical: {st.session_state.radical}")
+        if st.session_state.component_idc != "No Filter":
+            filter_parts.append(f"Structure: {st.session_state.component_idc}")
+
+        filter_summary = " · ".join(filter_parts) if filter_parts else "No filters"
+        instruction = "Click the same character twice to select" if st.session_state.preview_active else "Click a tile to preview"
+        st.markdown(f"<div class='status-line'>Selection list filtered by {filter_summary} — {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
@@ -279,7 +293,7 @@ def main():
         st.markdown("</div>", unsafe_allow_html=True)
 
     else:
-        # Results mode — main screen only shows result characters
+        # Results mode — clean list only
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         chars = [c for c in related if len(c)==1]
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
