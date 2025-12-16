@@ -110,19 +110,6 @@ def format_decomposition(char):
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     return "—" if not d or '?' in d else d
 
-def get_all_components(char, max_depth=5, depth=0, seen=None):
-    if seen is None: seen = set()
-    if char in seen or depth > max_depth or len(char) != 1: return set()
-    seen.add(char)
-    s = set()
-    d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
-    if d:
-        for c in d:
-            if c in IDC_CHARS or c == '?' or len(c) != 1: continue
-            s.add(c)
-            s.update(get_all_components(c, max_depth, depth+1, seen.copy()))
-    return s
-
 # State init
 defaults = {
     "selected_comp": "", "stroke_count": 0, "radical": "none", "component_idc": "none",
@@ -315,8 +302,6 @@ def main():
             (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
             (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
         ]
-        extra = get_all_components(st.session_state.selected_comp, max_depth=5)
-        filtered = list(set(filtered) | (extra & set(component_map)))
         sorted_comps = sorted(filtered, key=lambda c: get_stroke_count(c) or 999)
 
         if not sorted_comps:
