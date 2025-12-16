@@ -340,6 +340,18 @@ def main():
                 st.button("← Back to list", on_click=back, use_container_width=True)
             st.button("Reset Filters", on_click=reset, use_container_width=True)
 
+            # Secondary action: open external stroke-order tool (opens in a new tab)
+            if hasattr(st, "link_button"):
+                st.link_button("View stroke order", "https://www.chineseconverter.com/en/convert/chinese-stroke-order-tool", use_container_width=True)
+            else:
+                st.markdown(
+                    '<a href="https://www.chineseconverter.com/en/convert/chinese-stroke-order-tool" target="_blank" '
+                    'style="display:block;text-align:center;padding:0.5rem 0.75rem;'
+                    'border:1px solid rgba(49,51,63,0.2);border-radius:0.5rem;'
+                    'text-decoration:none;">View stroke order</a>',
+                    unsafe_allow_html=True
+                )
+
             st.markdown("---")
             st.markdown("### Enlarge")
             if st.session_state.enlarge_warning:
