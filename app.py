@@ -17,25 +17,70 @@ def apply_dynamic_css():
         .main {
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         }
+
+        /* Light sidebar background */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #1a2a3a 0%, #2c3e50 100%);
-            color: #ecf0f1;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border-right: 1px solid #e2e8f0;
         }
+
+        /* Light text in sidebar - dark for readability */
         [data-testid="stSidebar"] .stMarkdown,
         [data-testid="stSidebar"] label,
         [data-testid="stSidebar"] .stSelectbox > div > div > div,
         [data-testid="stSidebar"] .stTextInput > div > div > input,
-        [data-testid="stSidebar"] .stRadio > div > label,
-        [data-testid="stSidebar"] .stButton > button {
-            color: #ecf0f1 !important;
+        [data-testid="stSidebar"] .stRadio > div > label {
+            color: #2d3748 !important;
+            font-weight: 500;
         }
+
+        /* Darker background for input fields in sidebar */
+        [data-testid="stSidebar"] .stSelectbox > div > div,
+        [data-testid="stSidebar"] .stTextInput > div > div,
+        [data-testid="stSidebar"] .stRadio > div {
+            background-color: #edf2f7 !important;
+            border-radius: 8px !important;
+            padding: 8px 12px !important;
+            border: 1px solid #cbd5e0 !important;
+        }
+
+        /* Focused input fields */
+        [data-testid="stSidebar"] .stSelectbox > div[role="combobox"] > div:focus,
+        [data-testid="stSidebar"] .stTextInput > div > div > input:focus {
+            border-color: #e74c3c !important;
+            box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.2) !important;
+        }
+
+        /* Radio buttons - darker container, better visibility */
+        [data-testid="stSidebar"] .stRadio > div[role="radiogroup"] {
+            background-color: #edf2f7 !important;
+            padding: 12px !important;
+            border-radius: 10px !important;
+            gap: 10px !important;
+        }
+
+        /* Radio button circles */
         [data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label > div:first-child {
-            background-color: #ecf0f1 !important;
-            border-color: #bdc3c7 !important;
+            background-color: white !important;
+            border: 2px solid #a0aec0 !important;
         }
+
         [data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label[data-checked="true"] > div:first-child {
-            background-color: #3498db !important;
+            background-color: #e74c3c !important;
+            border-color: #e74c3c !important;
         }
+
+        /* Sidebar buttons */
+        [data-testid="stSidebar"] .stButton > button {
+            background-color: #e74c3c !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        [data-testid="stSidebar"] .stButton > button:hover {
+            background-color: #c0392b !important;
+        }
+
         .app-header {
             text-align: center;
             padding: 2rem 0;
@@ -44,6 +89,7 @@ def apply_dynamic_css():
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
             margin-bottom: 2rem;
         }
+
         .app-title {
             font-size: 3em;
             font-weight: 800;
@@ -51,6 +97,7 @@ def apply_dynamic_css():
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+
         .status-line {
             background: white;
             padding: 1.5rem;
@@ -62,17 +109,18 @@ def apply_dynamic_css():
             font-size: 1.1em;
             color: #2c3e50;
         }
+
         .results-header-sidebar {
             font-size: 1.4em;
             font-weight: 700;
-            color: #ecf0f1;
-            background: rgba(255,255,255,0.1);
+            color: #2d3748;
+            background: #e2e8f0;
             padding: 15px;
             border-radius: 10px;
             margin: 20px 0;
             text-align: center;
-            backdrop-filter: blur(10px);
         }
+
         .selected-char-sidebar {
             font-size: 4em;
             text-align: center;
@@ -83,7 +131,9 @@ def apply_dynamic_css():
             padding: 20px;
             background: white;
             border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
+
         .preview-card {
             background: white;
             padding: 2.5rem;
@@ -92,6 +142,7 @@ def apply_dynamic_css():
             margin: 2rem 0;
             border: 2px solid #e74c3c;
         }
+
         .preview-char {
             font-size: 5em;
             text-align: center;
@@ -99,6 +150,7 @@ def apply_dynamic_css():
             margin: 20px 0;
             font-weight: bold;
         }
+
         .preview-details {
             text-align: center;
             font-size: 1.1em;
@@ -108,6 +160,7 @@ def apply_dynamic_css():
             padding: 1rem;
             border-radius: 10px;
         }
+
         .char-card {
             background: white;
             padding: 1.5rem;
@@ -116,10 +169,12 @@ def apply_dynamic_css():
             box-shadow: 0 2px 12px rgba(0,0,0,0.08);
             border-left: 4px solid #3498db;
         }
+
         .char-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         }
+
         .comp-grid .stButton button {
             font-size: 2em !important;
             height: 80px !important;
@@ -128,11 +183,13 @@ def apply_dynamic_css():
             border-radius: 12px !important;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
         }
+
         .comp-grid .stButton button:hover {
             background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%) !important;
             border-color: #e74c3c !important;
             transform: scale(1.05);
         }
+
         .compounds-box {
             padding: 1.5rem;
             background: linear-gradient(135deg, #f1f8e9 0%, #dcedc8 100%);
@@ -140,16 +197,19 @@ def apply_dynamic_css():
             margin-top: 1rem;
             border-left: 4px solid #8bc34a;
         }
+
         .compounds-title {
             font-weight: 700;
             color: #558b2f;
             font-size: 1.1em;
         }
+
         .compounds-list {
             font-size: 1.3em;
             color: #33691e;
             line-height: 2;
         }
+
         .info-box {
             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
             padding: 1.5rem;
