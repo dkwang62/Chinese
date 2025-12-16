@@ -22,11 +22,10 @@ bootstrap_session_state()
 
 
 # -------------------------------
-# Dynamic CSS
+# Dynamic CSS (now simpler — no need to hide via CSS)
 # -------------------------------
 def apply_dynamic_css():
     font_scale = st.session_state.get("font_scale", 1.0)
-    hide_controls = "display: none;" if not st.session_state.get("show_inputs", True) else ""
 
     css = f"""
     <style>
@@ -84,9 +83,6 @@ def apply_dynamic_css():
             color: #c0392b;
             border-color: #f2c6c6;
         }}
-
-        /* Hide controls when component selected */
-        .controls-block {{ {hide_controls} }}
 
         @media (max-width: 768px) {{
             .selected-card {{ flex-direction: column; align-items: flex-start; padding: 10px; }}
@@ -259,7 +255,7 @@ def sync_text_input():
 
 def on_component_tile_click(c: str):
     if st.session_state.preview_active and st.session_state.preview_comp == c:
-        # SELECT
+        # SELECT → hide entire input section
         st.session_state.selected_comp = c
         st.session_state.last_valid_selected_comp = c
         st.session_state.text_input_comp = c
@@ -287,15 +283,26 @@ def on_reset_filters():
     st.session_state.show_inputs = True
     st.session_state.preview_active = False
     st.session_state.preview_comp = None
-    # Restore last valid if possible
     if st.session_state.last_valid_selected_comp in component_map:
         st.session_state.selected_comp = st.session_state.last_valid_selected_comp
 
 
 # -------------------------------
-# Controls
+# Controls — only shown when browsing
 # -------------------------------
 def render_controls():
+    if not st.session_state.show_inputs:
+        # When a component is selected → show only back/reset buttons
+        st.markdown("### Component Selected")
+        st.info("Selection complete. Return to browse other components.")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.button("← Back to component list", on_click=back_to_selection, use_container_width=True)
+        with col2:
+            st.button("Reset Filters", on_click=on_reset_filters, use_container_width=True)
+        return
+
+    # === Full controls when show_inputs == True ===
     idc_descriptions = {
         "No Filter": "No Filter", "⿰": "Left Right", "⿱": "Top Bottom", "⿲": "Left Middle Right",
         "⿳": "Top Middle Bottom", "⿴": "Surround", "⿵": "Surround Top", "⿶": "Surround Bottom",
@@ -303,12 +310,9 @@ def render_controls():
         "⿺": "Bottom Left Corner", "⿻": "Overlaid"
     }
 
-    st.markdown('<div class="controls-block">', unsafe_allow_html=True)
-
     st.markdown("### Component Filters")
     col1, col2, col3 = st.columns([0.4, 0.4, 0.4])
 
-    # Stroke count
     with col1:
         stroke_counts = sorted({sc for sc in (get_stroke_count(c) for c in component_map) if sc is not None})
         options = [0] + stroke_counts
@@ -322,7 +326,6 @@ def render_controls():
             on_change=sync_stroke_count
         )
 
-    # Radical
     with col2:
         all_radicals = {component_map.get(c, {}).get("meta", {}).get("radical", "") for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical")}
         radical_options = ["No Filter"] + sorted(all_radicals)
@@ -335,7 +338,6 @@ def render_controls():
             on_change=sync_radical
         )
 
-    # IDC structure
     with col3:
         all_idcs = {d[0] for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d[0] in IDC_CHARS}
         idc_options = ["No Filter"] + sorted(all_idcs)
@@ -350,12 +352,11 @@ def render_controls():
         )
 
     st.markdown("### Select Input Component")
-    st.caption("Click a tile to preview → click again to select.")
+    st.caption("Click a character tile to preview → click again to select and view results.")
 
     col4, col5 = st.columns([1.5, 0.2])
 
     with col4:
-        # Filtered list
         filtered = [
             c for c in component_map
             if (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
@@ -367,8 +368,7 @@ def render_controls():
         sorted_comps = sorted(filtered, key=lambda c: get_stroke_count(c) or 0)
 
         if not sorted_comps:
-            st.warning("No components match filters.")
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.warning("No components match the current filters.")
             return
 
         if st.session_state.preview_active and st.session_state.preview_comp:
@@ -414,33 +414,12 @@ def render_controls():
         if st.session_state.text_input_warning:
             st.warning(st.session_state.text_input_warning)
         st.text_input(
-            "Or type:",
+            "Or type one character:",
             value=st.session_state.text_input_comp,
             key="text_input_widget",
             on_change=sync_text_input,
-            placeholder="One character"
+            placeholder="e.g. 水"
         )
-
-    st.markdown('</div>', unsafe_allow_html=True)  # close controls-block
-
-    # Buttons when selected
-    if not st.session_state.show_inputs:
-        st.markdown("### Component Selected")
-        st.info("You can return to browsing without losing your filters.")
-        st.button("Back to component list", on_click=back_to_selection)
-        st.button("Reset Filters", on_click=on_reset_filters)
-
-    # Display mode (always visible)
-    st.markdown("### Output Type")
-    modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
-    index = modes.index(st.session_state.display_mode)
-    st.radio(
-        "Display:",
-        options=modes,
-        index=index,
-        key="display_mode_widget",
-        on_change=sync_display_mode
-    )
 
 
 # -------------------------------
@@ -475,10 +454,23 @@ def main():
     apply_dynamic_css()
     st.markdown("<h1>🈑 Radix</h1>", unsafe_allow_html=True)
 
+    # Always show output type selector
+    st.markdown("### Output Type")
+    modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
+    index = modes.index(st.session_state.display_mode)
+    st.radio(
+        "Display:",
+        options=modes,
+        index=index,
+        key="display_mode_widget",
+        on_change=sync_display_mode,
+        horizontal=True
+    )
+
     render_controls()
 
     if not st.session_state.selected_comp or st.session_state.selected_comp not in component_map:
-        st.info("Select a component to view results.")
+        st.info("👆 Select a component from the list above to view its details and related characters.")
         return
 
     # Selected component header
@@ -513,9 +505,9 @@ def main():
         render_result_card(char, compounds.get(char, []))
 
     if chars and n:
-        with st.expander("Export Compounds"):
+        with st.expander("Export Compounds for Lookup"):
             text = "\n".join(comp for char in chars for comp in compounds[char])
-            st.text_area("Copy for pinyin/meaning lookup", text, height=200)
+            st.text_area("Copy list:", text, height=200)
 
 
 if __name__ == "__main__":
