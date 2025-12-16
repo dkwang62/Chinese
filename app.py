@@ -4,14 +4,14 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # Set page configuration
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Radix")
 
 # Global IDC characters
 IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
 
 
 # -------------------------------
-# Session bootstrap (needed early)
+# Session bootstrap
 # -------------------------------
 def bootstrap_session_state():
     st.session_state.setdefault("diagnostic_messages", [])
@@ -31,36 +31,39 @@ def apply_dynamic_css():
     <style>
         :root { --fontScale: __FONTSCALE__; }
 
+        /* --- Detail Card Styles --- */
         .selected-card {
             background-color: #e8f4f8;
-            padding: 15px;
+            padding: 20px;
             border-radius: 10px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             display: flex;
             align-items: center;
-            gap: 15px;
-            border-left: 5px solid #3498db;
+            gap: 20px;
+            border-left: 6px solid #3498db;
         }
+        .selected-char { font-size: calc(3em * var(--fontScale)); color: #e74c3c; margin: 0; line-height: 1;}
+        .details { font-size: calc(1.1em * var(--fontScale)); color: #34495e; margin: 0; line-height: 1.6; }
+        .details strong { color: #2c3e50; font-weight: 600; }
+        
+        .results-header { font-size: calc(1.5em * var(--fontScale)); color: #2c3e50; margin: 30px 0 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
 
-        .selected-char { font-size: calc(2.5em * var(--fontScale)); color: #e74c3c; margin: 0; }
-        .details { font-size: calc(1.5em * var(--fontScale)); color: #34495e; margin: 0; }
-        .details strong { color: #2c3e50; }
-        .results-header { font-size: calc(1.5em * var(--fontScale)); color: #2c3e50; margin: 20px 0 10px; }
-
+        /* --- Sub-result Card Styles --- */
         .char-card {
             background-color: #ffffff;
             padding: 15px;
             border-radius: 8px;
-            margin-bottom: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+            border: 1px solid #f0f0f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             transition: transform 0.2s;
         }
         .char-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-color: #e0e0e0;
         }
-
         .char-card button {
             font-size: calc(1.4em * var(--fontScale));
             color: #e74c3c;
@@ -70,71 +73,68 @@ def apply_dynamic_css():
             margin: 0;
             cursor: pointer;
             display: inline;
-            transition: color 0.2s;
+            font-weight: bold;
         }
         .char-card button:hover {
             color: #c0392b;
             text-decoration: underline;
         }
 
+        /* --- Compounds Section --- */
         .compounds-section {
-            background-color: #f1f8e9;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
+            background-color: #f9fbf7;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 12px;
+            border: 1px solid #eef5e6;
         }
-        .compounds-title { font-size: calc(1.1em * var(--fontScale)); color: #558b2f; margin: 0 0 5px; }
-        .compounds-list { font-size: calc(1em * var(--fontScale)); color: #34495e; margin: 0; }
+        .compounds-title { font-size: calc(0.95em * var(--fontScale)); color: #558b2f; margin: 0 0 5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+        .compounds-list { font-size: calc(1em * var(--fontScale)); color: #2c3e50; margin: 0; line-height: 1.5; }
 
         .stContainer {
-            padding: 10px;
+            padding: 15px;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+            background: white;
         }
 
-        /* Default Streamlit button styling */
+        /* --- Default Streamlit Button --- */
         .stButton button {
-            background-color: #3498db;
-            color: white;
-            border-radius: 5px;
-            font-size: calc(0.9em * var(--fontScale));
-        }
-        .stButton button:hover {
-            background-color: #2980b9;
+            border-radius: 6px;
+            font-size: calc(1em * var(--fontScale));
+            font-weight: 500;
         }
 
-        /* Character grid tile overrides */
+        /* --- CLEAN GRID TILES (The fix for "Unacceptable" UI) --- */
         .comp-grid .stButton button {
             background: #ffffff;
-            color: #e74c3c;
-            border: 1px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: calc(1.25em * var(--fontScale));
-            padding: 0.55rem 0.25rem;
+            color: #2c3e50;
+            border: 1px solid #d1d9e0;
+            border-radius: 8px;
+            font-size: calc(1.6em * var(--fontScale));
+            padding: 0px; 
+            min-height: 56px; /* Enforce square-ish shape */
             line-height: 1;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: all 0.2s ease;
         }
         .comp-grid .stButton button:hover {
-            background: #fff5f5;
-            color: #c0392b;
-            border-color: #f2c6c6;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+            background: #f0f7fb;
+            color: #3498db;
+            border-color: #3498db;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.15);
+            z-index: 2;
         }
-
-        /* Popover trigger look (small info pill) */
-        .comp-grid div[data-testid="stPopover"] button {
-            background: #f7fafc;
-            color: #2c3e50;
-            border: 1px solid #e0e0e0;
-            border-radius: 999px;
-            padding: 0.35rem 0.55rem;
-            font-size: calc(0.85em * var(--fontScale));
+        .comp-grid .stButton button:active {
+            transform: translateY(0);
             box-shadow: none;
         }
-        .comp-grid div[data-testid="stPopover"] button:hover {
-            background: #edf2f7;
-            border-color: #d0d7de;
+        /* Highlight selected tile in grid (if applicable) */
+        .comp-grid .stButton button[kind="primary"] {
+             border: 2px solid #3498db;
+             background-color: #e8f4f8;
         }
 
         .debug-section {
@@ -142,23 +142,18 @@ def apply_dynamic_css():
             padding: 10px;
             border-radius: 5px;
             margin-top: 20px;
+            font-family: monospace;
+            font-size: 0.85em;
         }
         .diagnostic-message.error { color: #c0392b; }
         .diagnostic-message.warning { color: #e67e22; }
 
-        .stSelectbox, .stTextInput, .stRadio, .stSlider {
-            font-size: calc(0.9em * var(--fontScale));
-        }
+        .stSelectbox label, .stTextInput label { font-weight: 600; color: #444; }
 
         @media (max-width: 768px) {
-            .selected-card { flex-direction: column; align-items: flex-start; padding: 10px; }
-            .selected-char { font-size: calc(2em * var(--fontScale)); }
-            .details, .compounds-list { font-size: calc(0.95em * var(--fontScale)); line-height: 1.5; }
-            .results-header { font-size: calc(1.3em * var(--fontScale)); }
-            .char-card { padding: 10px; }
-            .char-card button { font-size: calc(1.2em * var(--fontScale)); }
-            .compounds-title { font-size: calc(1em * var(--fontScale)); }
-            .comp-grid .stButton button { font-size: calc(1.15em * var(--fontScale)); }
+            .selected-card { flex-direction: column; align-items: flex-start; padding: 15px; }
+            .selected-char { font-size: calc(2.5em * var(--fontScale)); }
+            .comp-grid .stButton button { font-size: calc(1.4em * var(--fontScale)); min-height: 48px; }
         }
     </style>
     """.replace("__FONTSCALE__", str(font_scale))
@@ -171,6 +166,7 @@ def apply_dynamic_css():
 # -------------------------------
 @st.cache_data
 def load_component_map():
+    # Ensure this file exists in your directory
     with open("enhanced_component_map_with_etymology.json", "r", encoding="utf-8") as f:
         data = json.load(f)
     return data
@@ -179,9 +175,7 @@ try:
     component_map = load_component_map()
 except Exception as e:
     component_map = {}
-    error_msg = f"Failed to load enhanced_component_map_with_etymology.json: {e}"
-    st.error(error_msg)
-    st.session_state.diagnostic_messages.append({"type": "error", "message": error_msg})
+    st.error(f"Failed to load data file: {e}")
 
 
 # -------------------------------
@@ -205,7 +199,9 @@ def get_etymology_text(meta):
     etymology = meta.get("etymology", {})
     hint = clean_field(etymology.get("hint", "No hint available"))
     details = clean_field(etymology.get("details", ""))
-    return f"{hint}{'; Details: ' + details if details and details != '—' else ''}"
+    if details and details != '—':
+        return f"{hint}; {details}"
+    return hint
 
 def format_decomposition(char):
     decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
@@ -252,146 +248,34 @@ def init_session_state():
         "diagnostic_messages": st.session_state.get("diagnostic_messages", []),
         "font_scale": st.session_state.get("font_scale", 1.0),
         "clicked_char": None,
-        "clicked_selectbox_value": None,
-        "show_inputs": True,
+        "show_inputs": True, # Controls Grid View vs Detail View
         "rerender_trigger": 0,
         "last_valid_selected_comp": ""
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
-
-    # Clean invalid decomposition markers once state exists
-    for char, entry in component_map.items():
-        decomposition = entry.get("meta", {}).get("decomposition", "")
-        if isinstance(decomposition, str) and '?' in decomposition:
-            st.session_state.diagnostic_messages.append({
-                "type": "warning",
-                "message": f"Invalid component '?' in decomposition for {char}: {decomposition}"
-            })
-            entry["meta"]["decomposition"] = ""
-
-    # Default selected_comp
-    if not st.session_state.selected_comp or st.session_state.selected_comp not in component_map:
-        st.session_state.selected_comp = next(iter(component_map), '') if component_map else ''
-        st.session_state.last_valid_selected_comp = st.session_state.selected_comp
-        st.session_state.debug_info += f"; Initialized selected_comp to '{st.session_state.selected_comp}'"
+    
+    # Default selected_comp initialization
+    if not st.session_state.selected_comp:
+        first_key = next(iter(component_map), '') if component_map else ''
+        st.session_state.selected_comp = first_key
+        st.session_state.last_valid_selected_comp = first_key
 
 init_session_state()
 
 
 # -------------------------------
-# Popover details card (rich formatting)
-# -------------------------------
-def render_component_popover_card(c: str) -> None:
-    meta = component_map.get(c, {}).get("meta", {})
-
-    pinyin = clean_field(meta.get("pinyin", "—"))
-    strokes = get_stroke_count(c)
-    radical = clean_field(meta.get("radical", "—"))
-    decomp = format_decomposition(c)
-    definition = clean_field(meta.get("definition", "No definition available"))
-    ety = get_etymology_text(meta)
-
-    st.markdown(f"### {c}")
-    st.caption("Component details")
-
-    st.markdown(
-        f"""
-**Pinyin:** {pinyin}  
-**Strokes:** {strokes if strokes is not None else "unknown"}  
-**Radical:** {radical}  
-**Definition:** {definition}
-        """.strip()
-    )
-
-    st.markdown("**Decomposition:**")
-    st.code(decomp if decomp and decomp != "—" else "—", language="text")
-
-    st.markdown("**Etymology:**")
-    st.markdown(ety if ety else "—")
-
-
-# -------------------------------
 # Callbacks
 # -------------------------------
-def process_text_input(component_map_arg):
-    text_value = ""
-    try:
-        text_value = st.session_state.text_input_comp.strip()
-        st.session_state.debug_info += f"; Input received: '{text_value}'"
-
-        if text_value == st.session_state.last_processed_input:
-            st.session_state.debug_info += "; Input already processed, skipping"
-            return
-
-        if len(text_value) != 1:
-            warning_msg = "Please enter exactly one character."
-            st.session_state.text_input_warning = warning_msg
-            st.session_state.diagnostic_messages.append({"type": "warning", "message": warning_msg})
-            st.session_state.debug_info += "; Invalid length"
-            st.session_state.text_input_comp = ""
-            st.session_state.last_processed_input = text_value
-            return
-
-        if text_value in component_map_arg:
-            st.session_state.debug_info += f"; Component '{text_value}' is valid"
-            st.session_state.previous_selected_comp = st.session_state.get("selected_comp", "")
-            st.session_state.selected_comp = text_value
-            st.session_state.last_valid_selected_comp = text_value
-            st.session_state.page = 1
-            st.session_state.text_input_warning = None
-
-            filtered_components = [
-                comp for comp in component_map_arg
-                if isinstance(comp, str) and len(comp) == 1 and
-                (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count) and
-                (st.session_state.radical == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.radical) and
-                (st.session_state.component_idc == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
-            ]
-            if text_value not in filtered_components:
-                st.session_state.debug_info += f"; '{text_value}' not in filtered components, resetting filters"
-                st.session_state.stroke_count = 0
-                st.session_state.radical = "No Filter"
-                st.session_state.component_idc = "No Filter"
-
-            st.session_state.text_input_comp = text_value
-            st.session_state.last_processed_input = text_value
-            st.session_state.rerender_trigger += 1
-        else:
-            warning_msg = "Invalid character. Please enter a valid component."
-            st.session_state.text_input_warning = warning_msg
-            st.session_state.diagnostic_messages.append({"type": "warning", "message": warning_msg})
-            st.session_state.debug_info += f"; Invalid component '{text_value}'"
-            st.session_state.text_input_comp = ""
-            st.session_state.last_processed_input = text_value
-
-    except Exception as e:
-        error_msg = f"Error processing input: {str(e)}"
-        st.session_state.text_input_warning = error_msg
-        st.session_state.diagnostic_messages.append({"type": "error", "message": error_msg})
-        st.session_state.debug_info += f"; Error: {str(e)}"
-        st.session_state.text_input_comp = ""
-        st.session_state.last_processed_input = text_value
 
 def on_filter_change():
+    """Resets pagination when filters change, stays on Grid View."""
     st.session_state.page = 1
     st.session_state.rerender_trigger += 1
-    st.session_state.debug_info += (
-        f"; Filter changed: stroke_count={st.session_state.stroke_count}, "
-        f"radical={st.session_state.radical}, component_idc={st.session_state.component_idc}"
-    )
-
-def on_display_mode_change():
-    if st.session_state.get("selected_comp", "") in component_map:
-        st.session_state.last_valid_selected_comp = st.session_state.selected_comp
-    st.session_state.rerender_trigger += 1
-    st.session_state.debug_info += (
-        f"; Display mode changed to '{st.session_state.display_mode}', "
-        f"selected_comp='{st.session_state.get('selected_comp', '')}', "
-        f"last_valid_selected_comp='{st.session_state.last_valid_selected_comp}'"
-    )
+    st.session_state.show_inputs = True
 
 def on_reset_filters():
+    """Wipes all filters and returns to default Grid View."""
     st.session_state.stroke_count = 0
     st.session_state.radical = "No Filter"
     st.session_state.component_idc = "No Filter"
@@ -401,451 +285,316 @@ def on_reset_filters():
     st.session_state.page = 1
     st.session_state.text_input_warning = None
     st.session_state.text_input_comp = ""
-    st.session_state.clicked_char = None
-    st.session_state.clicked_selectbox_value = None
     st.session_state.show_inputs = True
-
+    
+    # Reset selection to first available or last valid
     if st.session_state.last_valid_selected_comp in component_map:
         st.session_state.selected_comp = st.session_state.last_valid_selected_comp
     else:
         st.session_state.selected_comp = next(iter(component_map), '') if component_map else ''
-        st.session_state.last_valid_selected_comp = st.session_state.selected_comp
-
-    st.session_state.previous_selected_comp = st.session_state.selected_comp
+    
     st.session_state.rerender_trigger += 1
-    st.session_state.debug_info += (
-        f"; Filters reset, show_inputs={st.session_state.show_inputs}, "
-        f"selected_comp='{st.session_state.selected_comp}', "
-        f"display_mode='{st.session_state.display_mode}'"
-    )
 
 def on_char_button_click(char):
-    if char and isinstance(char, str) and len(char) == 1 and char in component_map:
-        st.session_state.debug_info += (
-            f"; Character '{char}' clicked, setting selected_comp, clearing filters, hiding inputs"
-        )
+    """
+    User clicks a tile:
+    1. Sets the selected component.
+    2. Hides the Grid (show_inputs = False).
+    3. Shows the Detail Card.
+    """
+    if char and char in component_map:
         st.session_state.previous_selected_comp = st.session_state.get("selected_comp", "")
         st.session_state.selected_comp = char
         st.session_state.last_valid_selected_comp = char
-        st.session_state.stroke_count = 0
-        st.session_state.radical = "No Filter"
-        st.session_state.component_idc = "No Filter"
-        st.session_state.selected_idc = "No Filter"
-        st.session_state.output_radical = "No Filter"
-        st.session_state.page = 1
+        
+        # KEY CHANGE: Do not reset filters here. Just switch view.
+        # st.session_state.stroke_count = 0  <-- Removed to preserve state
+        
         st.session_state.text_input_warning = None
         st.session_state.text_input_comp = char
-        st.session_state.show_inputs = False
-        st.session_state.clicked_selectbox_value = None
+        st.session_state.show_inputs = False # Switch to Detail View
         st.session_state.rerender_trigger += 1
 
-        radical = component_map.get(char, {}).get("meta", {}).get("radical", "")
-        if char == radical and radical != "":
-            st.session_state.diagnostic_messages.append({
-                "type": "warning",
-                "message": f"Selected character '{char}' is its own radical, which may be unexpected"
-            })
+def on_back_to_search():
+    """
+    User clicks 'Back to Search':
+    1. Shows the Grid (show_inputs = True).
+    2. Keeps all current filters intact.
+    """
+    st.session_state.show_inputs = True
+    st.session_state.rerender_trigger += 1
 
-        if not component_map.get(char, {}).get("related_characters", []):
-            st.session_state.diagnostic_messages.append({
-                "type": "warning",
-                "message": f"No related characters found for '{char}'"
-            })
-    else:
-        warning_msg = f"Invalid character '{char}' clicked."
-        st.session_state.diagnostic_messages.append({"type": "warning", "message": warning_msg})
-
-def handle_clicked_char(_component_map):
-    clicked_char = st.session_state.get("clicked_char", None)
-    if clicked_char:
-        on_char_button_click(clicked_char)
-        st.session_state.clicked_char = None
+def process_text_input(component_map_arg):
+    val = st.session_state.text_input_comp.strip()
+    if val and len(val) == 1 and val in component_map_arg:
+        on_char_button_click(val)
+    elif val:
+        st.session_state.text_input_warning = "Please enter exactly one valid character."
 
 
 # -------------------------------
-# Controls (filters + grid selector)
+# Controls (Filters & Grid)
 # -------------------------------
 def render_controls(component_map_arg):
     idc_descriptions = {
-        "No Filter": "No Filter",
-        "⿰": "Left Right",
-        "⿱": "Top Bottom",
-        "⿲": "Left Middle Right",
-        "⿳": "Top Middle Bottom",
-        "⿴": "Surround",
-        "⿵": "Surround Top",
-        "⿶": "Surround Bottom",
-        "⿷": "Surround Left",
-        "⿸": "Top Left Corner",
-        "⿹": "Top Right Corner",
-        "⿺": "Bottom Left Corner",
+        "No Filter": "No Filter", "⿰": "Left Right", "⿱": "Top Bottom", 
+        "⿲": "Left Middle Right", "⿳": "Top Middle Bottom", "⿴": "Surround", 
+        "⿵": "Surround Top", "⿶": "Surround Bottom", "⿷": "Surround Left", 
+        "⿸": "Top Left Corner", "⿹": "Top Right Corner", "⿺": "Bottom Left Corner", 
         "⿻": "Overlaid"
     }
 
-    sorted_components = []
+    # 1. Filter Logic (Always runs to determine what matches)
+    filtered_components = [
+        comp for comp in component_map_arg
+        if isinstance(comp, str) and len(comp) == 1 and
+        (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count) and
+        (st.session_state.radical == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.radical) and
+        (st.session_state.component_idc == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
+    ]
+    
+    sorted_components = sorted(filtered_components, key=lambda c: get_stroke_count(c) or 0)
 
-    # Restore last valid selected_comp
-    if st.session_state.last_valid_selected_comp in component_map_arg:
-        st.session_state.selected_comp = st.session_state.last_valid_selected_comp
-
+    # 2. Render Loop
     if st.session_state.show_inputs:
+        # --- VIEW A: SEARCH GRID ---
         with st.container():
             st.markdown("### Component Filters")
-            st.caption("Filter components by stroke count, radical, or structure.")
-            col1, col2, col3 = st.columns([0.4, 0.4, 0.4])
+            col1, col2, col3 = st.columns([0.33, 0.33, 0.34])
 
             with col1:
-                stroke_counts = sorted(set(
-                    sc for sc in (
-                        get_stroke_count(comp) for comp in component_map_arg
-                        if isinstance(comp, str) and len(comp) == 1
-                    ) if isinstance(sc, int) and sc > 0
+                # Stroke Filter
+                all_strokes = sorted(set(
+                    sc for sc in (get_stroke_count(comp) for comp in component_map_arg)
+                    if isinstance(sc, int) and sc > 0
                 ))
                 st.selectbox(
                     "Filter by Strokes:",
-                    options=[0] + stroke_counts if stroke_counts else [0],
+                    options=[0] + all_strokes,
                     key="stroke_count",
                     format_func=lambda x: "No Filter" if x == 0 else str(x),
                     on_change=on_filter_change
                 )
 
             with col2:
-                pre_filtered_components = [
-                    comp for comp in component_map_arg
-                    if isinstance(comp, str) and len(comp) == 1 and
-                    (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count)
-                ]
+                # Radical Filter (Dynamic based on pre-filter)
+                pre_filtered = [c for c in component_map_arg 
+                                if (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count)]
                 radicals = {"No Filter"} | {
-                    component_map_arg.get(comp, {}).get("meta", {}).get("radical", "")
-                    for comp in pre_filtered_components
-                    if component_map_arg.get(comp, {}).get("meta", {}).get("radical", "")
+                    component_map_arg.get(c, {}).get("meta", {}).get("radical", "") for c in pre_filtered
                 }
-                radical_options = ["No Filter"] + sorted(radicals - {"No Filter"})
-                if st.session_state.radical not in radical_options:
+                rad_options = ["No Filter"] + sorted([r for r in radicals if r and r != "No Filter"])
+                
+                # Safety check if current selection is invalid
+                if st.session_state.radical not in rad_options:
                     st.session_state.radical = "No Filter"
+                    
                 st.selectbox(
                     "Filter by Radical:",
-                    options=radical_options,
-                    index=radical_options.index(st.session_state.radical),
+                    options=rad_options,
                     key="radical",
                     on_change=on_filter_change
                 )
 
             with col3:
-                pre_filtered_components = [
-                    comp for comp in component_map_arg
-                    if isinstance(comp, str) and len(comp) == 1 and
-                    (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count) and
-                    (st.session_state.radical == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.radical)
-                ]
-                component_idcs = {"No Filter"} | {
-                    component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "")[0]
-                    for comp in pre_filtered_components
-                    if component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "") and
-                       component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "")[0] in IDC_CHARS
-                }
-                component_idc_options = ["No Filter"] + sorted(component_idcs - {"No Filter"})
-                if st.session_state.component_idc not in component_idc_options:
-                    st.session_state.component_idc = "No Filter"
+                # IDC Filter
+                idc_options = ["No Filter"] + sorted([k for k in idc_descriptions if k in IDC_CHARS])
                 st.selectbox(
-                    "Filter by Structure IDC:",
-                    options=component_idc_options,
-                    format_func=lambda x: f"{x} ({idc_descriptions.get(x, x)})" if x != "No Filter" else x,
-                    index=component_idc_options.index(st.session_state.component_idc),
+                    "Filter by Structure:",
+                    options=idc_options,
+                    format_func=lambda x: f"{x} {idc_descriptions.get(x,'')}" if x != "No Filter" else x,
                     key="component_idc",
                     on_change=on_filter_change
                 )
 
         with st.container():
-            st.markdown("### Select Input Component")
-            st.caption("Two-step: click ℹ for details, then click the character to select.")
+            st.markdown("### Select Character")
+            
+            if not sorted_components:
+                st.warning("No characters match your filters.")
+                return
 
-            col4, col5 = st.columns([1.5, 0.2])
+            # Pagination
+            PAGE_SIZE = 96
+            GRID_COLS = 12
+            total = len(sorted_components)
+            max_page = max(1, math.ceil(total / PAGE_SIZE))
+            st.session_state.page = max(1, min(st.session_state.page, max_page))
 
-            with col4:
-                filtered_components = [
-                    comp for comp in component_map_arg
-                    if isinstance(comp, str) and len(comp) == 1 and
-                    (st.session_state.stroke_count == 0 or get_stroke_count(comp) == st.session_state.stroke_count) and
-                    (st.session_state.radical == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("radical", "") == st.session_state.radical) and
-                    (st.session_state.component_idc == "No Filter" or component_map_arg.get(comp, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
-                ]
+            c_prev, c_info, c_next = st.columns([1, 4, 1])
+            with c_prev:
+                if st.button("◀ Prev", disabled=(st.session_state.page <= 1)):
+                    st.session_state.page -= 1
+                    st.rerun()
+            with c_info:
+                start_i = (st.session_state.page - 1) * PAGE_SIZE + 1
+                end_i = min(st.session_state.page * PAGE_SIZE, total)
+                st.markdown(f"<div style='text-align:center; padding-top:5px; color:#666;'>Showing {start_i}–{end_i} of {total}</div>", unsafe_allow_html=True)
+            with c_next:
+                if st.button("Next ▶", disabled=(st.session_state.page >= max_page)):
+                    st.session_state.page += 1
+                    st.rerun()
 
-                selected_char_components = get_all_components(st.session_state.get("selected_comp", ""), max_depth=5)
-                filtered_components.extend([
-                    comp for comp in selected_char_components
-                    if comp not in filtered_components and comp in component_map_arg
-                ])
+            # Render Grid
+            start = (st.session_state.page - 1) * PAGE_SIZE
+            end = min(start + PAGE_SIZE, total)
+            page_components = sorted_components[start:end]
 
-                sorted_components = sorted(filtered_components, key=lambda c: get_stroke_count(c) or 0)
-
-                if not sorted_components:
-                    st.session_state.selected_comp = next(iter(component_map_arg), '') if component_map_arg else ''
-                    st.session_state.last_valid_selected_comp = st.session_state.selected_comp
-                    st.session_state.text_input_comp = ""
-                    warning_msg = "No components match the current filters. Adjust filters and try again."
-                    st.session_state.diagnostic_messages.append({"type": "warning", "message": warning_msg})
-                    st.warning(warning_msg)
-                    return sorted_components
-
-                if st.session_state.get("selected_comp", "") not in sorted_components:
-                    st.session_state.selected_comp = sorted_components[0]
-                    st.session_state.last_valid_selected_comp = sorted_components[0]
-                    st.session_state.text_input_comp = sorted_components[0]
-
-                # Grid pagination
-                PAGE_SIZE = 96
-                GRID_COLS = 12
-
-                total = len(sorted_components)
-                max_page = max(1, math.ceil(total / PAGE_SIZE))
-                st.session_state.page = max(1, min(st.session_state.page, max_page))
-
-                p1, p2, p3 = st.columns([1, 2, 1])
-                with p1:
-                    if st.button("◀ Prev", disabled=(st.session_state.page <= 1), key="comp_prev"):
-                        st.session_state.page -= 1
-                        st.session_state.rerender_trigger += 1
-                        st.rerun()
-                with p2:
-                    start_i = (st.session_state.page - 1) * PAGE_SIZE + 1
-                    end_i = min(st.session_state.page * PAGE_SIZE, total)
-                    st.caption(f"Showing {start_i}–{end_i} of {total} components")
-                with p3:
-                    if st.button("Next ▶", disabled=(st.session_state.page >= max_page), key="comp_next"):
-                        st.session_state.page += 1
-                        st.session_state.rerender_trigger += 1
-                        st.rerun()
-
-                start = (st.session_state.page - 1) * PAGE_SIZE
-                end = min(start + PAGE_SIZE, total)
-                page_components = sorted_components[start:end]
-
-                # Render grid: ℹ popover + char tile
-                st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
-                cols = st.columns(GRID_COLS)
-
-                for i, ch in enumerate(page_components):
-                    with cols[i % GRID_COLS]:                    
-                        top_a, top_b = st.columns([1, 2])
-
-                        with top_a:
-                            # Make the label *functionally unique* without visually changing it.
-                            # (Zero-width spaces prevent any “duplicate element” edge cases.)
-                            pop_label = "ℹ" + ("\u200b" * (i + 1))
-
-                            with st.popover(pop_label):
-                                render_component_popover_card(ch)
-
-                        with top_b:
-                            is_selected = (st.session_state.get("selected_comp") == ch)
-                            st.button(
-                                ch,
-                                key=f"comp_tile_{ch}_{st.session_state.page}",
-                                use_container_width=True,
-                                type="primary" if is_selected else "secondary",
-                                on_click=on_char_button_click,
-                                args=(ch,),
-                            )
-                
-                st.markdown("</div>", unsafe_allow_html=True)
-
-            with col5:
-                if st.session_state.text_input_warning:
-                    st.warning(st.session_state.text_input_warning)
-
-                st.text_input(
-                    "Or type:",
-                    value=st.session_state.text_input_comp,
-                    key="text_input_comp",
-                    on_change=process_text_input,
-                    args=(component_map_arg,),
-                    placeholder="Enter one Chinese character"
-                )
-
-        # Paste helper (kept)
-        components.html("""
-            <script>
-                let debounceTimeout = null;
-                document.addEventListener('paste', function(e) {
-                    clearTimeout(debounceTimeout);
-                    const text = (e.clipboardData || window.clipboardData).getData('text').trim();
-                    const input = document.querySelector('input[data-testid="stTextInput"]');
-                    if (input) {
-                        input.value = text;
-                        input.dispatchEvent(new Event('input', { bubbles: true }));
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                });
-            </script>
-        """, height=0)
+            st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+            cols = st.columns(GRID_COLS)
+            for i, ch in enumerate(page_components):
+                with cols[i % GRID_COLS]:
+                    is_active = (ch == st.session_state.selected_comp)
+                    st.button(
+                        ch,
+                        key=f"btn_{ch}_{i}",
+                        use_container_width=True,
+                        type="primary" if is_active else "secondary",
+                        on_click=on_char_button_click,
+                        args=(ch,)
+                    )
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Text Input fallback
+            st.text_input("Or type a character directly:", key="text_input_comp", on_change=process_text_input, args=(component_map_arg,))
+            if st.session_state.text_input_warning:
+                st.warning(st.session_state.text_input_warning)
 
     else:
+        # --- VIEW B: DETAILS / ACTIONS ---
+        # Show Navigation Buttons
         with st.container():
-            st.markdown("### Component Selection")
-            st.info("Click 'Reset Filters' to select a new component or adjust filters.")
-            st.button("Reset Filters", on_click=on_reset_filters)
+            c_back, c_spacer, c_reset = st.columns([0.2, 0.6, 0.2])
+            with c_back:
+                st.button("⬅ Back to Search", on_click=on_back_to_search, type="primary", use_container_width=True)
+            with c_reset:
+                st.button("Reset All Filters", on_click=on_reset_filters, use_container_width=True)
 
-    # Always show display_mode selector
-    with st.container():
-        st.markdown("### Output Type")
-        st.caption("Choose whether to display single characters or compound phrases.")
+        # Show Display Mode Selector (always useful)
         st.radio(
-            "Select Output Type:",
+            "Display Mode:",
             ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"],
             key="display_mode",
-            on_change=on_display_mode_change
+            horizontal=True,
+            on_change=lambda: st.session_state.update(rerender_trigger=st.session_state.rerender_trigger+1)
         )
-
-    return sorted_components if st.session_state.show_inputs else []
 
 
 # -------------------------------
-# Render character card
+# Render Character Card
 # -------------------------------
 def render_char_card(char, compounds):
-    if not isinstance(char, str) or len(char) != 1:
-        st.session_state.diagnostic_messages.append({"type": "error", "message": f"Invalid character data: {char}"})
-        return
-
     meta = component_map.get(char, {}).get("meta", {})
-    fields = {
-        "Pinyin": clean_field(meta.get("pinyin", "—")),
-        "Strokes": f"{get_stroke_count(char)} strokes" if get_stroke_count(char) is not None else "unknown strokes",
-        "Radical": clean_field(meta.get("radical", "—")),
-        "Decomposition": format_decomposition(char),
-        "Definition": clean_field(meta.get("definition", "No definition available")),
-        "Etymology": get_etymology_text(meta)
-    }
-    details = " ".join(f"<strong>{k}:</strong> {v}" for k, v in fields.items())
-
-    button_key = f"char_button_{char}_{st.session_state.page}"
-    st.button(char, key=button_key, on_click=on_char_button_click, args=(char,))
-
-    st.markdown(f"<div class='char-card'><p class='details'>{details}</p>", unsafe_allow_html=True)
+    
+    fields = [
+        ("Pinyin", clean_field(meta.get("pinyin", "—"))),
+        ("Strokes", str(get_stroke_count(char) or "?")),
+        ("Radical", clean_field(meta.get("radical", "—"))),
+        ("Structure", format_decomposition(char)),
+        ("Definition", clean_field(meta.get("definition", "—"))),
+        ("Etymology", get_etymology_text(meta))
+    ]
+    
+    details_html = " | ".join(f"<strong>{k}:</strong> {v}" for k, v in fields if v != "—")
+    
+    # Header card logic
+    st.markdown(f"""
+    <div class='char-card'>
+        <div style='display:flex; align-items:center; gap:10px;'>
+            <h3 style='margin:0; color:#e74c3c; font-size:1.5em;'>{char}</h3>
+            <span style='color:#7f8c8d;'>{details_html}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     if compounds and st.session_state.display_mode != "Single Character":
-        compounds_text = " ".join(sorted(compounds))
-        st.markdown(
-            f"""<div class='compounds-section'>
-                    <p class='compounds-title'>{st.session_state.display_mode} for {char}:</p>
-                    <p class='compounds-list'>{compounds_text}</p>
-                </div>""",
-            unsafe_allow_html=True
-        )
-
-    st.markdown("</div>", unsafe_allow_html=True)
+        compounds_text = "   ".join(sorted(compounds))
+        st.markdown(f"""
+        <div class='compounds-section'>
+            <div class='compounds-list'>{compounds_text}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # -------------------------------
-# Main
+# Main Application
 # -------------------------------
 def main():
     if not component_map:
-        error_msg = "No data available. Please check the JSON file."
-        st.error(error_msg)
-        st.session_state.diagnostic_messages.append({"type": "error", "message": error_msg})
         return
 
     apply_dynamic_css()
-    st.markdown("<h1>🈑 Radix</h1>", unsafe_allow_html=True)
+    st.markdown("## 🈑 Radix Explorer")
 
+    # 1. Render Controls (and Grid if show_inputs is True)
     render_controls(component_map)
-    handle_clicked_char(component_map)
 
-    if not st.session_state.get("selected_comp", "") or st.session_state.selected_comp not in component_map:
-        st.info("Please select or type a component to view results.")
-        return
+    # 2. Render Details (Only if a character is selected AND we are not in grid view)
+    if not st.session_state.show_inputs and st.session_state.selected_comp:
+        
+        target_char = st.session_state.selected_comp
+        meta = component_map.get(target_char, {}).get("meta", {})
+        
+        # --- Main Selected Card ---
+        st.markdown(f"""
+        <div class='selected-card'>
+            <div class='selected-char'>{target_char}</div>
+            <div class='details'>
+                <strong>Pinyin:</strong> {clean_field(meta.get("pinyin", "—"))}<br>
+                <strong>Meaning:</strong> {clean_field(meta.get("definition", "—"))}<br>
+                <strong>Decomposition:</strong> {format_decomposition(target_char)}<br>
+                <strong>Etymology:</strong> {get_etymology_text(meta)}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # --- Related Results ---
+        related = component_map.get(target_char, {}).get("related_characters", [])
+        # Include self in results? usually related chars are children/compounds. 
+        # Let's filter to valid single chars
+        filtered_chars = [c for c in related if isinstance(c, str) and len(c) == 1]
+        
+        # If the list is empty, at least show the char itself
+        if not filtered_chars:
+            filtered_chars = [target_char]
+            
+        st.markdown(f"<div class='results-header'>Found {len(filtered_chars)} Related Characters</div>", unsafe_allow_html=True)
+        
+        # Prepare compounds map
+        char_compounds = {}
+        target_len = int(st.session_state.display_mode[0]) if st.session_state.display_mode[0].isdigit() else 1
+        
+        for c in filtered_chars:
+            all_comps = component_map.get(c, {}).get("meta", {}).get("compounds", [])
+            valid_comps = [x for x in all_comps if len(x) == target_len]
+            if target_len == 1 or valid_comps:
+                char_compounds[c] = valid_comps
 
-    meta = component_map.get(st.session_state.selected_comp, {}).get("meta", {})
-    fields = {
-        "Pinyin": clean_field(meta.get("pinyin", "—")),
-        "Strokes": f"{get_stroke_count(st.session_state.selected_comp)} strokes"
-                  if get_stroke_count(st.session_state.selected_comp) is not None else "unknown strokes",
-        "Radical": clean_field(meta.get("radical", "—")),
-        "Decomposition": format_decomposition(st.session_state.selected_comp),
-        "Definition": clean_field(meta.get("definition", "No definition available")),
-        "Etymology": get_etymology_text(meta)
-    }
-    details = " ".join(f"<strong>{k}:</strong> {v}" for k, v in fields.items())
+        # Render list
+        valid_display_chars = [c for c in filtered_chars if c in char_compounds]
+        
+        for char in sorted(valid_display_chars, key=lambda c: get_stroke_count(c) or 0):
+            # Make the small button clickable to "jump" to that character?
+            # For now, let's just render the card. 
+            # If we want to jump, we'd use on_click=on_char_button_click args=(char,)
+            
+            # Simple wrapper to render standard card
+            render_char_card(char, char_compounds[char])
 
-    st.markdown(
-        f"""<div class='selected-card'>
-                <h2 class='selected-char'>{st.session_state.selected_comp}</h2>
-                <p class='details'>{details}</p>
-            </div>""",
-        unsafe_allow_html=True
-    )
+        # --- Export Tool ---
+        if st.session_state.display_mode != "Single Character" and valid_display_chars:
+            with st.expander("📂 Export Compounds to Word/Text"):
+                text_out = ""
+                for c in valid_display_chars:
+                    if char_compounds[c]:
+                        text_out += f"--- {c} ---\n" + "\n".join(char_compounds[c]) + "\n"
+                st.text_area("Copy content:", text_out, height=150)
 
-    related = component_map.get(st.session_state.selected_comp, {}).get("related_characters", [])
-    filtered_chars = [c for c in related if isinstance(c, str) and len(c) == 1]
-
-    char_compounds = {
-        c: [] if st.session_state.display_mode == "Single Character" else [
-            comp for comp in component_map.get(c, {}).get("meta", {}).get("compounds", [])
-            if len(comp) == int(st.session_state.display_mode[0])
-        ]
-        for c in filtered_chars
-    }
-    filtered_chars = [
-        c for c in filtered_chars
-        if st.session_state.display_mode == "Single Character" or char_compounds.get(c)
-    ]
-
-    st.markdown(
-        f"<h2 class='results-header'>🧬 Results for {st.session_state.selected_comp} — {len(filtered_chars)} result(s)</h2>",
-        unsafe_allow_html=True
-    )
-
-    for char in sorted(filtered_chars, key=lambda c: get_stroke_count(c) or 0):
-        render_char_card(char, char_compounds.get(char, []))
-
-    if filtered_chars and st.session_state.display_mode != "Single Character":
-        with st.expander("Export Compounds"):
-            st.caption("Copy this text to get pinyin and meanings for the displayed compounds.")
-            export_text = "Give me the hanyu pinyin and meaning of each compound phrase in one line a phrase in a downloadable word file\n\n"
-            export_text += "\n".join(
-                compound
-                for char in filtered_chars
-                for compound in char_compounds.get(char, [])
-            )
-            st.text_area("Export Text", export_text, height=200, key="export_text")
-            components.html(f"""
-                <textarea id="copyTarget" style="opacity:0;position:absolute;left:-9999px;">{export_text}</textarea>
-                <script>
-                const copyText = document.getElementById("copyTarget");
-                copyText.select();
-                document.execCommand("copy");
-                </script>
-            """, height=0)
-
-    radicals = {c for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical", "") == c}
-    with st.expander("Debug Information (For Developers)", expanded=False):
-        st.markdown("<div class='debug-section'>", unsafe_allow_html=True)
-        st.slider("Adjust Font Size:", 0.7, 1.3, st.session_state.font_scale, 0.1, key="font_scale")
-        st.write(f"Total components: {len(component_map)}, Radicals: {len(radicals)}")
-        st.write(f"Current text_input_comp: '{st.session_state.text_input_comp}'")
-        st.write(f"Current selected_comp: '{st.session_state.get('selected_comp', '')}'")
-        st.write(f"Last valid selected_comp: '{st.session_state.last_valid_selected_comp}'")
-        st.write(f"Current stroke_count: {st.session_state.stroke_count}")
-        st.write(f"Current radical: {st.session_state.radical}")
-        st.write(f"Current component_idc: {st.session_state.component_idc}")
-        st.write(f"Current selected_idc: {st.session_state.selected_idc}")
-        st.write(f"Current output_radical: {st.session_state.output_radical}")
-        st.write(f"Current display_mode: '{st.session_state.display_mode}'")
-        st.write(f"Show inputs: {st.session_state.show_inputs}")
-        st.write(f"Font scale: {st.session_state.font_scale}")
-        st.write(f"Rerender trigger: {st.session_state.rerender_trigger}")
-        st.write(f"Debug log: {st.session_state.debug_info}")
-        st.markdown("### Errors and Warnings")
-        for msg in st.session_state.diagnostic_messages:
-            class_name = "error" if msg["type"] == "error" else "warning"
-            st.markdown(
-                f"<p class='diagnostic-message {class_name}'>{msg['type'].capitalize()}: {msg['message']}</p>",
-                unsafe_allow_html=True
-            )
-        st.markdown("</div>", unsafe_allow_html=True)
-
+    # Debug footer
+    with st.expander("Debug Info", expanded=False):
+        st.write(f"Selected: {st.session_state.selected_comp}")
+        st.write(f"Show Inputs: {st.session_state.show_inputs}")
+        st.write(f"Filters: S={st.session_state.stroke_count}, R={st.session_state.radical}")
 
 if __name__ == "__main__":
     main()
