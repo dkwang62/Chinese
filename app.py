@@ -148,11 +148,11 @@ def reset():
 def render_preview(c):
     meta = component_map.get(c, {}).get("meta", {})
     f = {
-        "Pinyin": clean_field(meta.get("pinyin", "—")),
-        "Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else "unknown",
+        "clean_field(meta.get("pinyin", "—")),
+        f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else " ",
         "Radical": clean_field(meta.get("radical", "—")),
         "Decomposition": format_decomposition(c),
-        "Definition": clean_field(meta.get("definition", "—")),
+        clean_field(meta.get("definition", "—")),
         "Etymology": get_etymology_text(meta),
     }
     details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
