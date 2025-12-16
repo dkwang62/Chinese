@@ -1,6 +1,7 @@
 import json
 import math
 import streamlit as st
+from streamlit.components.v1 import html as st_html
 
 st.set_page_config(layout="wide")
 
@@ -69,29 +70,6 @@ def apply_dynamic_css():
             margin: 20px 0 30px 0;
             text-align: center;
         }
-
-        /* 6. ENLARGE VIEW */
-        .enlarge-canvas {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 40px 10px;
-            min-height: calc(100vh - 180px);
-        }
-        .enlarge-chars {
-            line-height: 1;
-            letter-spacing: 0.08em;
-            user-select: text;
-        }
-        .enlarge-1 { font-size: clamp(180px, 40vw, 560px); }
-        .enlarge-2 { font-size: clamp(140px, 32vw, 460px); }
-        .enlarge-note {
-            text-align: center;
-            color: #666;
-            margin-top: -10px;
-            margin-bottom: 20px;
-        }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -151,7 +129,7 @@ defaults = {
     "selected_comp": "", "stroke_count": 0, "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
     "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None, "preview_active": False,
-    "enlarge_active": False, "enlarge_text": "", "enlarge_warning": None
+    "stroke_view_active": False, "stroke_view_char": ""
 }
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
@@ -200,12 +178,17 @@ def tile_click(c):
         st.session_state.preview_comp = c
 
 def back():
+    # Return to browsing list
     st.session_state.show_inputs = True
     st.session_state.preview_active = False
     st.session_state.preview_comp = None
-    st.session_state.enlarge_active = False
-    st.session_state.enlarge_warning = None
+    # Ensure we exit stroke order view
+    st.session_state.stroke_view_active = False
+    st.session_state.stroke_view_char = ""
 
+def end_stroke_view():
+    st.session_state.stroke_view_active = False
+    st.session_state.stroke_view_char = ""
 
 def reset():
     st.session_state.stroke_count = 0
@@ -215,25 +198,9 @@ def reset():
     st.session_state.show_inputs = True
     st.session_state.preview_active = False
     st.session_state.preview_comp = None
-    st.session_state.enlarge_active = False
-    st.session_state.enlarge_warning = None
-
-def clear_enlarge_warning():
-    st.session_state.enlarge_warning = None
-
-def start_enlarge():
-    raw = st.session_state.get("w_enlarge", "") or ""
-    s = "".join(ch for ch in raw.strip() if not ch.isspace())
-    if len(s) not in (1, 2):
-        st.session_state.enlarge_warning = "Paste exactly 1 or 2 characters."
-        return
-    st.session_state.enlarge_warning = None
-    st.session_state.enlarge_text = s
-    st.session_state.enlarge_active = True
-
-def end_enlarge():
-    st.session_state.enlarge_active = False
-    st.session_state.enlarge_warning = None
+    # Ensure we exit stroke order view
+    st.session_state.stroke_view_active = False
+    st.session_state.stroke_view_char = ""
 
 def render_preview(c):
     meta = component_map.get(c, {}).get("meta", {})
@@ -283,19 +250,178 @@ def render_preview(c):
     # Add a divider or spacer after the preview to separate it from the grid below
     st.markdown("---")
 
-def render_enlarge_view(chars: str):
-    chars = chars or ""
-    n = len(chars)
-    if n == 0:
-        st.info("No characters to display.")
+
+def render_stroke_order_view(char: str):
+    """Render an in-app stroke order animation (HanziWriter) for a single character."""
+    char = (char or "").strip()
+    char = char[0] if char else ""
+
+    if not char:
+        st.info("No character selected for stroke order.")
         return
-    if n > 2:
-        chars = chars[:2]
-        n = 2
-    st.markdown("<div class='enlarge-note'>Tip: Use your browser zoom if you need even more detail.</div>", unsafe_allow_html=True)
-    st.markdown(
-        f"<div class='enlarge-canvas'><div class='enlarge-chars enlarge-{n}'>{chars}</div></div>",
-        unsafe_allow_html=True,
+
+    # Note: HanziWriter loads character stroke data from the hanzi-writer-data package on jsDelivr.
+    # If the character is not available in that dataset, the embedded view will show an error message.
+    st.markdown(f"## Stroke order — {char}")
+
+    st_html(
+        f"""
+        <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap;">
+          <div>
+            <div id="hw-target" style="width:420px;height:420px;border:1px solid #e0e0e0;border-radius:12px;"></div>
+            <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+              <button id="hw-prev">Back</button>
+              <button id="hw-next">Next</button>
+              <button id="hw-reset">Reset</button>
+              <button id="hw-animate">Animate</button>
+            </div>
+            <div id="hw-status" style="margin-top:10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color:#444;"></div>
+            <div id="hw-error" style="margin-top:10px; color:#b00020;"></div>
+          </div>
+        </div>
+
+        <script>
+          (function() {{
+            const char = {json.dumps(char, ensure_ascii=False)};
+
+            const statusEl = document.getElementById('hw-status');
+            const errEl = document.getElementById('hw-error');
+
+function loadScript(src) {{
+  return new Promise((resolve, reject) => {{
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve(src);
+    s.onerror = () => {{
+      try {{ s.remove(); }} catch(e) {{}}
+      reject(new Error(`Failed to load script: ${{src}}`));
+    }};
+    document.head.appendChild(s);
+  }});
+}}
+
+async function ensureLibLoaded() {{
+  if (window.HanziWriter) return;
+
+  // Try multiple CDNs in case one is blocked/unreachable.
+  const sources = [
+    'https://cdn.jsdelivr.net/npm/hanzi-writer@3/dist/hanzi-writer.min.js',
+    'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'
+  ];
+
+  let lastErr = null;
+  for (const src of sources) {{
+    try {{
+      await loadScript(src);
+      if (window.HanziWriter) return;
+    }} catch (e) {{
+      lastErr = e;
+    }}
+  }}
+  throw new Error('Failed to load HanziWriter library. All configured CDNs were unreachable.');
+}}
+
+            const dataUrls = [
+              `https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/${{char}}.json`,
+              `https://unpkg.com/hanzi-writer-data@2.0.1/${{char}}.json`
+            ];
+
+
+            async function loadCharData() {{
+              for (const url of dataUrls) {{
+                try {{
+                  const res = await fetch(url);
+                  if (!res.ok) continue;
+                  return await res.json();
+                }} catch (e) {{
+                  // try next url
+                }}
+              }}
+              throw new Error('Stroke data not found for this character in hanzi-writer-data.');
+            }}
+
+            let writer = null;
+            let i = -1;
+            let total = 0;
+
+            function setStatus() {{
+              statusEl.textContent = `Stroke: ${{Math.max(i+1, 0)}} / ${{total}}`;
+            }}
+
+            async function init() {{
+              try {{
+                await ensureLibLoaded();
+                const charData = await loadCharData();
+                total = (charData.medians || []).length || 0;
+
+                writer = window.HanziWriter.create('hw-target', char, {{
+                  width: 420,
+                  height: 420,
+                  padding: 14,
+                  showOutline: true,
+                  showCharacter: false,
+                  strokeAnimationSpeed: 1,
+                  delayBetweenStrokes: 120,
+                  charDataLoader: () => Promise.resolve(charData)
+                }});
+
+                // Ensure a clean start.
+                i = -1;
+                writer.hideCharacter();
+                setStatus();
+              }} catch (e) {{
+                errEl.textContent = e && e.message ? e.message : String(e);
+              }}
+            }}
+
+            async function nextStroke() {{
+              if (!writer) return;
+              if (i + 1 >= total) return;
+              i += 1;
+              await writer.animateStroke(i);
+              setStatus();
+            }}
+
+            async function prevStroke() {{
+              if (!writer) return;
+              if (i <= -1) return;
+              i -= 1;
+
+              // Reliable "back": reset and replay up to i.
+              writer.hideCharacter();
+              for (let k = 0; k <= i; k++) {{
+                await writer.animateStroke(k);
+              }}
+              setStatus();
+            }}
+
+            function resetAll() {{
+              if (!writer) return;
+              i = -1;
+              writer.hideCharacter();
+              setStatus();
+            }}
+
+            async function animateAll() {{
+              if (!writer) return;
+              i = -1;
+              writer.hideCharacter();
+              await writer.animateCharacter();
+              i = total - 1;
+              setStatus();
+            }}
+
+            document.getElementById('hw-next').addEventListener('click', nextStroke);
+            document.getElementById('hw-prev').addEventListener('click', prevStroke);
+            document.getElementById('hw-reset').addEventListener('click', resetAll);
+            document.getElementById('hw-animate').addEventListener('click', animateAll);
+
+            init();
+          }})();
+        </script>
+        """,
+        height=560,
     )
 
 def main():
@@ -331,56 +457,60 @@ def main():
                 st.warning(st.session_state.text_input_warning)
             st.text_input("Jump to character", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="e.g. 水")
 
+        
         else:
-            # Results mode Sidebar
-            st.markdown("### Actions")
-            if st.session_state.enlarge_active:
-                st.button("← Back", on_click=end_enlarge, use_container_width=True)
-            else:
-                st.button("← Back to list", on_click=back, use_container_width=True)
-            st.button("Reset Filters", on_click=reset, use_container_width=True)
+                    # Results mode Sidebar
+                    st.markdown("### Actions")
 
-            # Secondary action: open external stroke-order tool (opens in a new tab)
-            if hasattr(st, "link_button"):
-                st.link_button("View stroke order", "https://www.chineseconverter.com/en/convert/chinese-stroke-order-tool", use_container_width=True)
-            else:
-                st.markdown(
-                    '<a href="https://www.chineseconverter.com/en/convert/chinese-stroke-order-tool" target="_blank" '
-                    'style="display:block;text-align:center;padding:0.5rem 0.75rem;'
-                    'border:1px solid rgba(49,51,63,0.2);border-radius:0.5rem;'
-                    'text-decoration:none;">View stroke order</a>',
-                    unsafe_allow_html=True
-                )
+                    # When viewing stroke order, keep the sidebar minimal and focused.
+                    if st.session_state.stroke_view_active:
+                        st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+                        st.button("← Back to list", on_click=back, use_container_width=True)
+                        st.button("Reset Filters", on_click=reset, use_container_width=True)
 
-            st.markdown("---")
-            st.markdown("### Enlarge")
-            if st.session_state.enlarge_warning:
-                st.warning(st.session_state.enlarge_warning)
-            st.text_input("Paste 1–2 characters", key="w_enlarge", on_change=clear_enlarge_warning, placeholder="e.g. 鬱 or 明月")
-            st.button("Update" if st.session_state.enlarge_active else "Enlarge", on_click=start_enlarge, use_container_width=True)
+                    # Normal Results mode sidebar (not in stroke order view)
+                    else:
+                        st.button("← Back to list", on_click=back, use_container_width=True)
+                        st.button("Reset Filters", on_click=reset, use_container_width=True)
 
-            # Selected character
-            st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
+                        st.markdown("---")
+                        st.markdown("### Stroke order")
 
-            # Results count logic (using deduplicated count for display)
-            related = component_map[st.session_state.selected_comp].get("related_characters", [])
-            chars_raw = [c for c in related if len(c)==1]
-            chars_unique = list(set(chars_raw)) # Deduplicate for count
-            
-            n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
-            compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars_unique} if n else {c:[] for c in chars_unique}
-            valid_chars = [c for c in chars_unique if n==0 or compounds[c]]
-            
-            st.markdown(f"<div class='results-header-sidebar'>🧬 Results — {len(valid_chars)}</div>", unsafe_allow_html=True)
+                        # Use the currently selected character by default (1 char).
+                        so_char = (st.session_state.selected_comp or "").strip()
+                        so_char = so_char[:1] if so_char else ""
+                        if so_char:
+                            if st.button("View stroke order", use_container_width=True):
+                                st.session_state.stroke_view_char = so_char
+                                st.session_state.stroke_view_active = True
+                                # Force an immediate rerun so the sidebar switches to the
+                                # stroke-order actions in the same click.
+                                st.rerun()
+                        else:
+                            st.caption("Select a character to enable stroke order.")
 
-            # Output Type
-            st.markdown("### Output Type")
-            modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
-            st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
+                        # Selected character
+                        st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
 
-    # === MAIN CONTENT ===
-    if st.session_state.enlarge_active:
-        render_enlarge_view(st.session_state.enlarge_text)
+                        # Results count logic (using deduplicated count for display)
+                        related = component_map[st.session_state.selected_comp].get("related_characters", [])
+                        chars_raw = [c for c in related if len(c) == 1]
+                        chars_unique = list(set(chars_raw))  # Deduplicate for count
+
+                        n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
+                        compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n] for c in chars_unique} if n else {c: [] for c in chars_unique}
+                        valid_chars = [c for c in chars_unique if n == 0 or compounds[c]]
+
+                        st.markdown(f"<div class='results-header-sidebar'>🧬 Results — {len(valid_chars)}</div>", unsafe_allow_html=True)
+
+                        # Output Type
+                        st.markdown("### Output Type")
+                        modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
+                        st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
+
+            # === MAIN CONTENT ===
+    if st.session_state.stroke_view_active:
+        render_stroke_order_view(st.session_state.stroke_view_char)
         return
 
     if st.session_state.show_inputs:
@@ -402,25 +532,16 @@ def main():
             (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
             (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
         ]
-        def result_count(comp: str) -> int:
 
+        # Strict filtering: do not inject sub-components from a previously selected character.
+        def _result_count(comp: str) -> int:
             rel = component_map.get(comp, {}).get("related_characters", [])
-
             return len({x for x in rel if isinstance(x, str) and len(x) == 1})
 
+        _counts = {c: _result_count(c) for c in filtered}
 
-        counts = {c: result_count(c) for c in filtered}
-
-
-        # Sort: most results first, then fewer strokes, then Unicode for stable ties
-
-        sorted_comps = sorted(
-
-            filtered,
-
-            key=lambda c: (-counts.get(c, 0), get_stroke_count(c) or 999, c)
-
-        )
+        # Sort: most results first; tie-breaker by strokes; final stable tie-breaker by codepoint.
+        sorted_comps = sorted(filtered, key=lambda c: (-_counts.get(c, 0), get_stroke_count(c) or 999, c))
 
         if not sorted_comps:
             st.info("No components match current filters.")
