@@ -11,9 +11,12 @@ IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹
 
 # Dynamic CSS with font scaling
 def apply_dynamic_css():
-    font_scale = st.session_state.get('font_scale', 1.0)
+    font_scale = st.session_state.get("font_scale", 1.0)
+
     css = f"""
     <style>
+        :root {{ --fontScale: {font_scale}; }}
+
         .selected-card {{
             background-color: #e8f4f8;
             padding: 15px;
@@ -117,6 +120,22 @@ def apply_dynamic_css():
             font-size: calc(0.9em * {font_scale});
         }}
 
+        /* Make the popover trigger look like a small info pill */
+        .comp-grid div[data-testid="stPopover"] button {
+            background: #f7fafc;
+            color: #2c3e50;
+            border: 1px solid #e0e0e0;
+            border-radius: 999px;
+            padding: 0.35rem 0.55rem;
+            font-size: calc(0.85em * var(--fontScale, 1));
+            box-shadow: none;
+        }
+        .comp-grid div[data-testid="stPopover"] button:hover {
+            background: #edf2f7;
+            border-color: #d0d7de;
+
+
+
         @media (max-width: 768px) {{
             .selected-card {{ flex-direction: column; align-items: flex-start; padding: 10px; }}
             .selected-char {{ font-size: calc(2em * {font_scale}); }}
@@ -130,6 +149,7 @@ def apply_dynamic_css():
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
+
 
 # Load component map
 @st.cache_data
@@ -199,9 +219,9 @@ def get_all_components(char, max_depth, depth=0, seen=None):
             components_set.update(get_all_components(comp, max_depth, depth + 1, seen.copy()))
     return components_set
 
-# NEW: Tooltip text for the grid (floating details)
-def component_tooltip(c: str) -> str:
+def render_component_popover_card(c: str) -> None:
     meta = component_map.get(c, {}).get("meta", {})
+
     pinyin = clean_field(meta.get("pinyin", "—"))
     strokes = get_stroke_count(c)
     radical = clean_field(meta.get("radical", "—"))
@@ -209,14 +229,25 @@ def component_tooltip(c: str) -> str:
     definition = clean_field(meta.get("definition", "No definition available"))
     ety = get_etymology_text(meta)
 
-    return (
-        f"Pinyin: {pinyin}\n"
-        f"Strokes: {strokes if strokes is not None else 'unknown'}\n"
-        f"Radical: {radical}\n"
-        f"Decomposition: {decomp}\n"
-        f"Definition: {definition}\n"
-        f"Etymology: {ety}"
+    st.markdown(f"### {c}")
+    st.caption("Component details")
+
+    # A compact “card-like” layout using markdown
+    st.markdown(
+        f"""
+**Pinyin:** {pinyin}  
+**Strokes:** {strokes if strokes is not None else "unknown"}  
+**Radical:** {radical}  
+**Definition:** {definition}
+        """.strip()
     )
+
+    st.markdown("**Decomposition:**")
+    st.code(decomp if decomp and decomp != "—" else "—", language="text")
+
+    st.markdown("**Etymology:**")
+    st.markdown(ety if ety else "—")
+
 
 # Session state initialization
 def init_session_state():
@@ -576,20 +607,35 @@ def render_controls(component_map):
                 end = min(start + PAGE_SIZE, total)
                 page_components = sorted_components[start:end]
 
+                # Render grid
                 st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
                 cols = st.columns(GRID_COLS)
+
                 for i, ch in enumerate(page_components):
                     with cols[i % GRID_COLS]:
-                        st.button(
-                            ch,  # character-only
-                            key=f"comp_tile_{ch}_{st.session_state.page}",
-                            help=component_tooltip(ch),  # floating details
-                            use_container_width=True,
-                            on_click=on_char_button_click,
-                            args=(ch,),
-                        )
+                        # Two-step UI: info popover + select tile
+                        top_a, top_b = st.columns([1, 1], gap="small")
+
+                        with top_a:
+                            with st.popover("ℹ", key=f"comp_info_{ch}_{st.session_state.page}"):
+                                render_component_popover_card(ch)
+
+                        with top_b:
+                            is_selected = (st.session_state.get("selected_comp") == ch)
+                            st.button(
+                                ch,  # character-only tile
+                                key=f"comp_tile_{ch}_{st.session_state.page}",
+                                use_container_width=True,
+                                type="primary" if is_selected else "secondary",
+                                on_click=on_char_button_click,
+                                args=(ch,),
+                            )
+
                 st.markdown("</div>", unsafe_allow_html=True)
 
+                            }
+
+            
             with col5:
                 if st.session_state.text_input_warning:
                     st.warning(st.session_state.text_input_warning)
