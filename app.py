@@ -626,11 +626,15 @@ def render_controls(component_map_arg):
                 cols = st.columns(GRID_COLS)
 
                 for i, ch in enumerate(page_components):
-                    with cols[i % GRID_COLS]:
-                        top_a, top_b = st.columns([1, 2], gap="small")
+                    with cols[i % GRID_COLS]:                    
+                        top_a, top_b = st.columns([1, 2])
 
                         with top_a:
-                            with st.popover("ℹ", key=f"comp_info_{ch}_{st.session_state.page}"):
+                            # Make the label *functionally unique* without visually changing it.
+                            # (Zero-width spaces prevent any “duplicate element” edge cases.)
+                            pop_label = "ℹ" + ("\u200b" * (i + 1))
+
+                            with st.popover(pop_label):
                                 render_component_popover_card(ch)
 
                         with top_b:
@@ -643,7 +647,7 @@ def render_controls(component_map_arg):
                                 on_click=on_char_button_click,
                                 args=(ch,),
                             )
-
+                
                 st.markdown("</div>", unsafe_allow_html=True)
 
             with col5:
