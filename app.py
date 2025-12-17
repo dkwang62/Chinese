@@ -618,9 +618,9 @@ def main():
         if st.session_state.stroke_count > 0:
             filter_parts.append(f"{st.session_state.stroke_count} strokes")
         if st.session_state.radical != "none":
-            filter_parts.append(f"Radical: {st.session_state.radical}")
+            filter_parts.append(f"{st.session_state.radical}")
         if st.session_state.component_idc != "none":
-            filter_parts.append(f"Structure: {st.session_state.component_idc}")
+            filter_parts.append(f"{st.session_state.component_idc}")
 
         filter_summary = " · ".join(filter_parts) if filter_parts else "none"
         instruction = "Click once to preview in sidebar · Click twice to explore characters"
