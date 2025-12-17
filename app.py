@@ -2,112 +2,96 @@ import json
 import math
 import streamlit as st
 from streamlit.components.v1 import html as st_html
-import json  # For the JS part
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Radix")
 
 IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
 
 def apply_dynamic_css():
     css = """
     <style>
-        /* 1. SIDEBAR: Results Count Header */
-        .results-header-sidebar {
-            font-size: 1.4em;
-            font-weight: bold;
-            color: #2c3e50;
-            margin: 20px 0 10px 0;
-            text-align: center;
+        /* General Cleanup */
+        .block-container { padding-top: 2rem; padding-bottom: 3rem; }
+        
+        /* Sidebar: Clean up spacing */
+        section[data-testid="stSidebar"] .block-container {
+            padding-top: 2rem;
         }
 
-        /* 2. SIDEBAR: The Big Red Selected Character */
-        .selected-char-sidebar {
-            font-size: 3em; 
+        /* Sidebar: Selected Character */
+        .sidebar-big-char {
+            font-size: 4em; 
             text-align: center;
             color: #e74c3c; 
-            margin: 20px 0;
+            margin: 10px 0 0 0;
             font-weight: bold;
+            line-height: 1.1;
         }
-
-        /* NEW: SIDEBAR PREVIEW STYLES */
-        .preview-char-sidebar {
-            font-size: 2.8em;
+        
+        .sidebar-meta {
+            font-size: 1em;
             text-align: center;
-            color: #e74c3c;
-            margin: 15px 0 10px 0;
-            font-weight: bold;
+            color: #555;
+            margin-bottom: 20px;
         }
-        .preview-details-sidebar {
-            font-size: 1.05em;
+        
+        .preview-details-box {
+            font-size: 0.95em;
             line-height: 1.5;
-            color: #2c3e50;
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-        }
-
-        /* 3. RESULTS: The White Description Card */
-        .char-card {
-            background: white;
-            padding: 18px;
-            border-radius: 10px;
-            margin-bottom: 0px; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            height: 100%; 
-            display: flex;
-            align-items: center;
-        }
-
-        /* 4. BROWSING GRID: Large Tiles */
-        .comp-grid .stButton button {
-            font-size: 2em;
-            height: 80px;
-            background: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 12px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-            padding: 0;
-            line-height: 80px;
-        }
-        .comp-grid .stButton button:hover {
-            background: #fff5f5;
-            border-color: #f2c6c6;
-            color: #c0392b;
-        }
-
-        /* 5. INSTRUCTIONS: The Green Status Line */
-        .status-line {
-            font-size: 1.1em;
-            font-weight: 600;
-            color: #0f5132;
-            background-color: #d1e7dd;
-            border: 1px solid #badbcc;
+            color: #333;
+            background: #fff;
             padding: 15px;
             border-radius: 8px;
-            margin: 20px 0 30px 0;
-            text-align: center;
+            border: 1px solid #eee;
+            margin-top: 15px;
         }
 
-        /* NEW: Preview count line in browsing mode */
-        .preview-count-line {
-            font-size: 1.3em;
-            text-align: center;
-            color: #2c3e50;
-            margin: 20px 0 25px 0;
+        /* Results: The Row Layout */
+        .result-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
         }
-        .preview-count-line .char {
-            font-size: 1.4em;
-            font-weight: bold;
-            color: #2c3e50;
+        
+        .char-card {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            border: 1px solid #f0f0f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            width: 100%;
         }
 
-        /* Jump input at bottom */
-        .jump-footer {
-            margin-top: 40px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-top: 1px solid #e0e0e0;
+        /* Browsing Grid Buttons */
+        .comp-grid .stButton button {
+            font-size: 2.2em;
+            height: 75px;
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            padding: 0;
+            line-height: 75px;
+            transition: all 0.2s;
+        }
+        .comp-grid .stButton button:hover {
+            border-color: #e74c3c;
+            color: #e74c3c;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(231, 76, 60, 0.15);
+        }
+
+        /* Navigation Row in Grid */
+        .nav-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            color: #666;
+        }
+
+        /* Input styling */
+        div[data-testid="stTextInput"] input {
             text-align: center;
         }
     </style>
@@ -127,7 +111,7 @@ try:
     component_map = load_component_map()
 except Exception as e:
     component_map = {}
-    st.error(f"Failed to load data: {e}")
+    st.error(f"Data error: {e}")
 
 def clean_field(field):
     return field[0] if isinstance(field, list) and field else field or "—"
@@ -142,9 +126,12 @@ def get_stroke_count(char):
 
 def get_etymology_text(meta):
     etymology = meta.get("etymology", {})
-    hint = clean_field(etymology.get("hint", "No hint"))
+    hint = clean_field(etymology.get("hint", ""))
     details = clean_field(etymology.get("details", ""))
-    return f"{hint}{'; ' + details if details and details != '—' else ''}"
+    if not hint and not details: return "—"
+    if hint and not details: return hint
+    if details and not hint: return details
+    return f"{hint}; {details}"
 
 def format_decomposition(char):
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
@@ -179,46 +166,38 @@ def sync_display():
 
 def sync_text():
     v = st.session_state.w_text.strip()
-    if len(v) != 1:
-        st.session_state.text_input_warning = "One character only"
-        return
+    if len(v) != 1: return # Silent fail on length
     if v in component_map:
         st.session_state.selected_comp = v
         st.session_state.last_valid_selected_comp = v
         st.session_state.text_input_comp = v
-        st.session_state.text_input_warning = None
         st.session_state.show_inputs = False
         st.session_state.preview_comp = None
+        st.session_state.text_input_warning = None
     else:
         st.session_state.text_input_warning = "Not found"
 
 def tile_click(c):
     if st.session_state.show_inputs:
-        # In browsing mode: single click → preview in sidebar
         if st.session_state.preview_comp == c:
-            # Second click → commit to full results view
             st.session_state.selected_comp = c
             st.session_state.last_valid_selected_comp = c
             st.session_state.show_inputs = False
             st.session_state.preview_comp = None
-            st.session_state.text_input_comp = c  # Sync jump input
+            st.session_state.text_input_comp = c
         else:
-            # First click → preview
             st.session_state.preview_comp = c
-    else:
-        pass
 
 def back():
     st.session_state.show_inputs = True
     st.session_state.preview_comp = None
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
-    st.session_state.text_input_comp = ""          # Clear jump input
+    st.session_state.text_input_comp = ""
     st.session_state.text_input_warning = None
 
 def end_stroke_view():
     st.session_state.stroke_view_active = False
-    st.session_state.stroke_view_char = ""
 
 def reset():
     st.session_state.stroke_count = 0
@@ -227,231 +206,104 @@ def reset():
     st.session_state.page = 1
     st.session_state.show_inputs = True
     st.session_state.preview_comp = None
-    st.session_state.stroke_view_active = False
-    st.session_state.stroke_view_char = ""
     st.session_state.text_input_comp = ""
     st.session_state.text_input_warning = None
 
 def render_sidebar_preview(c):
-    if not c or c not in component_map:
-        return
+    if not c or c not in component_map: return
 
     related = component_map.get(c, {}).get("related_characters", [])
     chars_unique = list(set([ch for ch in related if len(ch) == 1]))
     count = len(chars_unique)
 
     meta = component_map.get(c, {}).get("meta", {})
+    
+    # Clean minimalist preview
+    st.markdown(f"<div class='sidebar-big-char'>{c}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='sidebar-meta'>{count} characters contain {c}</div>", unsafe_allow_html=True)
+
     f = {
         "Pinyin": clean_field(meta.get("pinyin", "—")),
-        "Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else "unknown",
-        "Radical": clean_field(meta.get("radical", "—")),
-        "Decomposition": format_decomposition(c),
-        "Definition": clean_field(meta.get("definition", "—")),
-        "Etymology": get_etymology_text(meta),
+        "Strokes": str(get_stroke_count(c)) if get_stroke_count(c) else "?",
+        "Meaning": clean_field(meta.get("definition", "—")),
     }
-    details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
-
-    st.markdown(
-        f"<div class='preview-count-line'>{count} characters with <span class='char'>{c}</span></div>",
-        unsafe_allow_html=True
-    )
-
-    st.markdown(f"<div style='font-size:1.05em;line-height:1.5;color:#2c3e50;background:#f8f9fa;padding:12px;border-radius:8px;border:1px solid #e0e0e0;'>{details}</div>", unsafe_allow_html=True)
+    
+    details_html = "".join([f"<div style='margin-bottom:4px;'><b style='color:#777; margin-right:5px;'>{k}</b> {v}</div>" for k,v in f.items()])
+    st.markdown(f"<div class='preview-details-box'>{details_html}</div>", unsafe_allow_html=True)
 
 def render_stroke_order_view(char: str):
-    char = (char or "").strip()
-    char = char[0] if char else ""
+    char = (char or "").strip()[:1]
+    if not char: return
 
-    if not char:
-        st.info("No character selected for stroke order.")
-        return
-
-    st.markdown(f"## Stroke order — {char}")
-
+    # No title needed, visual context is enough
     st_html(
         f"""
-        <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap;">
-          <div>
-            <div id="hw-target" style="width:420px;height:420px;border:1px solid #e0e0e0;border-radius:12px;"></div>
-            <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-              <button id="hw-prev">Back</button>
-              <button id="hw-next">Next</button>
-              <button id="hw-reset">Reset</button>
-              <button id="hw-animate">Animate</button>
+        <div style="display:flex; justify-content:center; align-items:center; flex-direction:column;">
+            <div id="hw-target" style="width:300px;height:300px;border:1px solid #eee;border-radius:12px; margin-bottom:15px;"></div>
+            <div style="display:flex; gap:10px;">
+              <button id="hw-animate" style="padding:8px 16px; border-radius:6px; border:1px solid #ddd; background:white; cursor:pointer;">Animate</button>
+              <button id="hw-reset" style="padding:8px 16px; border-radius:6px; border:1px solid #ddd; background:white; cursor:pointer;">Reset</button>
             </div>
-            <div id="hw-status" style="margin-top:10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color:#444;"></div>
-            <div id="hw-error" style="margin-top:10px; color:#b00020;"></div>
-          </div>
+            <div id="hw-error" style="margin-top:10px; color:#b00020; font-size:0.8em;"></div>
         </div>
 
         <script>
           (function() {{
             const char = {json.dumps(char, ensure_ascii=False)};
-
-            const statusEl = document.getElementById('hw-status');
-            const errEl = document.getElementById('hw-error');
-
+            
             function loadScript(src) {{
-              return new Promise((resolve, reject) => {{
-                const s = document.createElement('script');
-                s.src = src;
-                s.async = true;
-                s.onload = () => resolve(src);
-                s.onerror = () => {{
-                  try {{ s.remove(); }} catch(e) {{}}
-                  reject(new Error(`Failed to load script: ${{src}}`));
-                }};
-                document.head.appendChild(s);
-              }});
-            }}
-
-            async function ensureLibLoaded() {{
-              if (window.HanziWriter) return;
-
-              const sources = [
-                'https://cdn.jsdelivr.net/npm/hanzi-writer@3/dist/hanzi-writer.min.js',
-                'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'
-              ];
-
-              let lastErr = null;
-              for (const src of sources) {{
-                try {{
-                  await loadScript(src);
-                  if (window.HanziWriter) return;
-                }} catch (e) {{
-                  lastErr = e;
-                }}
-              }}
-              throw new Error('Failed to load HanziWriter library. All configured CDNs were unreachable.');
-            }}
-
-            const dataUrls = [
-              `https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/${{char}}.json`,
-              `https://unpkg.com/hanzi-writer-data@2.0.1/${{char}}.json`
-            ];
-
-            async function loadCharData() {{
-              for (const url of dataUrls) {{
-                try {{
-                  const res = await fetch(url);
-                  if (!res.ok) continue;
-                  return await res.json();
-                }} catch (e) {{
-                }}
-              }}
-              throw new Error('Stroke data not found for this character in hanzi-writer-data.');
-            }}
-
-            let writer = null;
-            let i = -1;
-            let total = 0;
-
-            function setStatus() {{
-              statusEl.textContent = `Stroke: ${{Math.max(i+1, 0)}} / ${{total}}`;
+                return new Promise((resolve, reject) => {{
+                    if(window.HanziWriter) return resolve();
+                    const s = document.createElement('script');
+                    s.src = src;
+                    s.async = true;
+                    s.onload = resolve;
+                    s.onerror = reject;
+                    document.head.appendChild(s);
+                }});
             }}
 
             async function init() {{
-              try {{
-                await ensureLibLoaded();
-                const charData = await loadCharData();
-                total = (charData.medians || []).length || 0;
-
-                writer = window.HanziWriter.create('hw-target', char, {{
-                  width: 420,
-                  height: 420,
-                  padding: 14,
-                  showOutline: true,
-                  showCharacter: false,
-                  strokeAnimationSpeed: 1,
-                  delayBetweenStrokes: 120,
-                  charDataLoader: () => Promise.resolve(charData)
-                }});
-
-                i = -1;
-                writer.hideCharacter();
-                setStatus();
-              }} catch (e) {{
-                errEl.textContent = e && e.message ? e.message : String(e);
-              }}
+                try {{
+                    await loadScript('https://cdn.jsdelivr.net/npm/hanzi-writer@3/dist/hanzi-writer.min.js');
+                    
+                    const writer = window.HanziWriter.create('hw-target', char, {{
+                        width: 300, height: 300, padding: 10, showOutline: true,
+                        strokeAnimationSpeed: 1, delayBetweenStrokes: 200,
+                    }});
+                    
+                    document.getElementById('hw-animate').onclick = () => writer.animateCharacter();
+                    document.getElementById('hw-reset').onclick = () => {{ writer.hideCharacter(); writer.showCharacter(); }};
+                    writer.animateCharacter();
+                }} catch(e) {{
+                    document.getElementById('hw-error').innerText = "Could not load stroke data.";
+                }}
             }}
-
-            async function nextStroke() {{
-              if (!writer) return;
-              if (i + 1 >= total) return;
-              i += 1;
-              await writer.animateStroke(i);
-              setStatus();
-            }}
-
-            async function prevStroke() {{
-              if (!writer) return;
-              if (i <= -1) return;
-              i -= 1;
-              writer.hideCharacter();
-              for (let k = 0; k <= i; k++) {{
-                await writer.animateStroke(k);
-              }}
-              setStatus();
-            }}
-
-            function resetAll() {{
-              if (!writer) return;
-              i = -1;
-              writer.hideCharacter();
-              setStatus();
-            }}
-
-            async function animateAll() {{
-              if (!writer) return;
-              i = -1;
-              writer.hideCharacter();
-              await writer.animateCharacter();
-              i = total - 1;
-              setStatus();
-            }}
-
-            document.getElementById('hw-next').addEventListener('click', nextStroke);
-            document.getElementById('hw-prev').addEventListener('click', prevStroke);
-            document.getElementById('hw-reset').addEventListener('click', resetAll);
-            document.getElementById('hw-animate').addEventListener('click', animateAll);
-
             init();
           }})();
         </script>
         """,
-        height=560,
+        height=400,
     )
 
 def main():
-    if not component_map:
-        st.stop()
-
+    if not component_map: st.stop()
     apply_dynamic_css()
 
     # === SIDEBAR ===
     with st.sidebar:
-        st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
-
-        # Prominent Reset button always visible
-        if st.button("🔄 Reset All Filters & Selection", use_container_width=True, type="primary"):
-            reset()
-            st.rerun()
-
-      
-
+        st.markdown("<h2 style='text-align:center; color:#333; border-bottom:1px solid #eee; padding-bottom:10px;'>Radix</h2>", unsafe_allow_html=True)
+        
         if st.session_state.stroke_view_active:
-            st.button("← Back", on_click=end_stroke_view, use_container_width=True)
-            st.button("← Back to list", on_click=back, use_container_width=True)
-
+             st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+        
         elif st.session_state.show_inputs:
-            # Browsing mode - Filters only
-            st.markdown("### Filters")
-
+            # Filters
             stroke_set = {s for s in (get_stroke_count(c) for c in component_map) if isinstance(s, int)}
             stroke_opts = [0] + sorted(stroke_set)
-            current = st.session_state.stroke_count if isinstance(st.session_state.stroke_count, int) and st.session_state.stroke_count in stroke_opts else 0
+            current = st.session_state.stroke_count if st.session_state.stroke_count in stroke_opts else 0
             st.selectbox("Strokes", options=stroke_opts, index=stroke_opts.index(current),
-                         format_func=lambda x: "Any" if x == 0 else str(x), key="w_stroke", on_change=sync_stroke)
+                         format_func=lambda x: "All" if x == 0 else str(x), key="w_stroke", on_change=sync_stroke)
 
             rad_set = {component_map.get(c, {}).get("meta", {}).get("radical", "") for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical")}
             rad_opts = ["none"] + sorted(rad_set)
@@ -461,66 +313,54 @@ def main():
             idc_opts = ["none"] + sorted(idc_set)
             st.selectbox("Structure", options=idc_opts, index=idc_opts.index(st.session_state.component_idc), key="w_idc", on_change=sync_idc)
 
-            st.markdown("---")
-            # Preview in sidebar when browsing
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+            if st.button("Reset", use_container_width=True):
+                reset()
+                st.rerun()
+
             if st.session_state.preview_comp:
+                st.markdown("---")
                 render_sidebar_preview(st.session_state.preview_comp)
 
         else:
-            # Results mode sidebar
-            st.button("← Back to list", on_click=back, use_container_width=True)
-
-            so_char = (st.session_state.selected_comp or "").strip()[:1]
-            if so_char and st.button("View stroke order", use_container_width=True):
-                st.session_state.stroke_view_char = so_char
-                st.session_state.stroke_view_active = True
-                st.rerun()
-
-            # Large red character
-            st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
-
-            # Count line
+            # Results Mode Sidebar
+            st.button("← Back", on_click=back, use_container_width=True)
+            
+            # Big Red Char
+            st.markdown(f"<div class='sidebar-big-char'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
+            
+            # Count
             related = component_map[st.session_state.selected_comp].get("related_characters", [])
             chars_unique = list(set([c for c in related if len(c) == 1]))
             n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
             compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars_unique}
             valid_chars = [c for c in chars_unique if n == 0 or compounds[c]]
-            count = len(valid_chars)
+            
+            st.markdown(f"<div class='sidebar-meta'>{len(valid_chars)} characters</div>", unsafe_allow_html=True)
 
-            st.markdown(
-                f"<div class='count-line'>{count} characters with <span class='char'>{st.session_state.selected_comp}</span></div>",
-                unsafe_allow_html=True
-            )
-
+            if st.button("Stroke Order", use_container_width=True):
+                st.session_state.stroke_view_char = st.session_state.selected_comp
+                st.session_state.stroke_view_active = True
+                st.rerun()
+            
+            st.markdown("---")
             modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
-            st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
+            st.radio("View Mode", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display, label_visibility="collapsed")
 
-    # === MAIN CONTENT ===
+    # === MAIN ===
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
         return
 
     if st.session_state.show_inputs:
-        # Browsing mode
-        filter_parts = []
-        if st.session_state.stroke_count > 0:
-            filter_parts.append(f"{st.session_state.stroke_count} strokes")
-        if st.session_state.radical != "none":
-            filter_parts.append(f"Radical: {st.session_state.radical}")
-        if st.session_state.component_idc != "none":
-            filter_parts.append(f"Structure: {st.session_state.component_idc}")
-
-        filter_summary = " · ".join(filter_parts) if filter_parts else "none"
-        instruction = "Click once to preview in sidebar · Click twice to explore characters"
-        st.markdown(f"<div class='status-line'>Filtered: {filter_summary} — {instruction}</div>", unsafe_allow_html=True)
-
+        # --- BROWSING MODE ---
         filtered = [c for c in component_map if
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
             (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
             (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
         ]
 
-        def _result_count(comp: str) -> int:
+        def _result_count(comp):
             rel = component_map.get(comp, {}).get("related_characters", [])
             return len({x for x in rel if isinstance(x, str) and len(x) == 1})
 
@@ -528,56 +368,48 @@ def main():
         sorted_comps = sorted(filtered, key=lambda c: (-_counts.get(c, 0), get_stroke_count(c) or 999, c))
 
         if not sorted_comps:
-            st.info("No components match current filters.")
+            st.info("No characters found.")
             return
 
-        PAGE_SIZE = 120
-        GRID_COLS = 10
+        PAGE_SIZE = 100
         total = len(sorted_comps)
         max_page = max(1, math.ceil(total / PAGE_SIZE))
         st.session_state.page = max(1, min(st.session_state.page, max_page))
 
-        p1, p2, p3 = st.columns([1, 3, 1])
-        with p1:
-            if st.button("◀ Prev", disabled=st.session_state.page<=1):
-                st.session_state.page -= 1
-        with p2:
-            start = (st.session_state.page-1)*PAGE_SIZE + 1
-            end = min(st.session_state.page*PAGE_SIZE, total)
-            st.markdown(f"<div style='text-align:center; padding:10px 0; font-size:1.1em; color:#555;'>{start}–{end} of {total}</div>", unsafe_allow_html=True)
-        with p3:
-            if st.button("Next ▶", disabled=st.session_state.page>=max_page):
-                st.session_state.page += 1
+        # Minimal Navigation Top Row
+        c1, c2, c3 = st.columns([1, 6, 1])
+        with c1:
+            if st.button("◀", disabled=st.session_state.page<=1): st.session_state.page -= 1
+        with c2:
+            start, end = (st.session_state.page-1)*PAGE_SIZE + 1, min(st.session_state.page*PAGE_SIZE, total)
+            st.markdown(f"<div style='text-align:center; color:#999; line-height:35px;'>{start} – {end} of {total}</div>", unsafe_allow_html=True)
+        with c3:
+            if st.button("▶", disabled=st.session_state.page>=max_page): st.session_state.page += 1
 
+        # The Grid
         page = sorted_comps[(st.session_state.page-1)*PAGE_SIZE : st.session_state.page*PAGE_SIZE]
         st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
-        cols = st.columns(GRID_COLS)
+        cols = st.columns(10)
         for i, ch in enumerate(page):
-            with cols[i % GRID_COLS]:
-                is_preview = st.session_state.preview_comp == ch
+            with cols[i % 10]:
+                is_prev = st.session_state.preview_comp == ch
                 st.button(ch, key=f"b_{ch}_{st.session_state.page}", use_container_width=True,
-                          type="primary" if is_preview else "secondary", on_click=tile_click, args=(ch,))
+                          type="primary" if is_prev else "secondary", on_click=tile_click, args=(ch,))
         st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Bottom Instructions
+        st.markdown("<div style='text-align:center; margin-top:20px; color:#bbb; font-size:0.8em;'>Select to preview · Double-click to open</div>", unsafe_allow_html=True)
 
-        # === JUMP INPUT AT BOTTOM (only in browsing mode) ===
-        st.markdown("<div class='jump-footer'>", unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
+        # Minimal Jump Input
+        st.markdown("---")
+        col_space, col_inp, col_space2 = st.columns([1, 1, 1])
+        with col_inp:
             if st.session_state.text_input_warning:
-                st.warning(st.session_state.text_input_warning)
-            st.text_input(
-                "Jump to character",
-                value=st.session_state.text_input_comp,
-                key="w_text",
-                on_change=sync_text,
-                placeholder="Type a single Hanzi, e.g. 水",
-                label_visibility="collapsed"
-            )
-            st.caption("Enter one Chinese character to jump directly to its details")
-        st.markdown("</div>", unsafe_allow_html=True)
+                st.caption(f"⚠️ {st.session_state.text_input_warning}")
+            st.text_input("Jump", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="Search character...", label_visibility="collapsed")
 
     else:
-        # Results mode
+        # --- RESULTS MODE ---
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         chars = list(set([c for c in related if len(c)==1]))
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
@@ -587,45 +419,46 @@ def main():
 
         for c in chars:
             meta = component_map.get(c, {}).get("meta", {})
-            fd = {
+            f_data = {
                 "Pinyin": clean_field(meta.get("pinyin", "—")),
-                "Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else "unknown",
                 "Radical": clean_field(meta.get("radical", "—")),
-                "Decomposition": format_decomposition(c),
-                "Definition": clean_field(meta.get("definition", "—")),
-                "Etymology": get_etymology_text(meta),
+                "Strokes": str(get_stroke_count(c)) if get_stroke_count(c) else "?",
+                "Meaning": clean_field(meta.get("definition", "—")),
             }
-            det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
             
-            # --- MODIFIED LAYOUT ---
-            # Column 1: Pen Button
-            # Column 2: Big Character
-            # Column 3: Description Card
-            col_btn, col_char, col_details = st.columns([1, 2, 12])
+            # Layout: Button | Char | Details
+            c_btn, c_char, c_det = st.columns([1, 2, 10])
             
-            with col_btn:
-                # Vertical spacer to push button down slightly if needed, or just standard align
-                st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
-                if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order"):
+            with c_btn:
+                st.markdown("<div style='height:25px'></div>", unsafe_allow_html=True)
+                if st.button("🖊️", key=f"s_{c}", help="Stroke Order"):
                     st.session_state.stroke_view_char = c
                     st.session_state.stroke_view_active = True
                     st.rerun()
-
-            with col_char:
-                # Display character large, similar to screenshot
-                st.markdown(f"<div style='font-size: 3.5em; font-weight: bold; text-align: center; color: #111; line-height: 1.2;'>{c}</div>", unsafe_allow_html=True)
-
-            with col_details:
-                st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
-                if compounds.get(c):
-                    st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:5px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
             
-            # Spacer between rows
-            st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
+            with c_char:
+                 st.markdown(f"<div style='font-size:3em; font-weight:bold; text-align:center; color:#333;'>{c}</div>", unsafe_allow_html=True)
+            
+            with c_det:
+                info_str = " &nbsp;·&nbsp; ".join([f"<span style='color:#888'>{k}</span> {v}" for k,v in f_data.items()])
+                
+                compound_html = ""
+                if compounds.get(c):
+                    compound_list = " ".join(sorted(compounds[c]))
+                    compound_html = f"<div style='margin-top:8px; padding-top:8px; border-top:1px dashed #eee; color:#2c3e50; font-size:0.95em;'>{compound_list}</div>"
+                
+                st.markdown(f"""
+                <div class='char-card'>
+                    <div style='line-height:1.4;'>{info_str}</div>
+                    {compound_html}
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
         if chars and n:
-            with st.expander("Export Compounds"):
-                st.text_area("Copy list", "\n".join(w for c in chars for w in compounds[c]), height=150)
+            with st.expander("Copy text"):
+                st.text_area("", "\n".join(w for c in chars for w in compounds[c]), height=100, label_visibility="collapsed")
 
 if __name__ == "__main__":
     main()
