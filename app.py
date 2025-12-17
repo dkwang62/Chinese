@@ -454,9 +454,13 @@ def main():
                          format_func=lambda x: "Any" if x == 0 else str(x), key="w_stroke", on_change=sync_stroke)
 
             rad_set = {component_map.get(c, {}).get("meta", {}).get("radical", "") for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical")}
-            rad_opts = ["none"] + sorted(rad_set)
+            # Sort function: (Stroke Count [Ascending], Radical Name [Alphabetical])
+            # We use 999 for radicals with unknown strokes so they appear at the bottom
+            rad_opts = ["none"] + sorted(list(rad_set), key=lambda r: (get_stroke_count(r) or 999, r))
             st.selectbox("Radical", options=rad_opts, index=rad_opts.index(st.session_state.radical), key="w_radical", on_change=sync_radical)
 
+
+            
             idc_set = {d[0] for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d[0] in IDC_CHARS}
             idc_opts = ["none"] + sorted(idc_set)
             st.selectbox("Structure", options=idc_opts, index=idc_opts.index(st.session_state.component_idc), key="w_idc", on_change=sync_idc)
