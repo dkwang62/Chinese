@@ -110,6 +110,26 @@ def apply_dynamic_css():
             border-top: 1px solid #e0e0e0;
             text-align: center;
         }
+        
+        /* === NEW CSS FOR RADICAL GRID TILES === */
+        /* Targets the buttons specifically inside the radical selector area */
+        div[data-testid="stExpander"] .stButton button {
+            font-size: 1.2rem;
+            height: 40px;
+            padding: 0;
+            line-height: 1.2;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+        
+        /* Subtle divider for stroke counts */
+        .stroke-header {
+            font-size: 0.85em;
+            color: #888;
+            border-bottom: 1px solid #eee;
+            margin: 10px 0 5px 0;
+            padding-bottom: 2px;
+        }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -166,9 +186,7 @@ def sync_stroke():
     st.session_state.stroke_count = int(val) if val != 0 else 0
     st.session_state.page = 1
 
-def sync_radical():
-    st.session_state.radical = st.session_state.w_radical
-    st.session_state.page = 1
+# REMOVED: sync_radical (Handled manually in button logic now)
 
 def sync_idc():
     st.session_state.component_idc = st.session_state.w_idc
@@ -258,6 +276,7 @@ def render_sidebar_preview(c):
 
     st.markdown(f"<div style='font-size:1.05em;line-height:1.5;color:#2c3e50;background:#f8f9fa;padding:12px;border-radius:8px;border:1px solid #e0e0e0;'>{details}</div>", unsafe_allow_html=True)
 
+# ... [stroke order view code remains the same] ...
 def render_stroke_order_view(char: str):
     char = (char or "").strip()
     char = char[0] if char else ""
@@ -287,7 +306,8 @@ def render_stroke_order_view(char: str):
         <script>
           (function() {{
             const char = {json.dumps(char, ensure_ascii=False)};
-
+            /* ... (keep existing script logic intact if referencing the file provided) ... */
+            
             const statusEl = document.getElementById('hw-status');
             const errEl = document.getElementById('hw-error');
 
@@ -432,35 +452,83 @@ def main():
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
-        # Prominent Reset button always visible
         if st.button("🔄 Reset All Filters & Selection", use_container_width=True, type="primary"):
             reset()
             st.rerun()
-
-      
 
         if st.session_state.stroke_view_active:
             st.button("← Back", on_click=end_stroke_view, use_container_width=True)
             st.button("← Back to list", on_click=back, use_container_width=True)
 
         elif st.session_state.show_inputs:
-            # Browsing mode - Filters only
+            # Browsing mode - Filters
             st.markdown("### Filters")
 
+            # 1. Stroke Filter
             stroke_set = {s for s in (get_stroke_count(c) for c in component_map) if isinstance(s, int)}
             stroke_opts = [0] + sorted(stroke_set)
             current = st.session_state.stroke_count if isinstance(st.session_state.stroke_count, int) and st.session_state.stroke_count in stroke_opts else 0
-            st.selectbox("Strokes", options=stroke_opts, index=stroke_opts.index(current),
+            st.selectbox("Total Strokes", options=stroke_opts, index=stroke_opts.index(current),
                          format_func=lambda x: "Any" if x == 0 else str(x), key="w_stroke", on_change=sync_stroke)
 
-            rad_set = {component_map.get(c, {}).get("meta", {}).get("radical", "") for c in component_map if component_map.get(c, {}).get("meta", {}).get("radical")}
-            # Sort function: (Stroke Count [Ascending], Radical Name [Alphabetical])
-            # We use 999 for radicals with unknown strokes so they appear at the bottom
-            rad_opts = ["none"] + sorted(list(rad_set), key=lambda r: (get_stroke_count(r) or 999, r))
-            st.selectbox("Radical", options=rad_opts, index=rad_opts.index(st.session_state.radical), key="w_radical", on_change=sync_radical)
-
-
+            # 2. Radical Filter (NEW: Grid based)
             
+            # Prepare Data for Radical Grid
+            if "rad_groups" not in st.session_state:
+                # Calculate counts once
+                r_counts = {}
+                for c, data in component_map.items():
+                    r = data.get("meta", {}).get("radical")
+                    if r: r_counts[r] = r_counts.get(r, 0) + 1
+                
+                # Group by strokes
+                r_groups = {}
+                for r in r_counts.keys():
+                    s = get_stroke_count(r) or 999
+                    if s not in r_groups: r_groups[s] = []
+                    r_groups[s].append(r)
+                
+                # Sort radicals inside groups by stroke count logic or frequency? 
+                # Let's sort alphabetically for stability
+                for s in r_groups:
+                    r_groups[s].sort()
+                    
+                st.session_state.rad_groups = r_groups
+                st.session_state.rad_counts = r_counts
+
+            # The Expander UI
+            label = f"Radical: {st.session_state.radical}" if st.session_state.radical != "none" else "Radical (Select)"
+            with st.expander(label, expanded=False):
+                if st.button("Clear Radical", use_container_width=True):
+                    st.session_state.radical = "none"
+                    st.session_state.page = 1
+                    st.rerun()
+                
+                groups = st.session_state.rad_groups
+                sorted_strokes = sorted(groups.keys())
+                
+                for s in sorted_strokes:
+                    s_label = f"{s} Strokes" if s != 999 else "Unknown Strokes"
+                    st.markdown(f"<div class='stroke-header'>{s_label}</div>", unsafe_allow_html=True)
+                    
+                    rads = groups[s]
+                    cols = st.columns(5) # 5 tiles per row
+                    for i, r in enumerate(rads):
+                        count = st.session_state.rad_counts.get(r, 0)
+                        is_selected = (st.session_state.radical == r)
+                        
+                        # Highlight popular ones with bold text via markdown logic isn't possible in button label easily,
+                        # but we can use help to show popularity.
+                        with cols[i % 5]:
+                            # Button logic
+                            if st.button(r, key=f"rad_{r}", 
+                                         type="primary" if is_selected else "secondary", 
+                                         help=f"Radical: {r}\nFrequency: {count} characters"):
+                                st.session_state.radical = r
+                                st.session_state.page = 1
+                                st.rerun()
+
+            # 3. Structure Filter
             idc_set = {d[0] for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d[0] in IDC_CHARS}
             idc_opts = ["none"] + sorted(idc_set)
             st.selectbox("Structure", options=idc_opts, index=idc_opts.index(st.session_state.component_idc), key="w_idc", on_change=sync_idc)
@@ -602,13 +670,9 @@ def main():
             det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
             
             # --- MODIFIED LAYOUT ---
-            # Column 1: Pen Button
-            # Column 2: Big Character
-            # Column 3: Description Card
             col_btn, col_char, col_details = st.columns([1, 2, 12])
             
             with col_btn:
-                # Vertical spacer to push button down slightly if needed, or just standard align
                 st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
                 if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order"):
                     st.session_state.stroke_view_char = c
@@ -616,7 +680,6 @@ def main():
                     st.rerun()
 
             with col_char:
-                # Display character large, similar to screenshot
                 st.markdown(f"<div style='font-size: 3.5em; font-weight: bold; text-align: center; color: #111; line-height: 1.2;'>{c}</div>", unsafe_allow_html=True)
 
             with col_details:
@@ -624,7 +687,6 @@ def main():
                 if compounds.get(c):
                     st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:5px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
             
-            # Spacer between rows
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
         if chars and n:
