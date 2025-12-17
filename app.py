@@ -518,7 +518,7 @@ def main():
             filter_parts.append(f"Structure: {st.session_state.component_idc}")
 
         filter_summary = " · ".join(filter_parts) if filter_parts else "none"
-        instruction = "Click a TILE to see details in sidebar (click again to view built characters)"
+        instruction = "Click once to preview in sidebar · Click twice to explore characters"
         st.markdown(f"<div class='status-line'>Filtered: {filter_summary} — {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
