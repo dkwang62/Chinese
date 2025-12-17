@@ -622,9 +622,9 @@ def main():
         if st.session_state.component_idc != "none":
             filter_parts.append(f"{st.session_state.component_idc}")
 
-        filter_summary = " + ".join(filter_parts) if filter_parts else "none"
-        instruction = "Click once to preview in sidebar · Click twice to explore characters"
-        st.markdown(f"<div class='status-line'>{filter_summary} — {instruction}</div>", unsafe_allow_html=True)
+        filter_summary = " + ".join(filter_parts) if filter_parts else "All components"
+        instruction = "🖱Preview in sidebar · 🖱🖱 to select"
+        st.markdown(f"<div class='status-line'>{filter_summary} {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
