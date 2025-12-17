@@ -111,8 +111,8 @@ def apply_dynamic_css():
             text-align: center;
         }
         
-        /* === NEW CSS FOR RADICAL GRID TILES === */
-        /* Targets the buttons specifically inside the radical selector area */
+        /* === UNIFIED GRID TILES FOR ALL FILTERS === */
+        /* Targets ALL buttons inside ANY expander (Strokes, Radical, Structure) */
         div[data-testid="stExpander"] .stButton button {
             font-size: 1.2rem;
             height: 40px;
@@ -120,9 +120,16 @@ def apply_dynamic_css():
             line-height: 1.2;
             border-radius: 4px;
             border: 1px solid #eee;
+            transition: all 0.1s ease-in-out;
         }
         
-        /* Subtle divider for stroke counts */
+        /* Hover effect for filter tiles */
+        div[data-testid="stExpander"] .stButton button:hover {
+            border-color: #bbb;
+            background-color: #f0f0f0;
+        }
+        
+        /* Subtle divider for stroke counts in Radical view */
         .stroke-header {
             font-size: 0.85em;
             color: #888;
@@ -185,8 +192,6 @@ def sync_stroke():
     val = st.session_state.w_stroke
     st.session_state.stroke_count = int(val) if val != 0 else 0
     st.session_state.page = 1
-
-# REMOVED: sync_radical (Handled manually in button logic now)
 
 def sync_idc():
     st.session_state.component_idc = st.session_state.w_idc
@@ -464,41 +469,64 @@ def main():
             # Browsing mode - Filters
             st.markdown("### Filters")
 
-            # 1. Stroke Filter
-            stroke_set = {s for s in (get_stroke_count(c) for c in component_map) if isinstance(s, int)}
-            stroke_opts = [0] + sorted(stroke_set)
-            current = st.session_state.stroke_count if isinstance(st.session_state.stroke_count, int) and st.session_state.stroke_count in stroke_opts else 0
-            st.selectbox("Total Strokes", options=stroke_opts, index=stroke_opts.index(current),
-                         format_func=lambda x: "Any" if x == 0 else str(x), key="w_stroke", on_change=sync_stroke)
-
-            # 2. Radical Filter (NEW: Grid based)
-            
-            # Prepare Data for Radical Grid
+            # --- PRE-CALCULATE COUNTS (CACHE) ---
             if "rad_groups" not in st.session_state:
-                # Calculate counts once
                 r_counts = {}
+                s_counts = {}
+                idc_counts = {}
+                
                 for c, data in component_map.items():
+                    # Radical
                     r = data.get("meta", {}).get("radical")
                     if r: r_counts[r] = r_counts.get(r, 0) + 1
+                    
+                    # Stroke
+                    s = get_stroke_count(c)
+                    if s: s_counts[s] = s_counts.get(s, 0) + 1
+
+                    # IDC
+                    d = data.get("meta", {}).get("decomposition", "")
+                    if d and d[0] in IDC_CHARS:
+                        idc = d[0]
+                        idc_counts[idc] = idc_counts.get(idc, 0) + 1
                 
-                # Group by strokes
+                # Group Radicals by strokes
                 r_groups = {}
                 for r in r_counts.keys():
                     s = get_stroke_count(r) or 999
                     if s not in r_groups: r_groups[s] = []
                     r_groups[s].append(r)
-                
-                # Sort radicals inside groups by stroke count logic or frequency? 
-                # Let's sort alphabetically for stability
-                for s in r_groups:
-                    r_groups[s].sort()
+                for s in r_groups: r_groups[s].sort()
                     
                 st.session_state.rad_groups = r_groups
                 st.session_state.rad_counts = r_counts
+                st.session_state.stroke_counts = s_counts
+                st.session_state.idc_counts = idc_counts
 
-            # The Expander UI
-            label = f"Radical: {st.session_state.radical}" if st.session_state.radical != "none" else "Radical (Select)"
-            with st.expander(label, expanded=False):
+            # 1. Stroke Filter (Grid)
+            s_label = f"Total Strokes: {st.session_state.stroke_count}" if st.session_state.stroke_count > 0 else "Total Strokes (Any)"
+            with st.expander(s_label, expanded=False):
+                if st.button("Clear Strokes", use_container_width=True):
+                    st.session_state.stroke_count = 0
+                    st.session_state.page = 1
+                    st.rerun()
+                
+                s_keys = sorted(st.session_state.stroke_counts.keys())
+                s_cols = st.columns(6) # 6 tiles per row for numbers
+                for i, s in enumerate(s_keys):
+                    count = st.session_state.stroke_counts[s]
+                    is_selected = (st.session_state.stroke_count == s)
+                    with s_cols[i % 6]:
+                        if st.button(str(s), key=f"str_{s}", 
+                                     type="primary" if is_selected else "secondary",
+                                     help=f"{s} Strokes\nFrequency: {count} characters"):
+                            st.session_state.stroke_count = s
+                            st.session_state.page = 1
+                            st.rerun()
+
+            # 2. Radical Filter (Grid)
+            r_label = f"Radical: {st.session_state.radical}" if st.session_state.radical != "none" else "Radical (Any)"
+            with st.expander(r_label, expanded=False):
                 if st.button("Clear Radical", use_container_width=True):
                     st.session_state.radical = "none"
                     st.session_state.page = 1
@@ -508,19 +536,15 @@ def main():
                 sorted_strokes = sorted(groups.keys())
                 
                 for s in sorted_strokes:
-                    s_label = f"{s} Strokes" if s != 999 else "Unknown Strokes"
-                    st.markdown(f"<div class='stroke-header'>{s_label}</div>", unsafe_allow_html=True)
+                    section_header = f"{s} Strokes" if s != 999 else "Unknown Strokes"
+                    st.markdown(f"<div class='stroke-header'>{section_header}</div>", unsafe_allow_html=True)
                     
                     rads = groups[s]
-                    cols = st.columns(5) # 5 tiles per row
+                    cols = st.columns(5) # 5 tiles per row for chars
                     for i, r in enumerate(rads):
                         count = st.session_state.rad_counts.get(r, 0)
                         is_selected = (st.session_state.radical == r)
-                        
-                        # Highlight popular ones with bold text via markdown logic isn't possible in button label easily,
-                        # but we can use help to show popularity.
                         with cols[i % 5]:
-                            # Button logic
                             if st.button(r, key=f"rad_{r}", 
                                          type="primary" if is_selected else "secondary", 
                                          help=f"Radical: {r}\nFrequency: {count} characters"):
@@ -528,10 +552,26 @@ def main():
                                 st.session_state.page = 1
                                 st.rerun()
 
-            # 3. Structure Filter
-            idc_set = {d[0] for d in (component_map.get(c, {}).get("meta", {}).get("decomposition", "") for c in component_map) if d and d[0] in IDC_CHARS}
-            idc_opts = ["none"] + sorted(idc_set)
-            st.selectbox("Structure", options=idc_opts, index=idc_opts.index(st.session_state.component_idc), key="w_idc", on_change=sync_idc)
+            # 3. Structure Filter (Grid)
+            idc_label = f"Structure: {st.session_state.component_idc}" if st.session_state.component_idc != "none" else "Structure (Any)"
+            with st.expander(idc_label, expanded=False):
+                if st.button("Clear Structure", use_container_width=True):
+                    st.session_state.component_idc = "none"
+                    st.session_state.page = 1
+                    st.rerun()
+                
+                idc_keys = sorted(st.session_state.idc_counts.keys())
+                idc_cols = st.columns(5) # 5 tiles per row
+                for i, idc in enumerate(idc_keys):
+                    count = st.session_state.idc_counts[idc]
+                    is_selected = (st.session_state.component_idc == idc)
+                    with idc_cols[i % 5]:
+                        if st.button(idc, key=f"idc_{idc}",
+                                     type="primary" if is_selected else "secondary",
+                                     help=f"Structure: {idc}\nFrequency: {count} characters"):
+                            st.session_state.component_idc = idc
+                            st.session_state.page = 1
+                            st.rerun()
 
             st.markdown("---")
             # Preview in sidebar when browsing
