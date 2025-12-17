@@ -437,7 +437,7 @@ def main():
             reset()
             st.rerun()
 
-        st.markdown("---")
+      
 
         if st.session_state.stroke_view_active:
             st.button("← Back", on_click=end_stroke_view, use_container_width=True)
@@ -461,6 +461,7 @@ def main():
             idc_opts = ["none"] + sorted(idc_set)
             st.selectbox("Structure", options=idc_opts, index=idc_opts.index(st.session_state.component_idc), key="w_idc", on_change=sync_idc)
 
+            st.markdown("---")
             # Preview in sidebar when browsing
             if st.session_state.preview_comp:
                 render_sidebar_preview(st.session_state.preview_comp)
