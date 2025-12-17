@@ -2,6 +2,7 @@ import json
 import math
 import streamlit as st
 from streamlit.components.v1 import html as st_html
+import json  # For the JS part
 
 st.set_page_config(layout="wide")
 
@@ -28,12 +29,29 @@ def apply_dynamic_css():
             font-weight: bold;
         }
 
+        /* NEW: SIDEBAR PREVIEW STYLES */
+        .preview-char-sidebar {
+            font-size: 2.8em;
+            text-align: center;
+            color: #e74c3c;
+            margin: 15px 0 10px 0;
+            font-weight: bold;
+        }
+        .preview-details-sidebar {
+            font-size: 1.05em;
+            line-height: 1.5;
+            color: #2c3e50;
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
         /* 3. RESULTS: The White Description Card */
         .char-card {
             background: white;
             padding: 18px;
             border-radius: 10px;
-            /* margin-bottom: 0px ensures it sits tight with the phrases box */
             margin-bottom: 0px; 
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             height: 100%; 
@@ -43,8 +61,8 @@ def apply_dynamic_css():
 
         /* 4. BROWSING GRID: Large Tiles */
         .comp-grid .stButton button {
-            font-size: 2em;       /* Large font */
-            height: 80px;         /* Tall button */
+            font-size: 2em;
+            height: 80px;
             background: white;
             border: 1px solid #e0e0e0;
             border-radius: 12px;
@@ -63,20 +81,33 @@ def apply_dynamic_css():
             font-size: 1.1em;
             font-weight: 600;
             color: #0f5132;
-            background-color: #d1e7dd; /* Light green background */
+            background-color: #d1e7dd;
             border: 1px solid #badbcc;
             padding: 15px;
             border-radius: 8px;
             margin: 20px 0 30px 0;
             text-align: center;
         }
+
+        /* NEW: Preview count line in browsing mode */
+        .preview-count-line {
+            font-size: 1.3em;
+            text-align: center;
+            color: #2c3e50;
+            margin: 20px 0 25px 0;
+        }
+        .preview-count-line .char {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
 @st.cache_data
 def load_component_map():
-    # Ensure this file exists in your directory
     try:
         with open("enhanced_component_map_with_etymology.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -111,24 +142,11 @@ def format_decomposition(char):
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     return "—" if not d or '?' in d else d
 
-def get_all_components(char, max_depth=5, depth=0, seen=None):
-    if seen is None: seen = set()
-    if char in seen or depth > max_depth or len(char) != 1: return set()
-    seen.add(char)
-    s = set()
-    d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
-    if d:
-        for c in d:
-            if c in IDC_CHARS or c == '?' or len(c) != 1: continue
-            s.add(c)
-            s.update(get_all_components(c, max_depth, depth+1, seen.copy()))
-    return s
-
 # State init
 defaults = {
     "selected_comp": "", "stroke_count": 0, "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
-    "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None, "preview_active": False,
+    "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None,
     "stroke_view_active": False, "stroke_view_char": ""
 }
 for k, v in defaults.items():
@@ -162,27 +180,29 @@ def sync_text():
         st.session_state.text_input_comp = v
         st.session_state.text_input_warning = None
         st.session_state.show_inputs = False
-        st.session_state.preview_active = False
+        st.session_state.preview_comp = None
     else:
         st.session_state.text_input_warning = "Not found"
 
 def tile_click(c):
-    if st.session_state.preview_active and st.session_state.preview_comp == c:
-        st.session_state.selected_comp = c
-        st.session_state.last_valid_selected_comp = c
-        st.session_state.show_inputs = False
-        st.session_state.preview_active = False
-        st.session_state.preview_comp = None
+    if st.session_state.show_inputs:
+        # In browsing mode: single click → preview in sidebar
+        if st.session_state.preview_comp == c:
+            # Second click → commit to full results view
+            st.session_state.selected_comp = c
+            st.session_state.last_valid_selected_comp = c
+            st.session_state.show_inputs = False
+            st.session_state.preview_comp = None
+        else:
+            # First click → preview
+            st.session_state.preview_comp = c
     else:
-        st.session_state.preview_active = True
-        st.session_state.preview_comp = c
+        # Optional: clicking a result tile could preview it, but not necessary
+        pass
 
 def back():
-    # Return to browsing list
     st.session_state.show_inputs = True
-    st.session_state.preview_active = False
     st.session_state.preview_comp = None
-    # Ensure we exit stroke order view
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
 
@@ -196,13 +216,20 @@ def reset():
     st.session_state.component_idc = "none"
     st.session_state.page = 1
     st.session_state.show_inputs = True
-    st.session_state.preview_active = False
     st.session_state.preview_comp = None
-    # Ensure we exit stroke order view
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
 
-def render_preview(c):
+def render_sidebar_preview(c):
+    if not c or c not in component_map:
+        return
+
+    # Calculate the number of related single characters (same logic as in results mode)
+    related = component_map.get(c, {}).get("related_characters", [])
+    chars_unique = list(set([ch for ch in related if len(ch) == 1]))
+    count = len(chars_unique)  # We count all built characters here (independent of display mode)
+
+    
     meta = component_map.get(c, {}).get("meta", {})
     f = {
         "Pinyin": clean_field(meta.get("pinyin", "—")),
@@ -213,43 +240,23 @@ def render_preview(c):
         "Etymology": get_etymology_text(meta),
     }
     details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
-    
-    # --- NEW LAYOUT: Side-by-Side and Proportional ---
-    # Create a container with a border for the preview area
-    with st.container():
-        # Use columns: Narrow column for Char, Wide column for Text
-        # vertical_alignment="center" ensures the text aligns with the character
-        c1, c2 = st.columns([1, 8], vertical_alignment="center")
-        
-        with c1:
-            # Character: Smaller, contained, red
-            st.markdown(f'''
-                <div style="
-                    font-size: 3.5em; 
-                    font-weight: bold; 
-                    color: #e74c3c; 
-                    text-align: center; 
-                    line-height: 1;
-                ">
-                    {c}
-                </div>
-            ''', unsafe_allow_html=True)
-            
-        with c2:
-            # Description: Normal readable size, left-aligned
-            st.markdown(f'''
-                <div style="
-                    font-size: 1.1em; 
-                    color: #2c3e50; 
-                    line-height: 1.5;
-                ">
-                    {details}
-                </div>
-            ''', unsafe_allow_html=True)
-            
-    # Add a divider or spacer after the preview to separate it from the grid below
-    st.markdown("---")
 
+    # Large preview character
+    # st.markdown(f"<div style='font-size:2.8em;text-align:center;color:#e74c3c;margin:15px 0 10px 0;font-weight:bold;'>{c}</div>", unsafe_allow_html=True)
+
+    # NEW: Count line – same style as results mode
+    st.markdown(
+        f"<div class='preview-count-line'>{count} characters with <span class='char'>{c}</span></div>",
+        unsafe_allow_html=True
+    )
+
+    # Details box
+    st.markdown(f"<div style='font-size:1.05em;line-height:1.5;color:#2c3e50;background:#f8f9fa;padding:12px;border-radius:8px;border:1px solid #e0e0e0;'>{details}</div>", unsafe_allow_html=True)
+
+    # st.caption("*Click the same tile again to view all characters built on it*")
+    
+    # st.markdown(f"<div class='preview-char-sidebar'>{c}</div>", unsafe_allow_html=True)
+    # st.markdown(f"<div class='preview-details-sidebar'>{details}</div>", unsafe_allow_html=True)
 
 def render_stroke_order_view(char: str):
     """Render an in-app stroke order animation (HanziWriter) for a single character."""
@@ -260,8 +267,6 @@ def render_stroke_order_view(char: str):
         st.info("No character selected for stroke order.")
         return
 
-    # Note: HanziWriter loads character stroke data from the hanzi-writer-data package on jsDelivr.
-    # If the character is not available in that dataset, the embedded view will show an error message.
     st.markdown(f"## Stroke order — {char}")
 
     st_html(
@@ -287,46 +292,44 @@ def render_stroke_order_view(char: str):
             const statusEl = document.getElementById('hw-status');
             const errEl = document.getElementById('hw-error');
 
-function loadScript(src) {{
-  return new Promise((resolve, reject) => {{
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = true;
-    s.onload = () => resolve(src);
-    s.onerror = () => {{
-      try {{ s.remove(); }} catch(e) {{}}
-      reject(new Error(`Failed to load script: ${{src}}`));
-    }};
-    document.head.appendChild(s);
-  }});
-}}
+            function loadScript(src) {{
+              return new Promise((resolve, reject) => {{
+                const s = document.createElement('script');
+                s.src = src;
+                s.async = true;
+                s.onload = () => resolve(src);
+                s.onerror = () => {{
+                  try {{ s.remove(); }} catch(e) {{}}
+                  reject(new Error(`Failed to load script: ${{src}}`));
+                }};
+                document.head.appendChild(s);
+              }});
+            }}
 
-async function ensureLibLoaded() {{
-  if (window.HanziWriter) return;
+            async function ensureLibLoaded() {{
+              if (window.HanziWriter) return;
 
-  // Try multiple CDNs in case one is blocked/unreachable.
-  const sources = [
-    'https://cdn.jsdelivr.net/npm/hanzi-writer@3/dist/hanzi-writer.min.js',
-    'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'
-  ];
+              const sources = [
+                'https://cdn.jsdelivr.net/npm/hanzi-writer@3/dist/hanzi-writer.min.js',
+                'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'
+              ];
 
-  let lastErr = null;
-  for (const src of sources) {{
-    try {{
-      await loadScript(src);
-      if (window.HanziWriter) return;
-    }} catch (e) {{
-      lastErr = e;
-    }}
-  }}
-  throw new Error('Failed to load HanziWriter library. All configured CDNs were unreachable.');
-}}
+              let lastErr = null;
+              for (const src of sources) {{
+                try {{
+                  await loadScript(src);
+                  if (window.HanziWriter) return;
+                }} catch (e) {{
+                  lastErr = e;
+                }}
+              }}
+              throw new Error('Failed to load HanziWriter library. All configured CDNs were unreachable.');
+            }}
 
             const dataUrls = [
               `https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/${{char}}.json`,
               `https://unpkg.com/hanzi-writer-data@2.0.1/${{char}}.json`
             ];
-
 
             async function loadCharData() {{
               for (const url of dataUrls) {{
@@ -335,7 +338,6 @@ async function ensureLibLoaded() {{
                   if (!res.ok) continue;
                   return await res.json();
                 }} catch (e) {{
-                  // try next url
                 }}
               }}
               throw new Error('Stroke data not found for this character in hanzi-writer-data.');
@@ -366,7 +368,6 @@ async function ensureLibLoaded() {{
                   charDataLoader: () => Promise.resolve(charData)
                 }});
 
-                // Ensure a clean start.
                 i = -1;
                 writer.hideCharacter();
                 setStatus();
@@ -387,8 +388,6 @@ async function ensureLibLoaded() {{
               if (!writer) return;
               if (i <= -1) return;
               i -= 1;
-
-              // Reliable "back": reset and replay up to i.
               writer.hideCharacter();
               for (let k = 0; k <= i; k++) {{
                 await writer.animateStroke(k);
@@ -434,7 +433,12 @@ def main():
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
-        if st.session_state.show_inputs:
+        if st.session_state.stroke_view_active:
+            st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+            st.button("← Back to list", on_click=back, use_container_width=True)
+            st.button("Reset Filters", on_click=reset, use_container_width=True)
+
+        elif st.session_state.show_inputs:
             # Browsing mode
             st.markdown("### Filters")
 
@@ -456,59 +460,49 @@ def main():
             if st.session_state.text_input_warning:
                 st.warning(st.session_state.text_input_warning)
             st.text_input("Jump to character", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="e.g. 水")
+            st.markdown("---")
+            
+            # Preview in sidebar when browsing
+            if st.session_state.preview_comp:
+                render_sidebar_preview(st.session_state.preview_comp)
+                # st.markdown("### Preview")
+                # render_sidebar_preview(st.session_state.preview_comp)
+                # st.caption("*Click the same tile again to view all characters built on it*")
 
-        
         else:
-                    # Results mode Sidebar
-                    st.markdown("### Actions")
+            # Results mode sidebar
+            # st.markdown("### Actions")
+            st.button("← Back to list", on_click=back, use_container_width=True)
+            st.button("Reset Filters", on_click=reset, use_container_width=True)
 
-                    # When viewing stroke order, keep the sidebar minimal and focused.
-                    if st.session_state.stroke_view_active:
-                        st.button("← Back", on_click=end_stroke_view, use_container_width=True)
-                        st.button("← Back to list", on_click=back, use_container_width=True)
-                        st.button("Reset Filters", on_click=reset, use_container_width=True)
+            st.markdown("---")
+            so_char = (st.session_state.selected_comp or "").strip()[:1]
+            if so_char and st.button("View stroke order", use_container_width=True):
+                st.session_state.stroke_view_char = so_char
+                st.session_state.stroke_view_active = True
+                st.rerun()
 
-                    # Normal Results mode sidebar (not in stroke order view)
-                    else:
-                        st.button("← Back to list", on_click=back, use_container_width=True)
-                        st.button("Reset Filters", on_click=reset, use_container_width=True)
 
-                        st.markdown("---")
-                        st.markdown("### Stroke order")
+             # Large red character
+            st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
 
-                        # Use the currently selected character by default (1 char).
-                        so_char = (st.session_state.selected_comp or "").strip()
-                        so_char = so_char[:1] if so_char else ""
-                        if so_char:
-                            if st.button("View stroke order", use_container_width=True):
-                                st.session_state.stroke_view_char = so_char
-                                st.session_state.stroke_view_active = True
-                                # Force an immediate rerun so the sidebar switches to the
-                                # stroke-order actions in the same click.
-                                st.rerun()
-                        else:
-                            st.caption("Select a character to enable stroke order.")
+            # Count line: "6 characters with 田"
+            related = component_map[st.session_state.selected_comp].get("related_characters", [])
+            chars_unique = list(set([c for c in related if len(c) == 1]))
+            n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
+            compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars_unique}
+            valid_chars = [c for c in chars_unique if n == 0 or compounds[c]]
+            count = len(valid_chars)
 
-                        # Selected character
-                        st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div class='count-line'>{count} characters with <span class='char'>{st.session_state.selected_comp}</span></div>",
+                unsafe_allow_html=True
+            )
 
-                        # Results count logic (using deduplicated count for display)
-                        related = component_map[st.session_state.selected_comp].get("related_characters", [])
-                        chars_raw = [c for c in related if len(c) == 1]
-                        chars_unique = list(set(chars_raw))  # Deduplicate for count
+            modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
+            st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
 
-                        n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
-                        compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n] for c in chars_unique} if n else {c: [] for c in chars_unique}
-                        valid_chars = [c for c in chars_unique if n == 0 or compounds[c]]
-
-                        st.markdown(f"<div class='results-header-sidebar'>🧬 Results — {len(valid_chars)}</div>", unsafe_allow_html=True)
-
-                        # Output Type
-                        st.markdown("### Output Type")
-                        modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
-                        st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
-
-            # === MAIN CONTENT ===
+    # === MAIN CONTENT ===
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
         return
@@ -524,7 +518,7 @@ def main():
             filter_parts.append(f"Structure: {st.session_state.component_idc}")
 
         filter_summary = " · ".join(filter_parts) if filter_parts else "none"
-        instruction = "Click TILE twice to see characters built on this component" if st.session_state.preview_active else "Click a TILE to preview"
+        instruction = "Click a TILE to see details in sidebar (click again to view built characters)"
         st.markdown(f"<div class='status-line'>Filtered: {filter_summary} — {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
@@ -533,56 +527,49 @@ def main():
             (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
         ]
 
-        # Strict filtering: do not inject sub-components from a previously selected character.
         def _result_count(comp: str) -> int:
             rel = component_map.get(comp, {}).get("related_characters", [])
             return len({x for x in rel if isinstance(x, str) and len(x) == 1})
 
         _counts = {c: _result_count(c) for c in filtered}
-
-        # Sort: most results first; tie-breaker by strokes; final stable tie-breaker by codepoint.
         sorted_comps = sorted(filtered, key=lambda c: (-_counts.get(c, 0), get_stroke_count(c) or 999, c))
 
         if not sorted_comps:
             st.info("No components match current filters.")
             return
 
-        if st.session_state.preview_active and st.session_state.preview_comp:
-            render_preview(st.session_state.preview_comp)
-
         PAGE_SIZE = 120
-        # --- FIX 1: REDUCE COLUMNS TO MAKE TILES WIDER ---
-        GRID_COLS = 10 
+        GRID_COLS = 10
         total = len(sorted_comps)
         max_page = max(1, math.ceil(total / PAGE_SIZE))
         st.session_state.page = max(1, min(st.session_state.page, max_page))
 
         p1, p2, p3 = st.columns([1, 3, 1])
         with p1:
-            if st.button("◀ Prev", disabled=st.session_state.page<=1): st.session_state.page -= 1
+            if st.button("◀ Prev", disabled=st.session_state.page<=1):
+                st.session_state.page -= 1
         with p2:
             start = (st.session_state.page-1)*PAGE_SIZE + 1
             end = min(st.session_state.page*PAGE_SIZE, total)
             st.markdown(f"<div style='text-align:center; padding:10px 0; font-size:1.1em; color:#555;'>{start}–{end} of {total}</div>", unsafe_allow_html=True)
         with p3:
-            if st.button("Next ▶", disabled=st.session_state.page>=max_page): st.session_state.page += 1
+            if st.button("Next ▶", disabled=st.session_state.page>=max_page):
+                st.session_state.page += 1
 
         page = sorted_comps[(st.session_state.page-1)*PAGE_SIZE : st.session_state.page*PAGE_SIZE]
         st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
         cols = st.columns(GRID_COLS)
         for i, ch in enumerate(page):
             with cols[i % GRID_COLS]:
-                preview = st.session_state.preview_active and st.session_state.preview_comp == ch
+                is_preview = st.session_state.preview_comp == ch
                 st.button(ch, key=f"b_{ch}_{st.session_state.page}", use_container_width=True,
-                          type="primary" if preview else "secondary", on_click=tile_click, args=(ch,))
+                          type="primary" if is_preview else "secondary", on_click=tile_click, args=(ch,))
         st.markdown("</div>", unsafe_allow_html=True)
 
     else:
         # Results mode
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
-        
-        # Deduplicate and filter
-        chars = list(set([c for c in related if len(c)==1])) 
+        chars = list(set([c for c in related if len(c)==1]))
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
         chars = [c for c in chars if n==0 or compounds[c]]
@@ -599,23 +586,15 @@ def main():
             }
             det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
             
-            # Create columns for layout
-            c1, c2 = st.columns([1, 10]) 
-            
+            c1, c2 = st.columns([1, 10])
             with c1:
-                st.button(c, key=f"res_{c}", on_click=tile_click, args=(c,), use_container_width=True)
-            
+                st.button(c, key=f"res_{c}", use_container_width=True)
             with c2:
-                # 1. Render Description (White Box)
                 st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
-                
-                # 2. Render Phrases (Green Box)
-                # Reduced margin-top to 5px so it sits tight against the white box
                 if compounds.get(c):
                     st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:5px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
-                
-                # 3. Add Spacer for the NEXT character (The "Blank Row")
                 st.markdown("<div style='height: 30px'></div>", unsafe_allow_html=True)
+
         if chars and n:
             with st.expander("Export Compounds"):
                 st.text_area("Copy list", "\n".join(w for c in chars for w in compounds[c]), height=150)
