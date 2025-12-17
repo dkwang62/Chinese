@@ -101,7 +101,15 @@ def apply_dynamic_css():
             font-weight: bold;
             color: #2c3e50;
         }
-        
+
+        /* Jump input at bottom */
+        .jump-footer {
+            margin-top: 40px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+        }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -193,11 +201,11 @@ def tile_click(c):
             st.session_state.last_valid_selected_comp = c
             st.session_state.show_inputs = False
             st.session_state.preview_comp = None
+            st.session_state.text_input_comp = c  # Sync jump input
         else:
             # First click → preview
             st.session_state.preview_comp = c
     else:
-        # Optional: clicking a result tile could preview it, but not necessary
         pass
 
 def back():
@@ -205,6 +213,8 @@ def back():
     st.session_state.preview_comp = None
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
+    st.session_state.text_input_comp = ""          # Clear jump input
+    st.session_state.text_input_warning = None
 
 def end_stroke_view():
     st.session_state.stroke_view_active = False
@@ -219,17 +229,17 @@ def reset():
     st.session_state.preview_comp = None
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
+    st.session_state.text_input_comp = ""
+    st.session_state.text_input_warning = None
 
 def render_sidebar_preview(c):
     if not c or c not in component_map:
         return
 
-    # Calculate the number of related single characters (same logic as in results mode)
     related = component_map.get(c, {}).get("related_characters", [])
     chars_unique = list(set([ch for ch in related if len(ch) == 1]))
-    count = len(chars_unique)  # We count all built characters here (independent of display mode)
+    count = len(chars_unique)
 
-    
     meta = component_map.get(c, {}).get("meta", {})
     f = {
         "Pinyin": clean_field(meta.get("pinyin", "—")),
@@ -241,25 +251,14 @@ def render_sidebar_preview(c):
     }
     details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
 
-    # Large preview character
-    # st.markdown(f"<div style='font-size:2.8em;text-align:center;color:#e74c3c;margin:15px 0 10px 0;font-weight:bold;'>{c}</div>", unsafe_allow_html=True)
-
-    # NEW: Count line – same style as results mode
     st.markdown(
         f"<div class='preview-count-line'>{count} characters with <span class='char'>{c}</span></div>",
         unsafe_allow_html=True
     )
 
-    # Details box
     st.markdown(f"<div style='font-size:1.05em;line-height:1.5;color:#2c3e50;background:#f8f9fa;padding:12px;border-radius:8px;border:1px solid #e0e0e0;'>{details}</div>", unsafe_allow_html=True)
 
-    # st.caption("*Click the same tile again to view all characters built on it*")
-    
-    # st.markdown(f"<div class='preview-char-sidebar'>{c}</div>", unsafe_allow_html=True)
-    # st.markdown(f"<div class='preview-details-sidebar'>{details}</div>", unsafe_allow_html=True)
-
 def render_stroke_order_view(char: str):
-    """Render an in-app stroke order animation (HanziWriter) for a single character."""
     char = (char or "").strip()
     char = char[0] if char else ""
 
@@ -433,13 +432,19 @@ def main():
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
+        # Prominent Reset button always visible
+        if st.button("🔄 Reset All Filters & Selection", use_container_width=True, type="primary"):
+            reset()
+            st.rerun()
+
+        st.markdown("---")
+
         if st.session_state.stroke_view_active:
             st.button("← Back", on_click=end_stroke_view, use_container_width=True)
             st.button("← Back to list", on_click=back, use_container_width=True)
-            st.button("Reset Filters", on_click=reset, use_container_width=True)
 
         elif st.session_state.show_inputs:
-            # Browsing mode
+            # Browsing mode - Filters only
             st.markdown("### Filters")
 
             stroke_set = {s for s in (get_stroke_count(c) for c in component_map) if isinstance(s, int)}
@@ -456,37 +461,24 @@ def main():
             idc_opts = ["none"] + sorted(idc_set)
             st.selectbox("Structure", options=idc_opts, index=idc_opts.index(st.session_state.component_idc), key="w_idc", on_change=sync_idc)
 
-            st.markdown("---")
-            if st.session_state.text_input_warning:
-                st.warning(st.session_state.text_input_warning)
-            st.text_input("Jump to character", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="e.g. 水")
-            st.markdown("---")
-            
             # Preview in sidebar when browsing
             if st.session_state.preview_comp:
                 render_sidebar_preview(st.session_state.preview_comp)
-                # st.markdown("### Preview")
-                # render_sidebar_preview(st.session_state.preview_comp)
-                # st.caption("*Click the same tile again to view all characters built on it*")
 
         else:
             # Results mode sidebar
-            # st.markdown("### Actions")
             st.button("← Back to list", on_click=back, use_container_width=True)
-            st.button("Reset Filters", on_click=reset, use_container_width=True)
 
-            st.markdown("---")
             so_char = (st.session_state.selected_comp or "").strip()[:1]
             if so_char and st.button("View stroke order", use_container_width=True):
                 st.session_state.stroke_view_char = so_char
                 st.session_state.stroke_view_active = True
                 st.rerun()
 
-
-             # Large red character
+            # Large red character
             st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
 
-            # Count line: "6 characters with 田"
+            # Count line
             related = component_map[st.session_state.selected_comp].get("related_characters", [])
             chars_unique = list(set([c for c in related if len(c) == 1]))
             n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
@@ -564,6 +556,23 @@ def main():
                 is_preview = st.session_state.preview_comp == ch
                 st.button(ch, key=f"b_{ch}_{st.session_state.page}", use_container_width=True,
                           type="primary" if is_preview else "secondary", on_click=tile_click, args=(ch,))
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # === JUMP INPUT AT BOTTOM (only in browsing mode) ===
+        st.markdown("<div class='jump-footer'>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.session_state.text_input_warning:
+                st.warning(st.session_state.text_input_warning)
+            st.text_input(
+                "Jump to character",
+                value=st.session_state.text_input_comp,
+                key="w_text",
+                on_change=sync_text,
+                placeholder="Type a single Hanzi, e.g. 水",
+                label_visibility="collapsed"
+            )
+            st.caption("Enter one Chinese character to jump directly to its details")
         st.markdown("</div>", unsafe_allow_html=True)
 
     else:
