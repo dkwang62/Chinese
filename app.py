@@ -174,6 +174,22 @@ def apply_dynamic_css():
             text-align: center;
         }
         
+        if st.session_state.script_variant == "simplified":
+            filter_parts.append("<span class='status-tag'>Simplified only</span>")
+        elif st.session_state.script_variant == "traditional":
+            filter_parts.append("<span class='status-tag'>Traditional only</span>")
+        elif st.session_state.script_variant != "none":
+            filter_parts.append("<span class='status-tag'>Any</span>")  # won't happen, but safe
+
+
+
+
+
+
+
+
+
+
         /* === UNIFIED GRID TILES FOR ALL FILTERS === */
         div[data-testid="stExpander"] .stButton button {
             font-size: 1.2rem;
@@ -599,13 +615,24 @@ def main():
             st.markdown("### Filters")
 
             # NEW: Script Variant Filter (added at the top)
+            script_options = ["Any", "Simplified only", "Traditional only"]
+            script_values = ["none", "simplified", "traditional"]
+
+            # Determine current index safely
+            current_value = st.session_state.script_variant
+            if current_value not in script_values:
+                current_value = "none"  # Fallback to "Any" if invalid
+
+            current_index = script_values.index(current_value)
+
             st.selectbox(
                 "Script Variant",
-                options=["Any", "Simplified only", "Traditional only"],
-                index=["none", "simplified", "traditional"].index(st.session_state.script_variant),
+                options=script_options,
+                index=current_index,
                 key="w_script",
                 on_change=sync_script
             )
+
 
             # --- PRE-CALCULATE COUNTS (CACHE) ---
             if "rad_groups" not in st.session_state:
