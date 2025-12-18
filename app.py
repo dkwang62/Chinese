@@ -113,14 +113,39 @@ def apply_dynamic_css():
         /* 5. INSTRUCTIONS: The Green Status Line */
         .status-line {
             font-size: 1.1em;
-            font-weight: 600;
+            font-weight: 500; /* Slightly lighter weight for cleaner look */
             color: #0f5132;
             background-color: #d1e7dd;
             border: 1px solid #badbcc;
-            padding: 15px;
+            padding: 12px 15px;
             border-radius: 8px;
             margin: 20px 0 30px 0;
             text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* NEW: PILL TAGS FOR STATUS LINE */
+        .status-tag {
+            background-color: #f1f3f5;
+            color: #2c3e50;
+            padding: 4px 10px;
+            border-radius: 6px; /* Rounded pill shape */
+            font-weight: 600;
+            font-size: 0.9em;
+            border: 1px solid #e9ecef;
+            display: inline-flex;
+            align-items: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .status-text {
+            color: #0f5132;
+            font-size: 0.95em;
+            margin-left: 10px;
         }
 
         /* NEW: Preview count line in browsing mode */
@@ -700,18 +725,20 @@ def main():
         return
 
     if st.session_state.show_inputs:
-        # Browsing mode
+        # Browsing mode - UPDATED STATUS BAR LOGIC
         filter_parts = []
         if st.session_state.stroke_count > 0:
-            filter_parts.append(f"{st.session_state.stroke_count} strokes")
+            filter_parts.append(f"<span class='status-tag'>{st.session_state.stroke_count} strokes</span>")
         if st.session_state.radical != "none":
-            filter_parts.append(f"{st.session_state.radical}")
+            filter_parts.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
         if st.session_state.component_idc != "none":
-            filter_parts.append(f"{st.session_state.component_idc}")
+            filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
 
-        filter_summary = " and ".join(filter_parts) if filter_parts else "All components"
-        instruction = " · 🖱to preview in sidebar · 🖱🖱 to select"
-        st.markdown(f"<div class='status-line'>{filter_summary} {instruction}</div>", unsafe_allow_html=True)
+        # Join with just spaces, no "and" text, as the pills provide visual separation
+        filter_html = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
+        
+        instruction = "<span class='status-text'>· 🖱to preview in sidebar · 🖱🖱 to select</span>"
+        st.markdown(f"<div class='status-line'>{filter_html} {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
