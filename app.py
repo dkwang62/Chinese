@@ -20,22 +20,14 @@ def apply_dynamic_css():
             text-align: center;
         }
 
-        /* 2. SIDEBAR: The Big Red Selected Character */
+        /* 2. SIDEBAR: The Big Red Selected Character (Used for both Preview and Selection) */
         .selected-char-sidebar {
             font-size: 3em; 
             text-align: center;
             color: #e74c3c; 
             margin: 20px 0;
             font-weight: bold;
-        }
-
-        /* NEW: SIDEBAR PREVIEW STYLES */
-        .preview-char-sidebar {
-            font-size: 2.8em;
-            text-align: center;
-            color: #e74c3c;
-            margin: 15px 0 10px 0;
-            font-weight: bold;
+            line-height: 1.2;
         }
         
         /* 3. RESULTS: The White Description Card (Cleaner Layout) */
@@ -113,7 +105,7 @@ def apply_dynamic_css():
         /* 5. INSTRUCTIONS: The Green Status Line */
         .status-line {
             font-size: 1.1em;
-            font-weight: 500; /* Slightly lighter weight for cleaner look */
+            font-weight: 500;
             color: #0f5132;
             background-color: #d1e7dd;
             border: 1px solid #badbcc;
@@ -128,12 +120,12 @@ def apply_dynamic_css():
             flex-wrap: wrap;
         }
 
-        /* NEW: PILL TAGS FOR STATUS LINE */
+        /* PILL TAGS FOR STATUS LINE */
         .status-tag {
             background-color: #f1f3f5;
             color: #2c3e50;
             padding: 4px 10px;
-            border-radius: 6px; /* Rounded pill shape */
+            border-radius: 6px;
             font-weight: 600;
             font-size: 0.9em;
             border: 1px solid #e9ecef;
@@ -148,7 +140,7 @@ def apply_dynamic_css():
             margin-left: 10px;
         }
 
-        /* NEW: Preview count line in browsing mode */
+        /* Preview count line in browsing mode */
         .preview-count-line {
             font-size: 1.3em;
             text-align: center;
@@ -381,16 +373,21 @@ def generate_clean_card_html(c):
     return f"<div class='char-card'>{meta_html}{def_html}{ety_html}</div>"
 
 def render_sidebar_preview(c):
+    """Renders the sidebar preview when a tile is clicked once."""
     related = component_map.get(c, {}).get("related_characters", [])
     chars_unique = list(set([ch for ch in related if len(ch) == 1]))
     count = len(chars_unique)
 
+    # 1. Big Red Character (reusing the same class as selected state)
+    st.markdown(f"<div class='selected-char-sidebar'>{c}</div>", unsafe_allow_html=True)
+
+    # 2. Count Line
     st.markdown(
         f"<div class='preview-count-line'>{count} characters with <span class='char'>{c}</span></div>",
         unsafe_allow_html=True
     )
     
-    # Use the shared minimalist card generator
+    # 3. Info Card
     st.markdown(generate_clean_card_html(c), unsafe_allow_html=True)
 
 # ... [stroke order view code remains the same] ...
@@ -700,7 +697,7 @@ def main():
                 st.session_state.stroke_view_active = True
                 st.rerun()
 
-            # Large red character
+            # Large red character (reused class)
             st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
 
             # Count line
