@@ -2,14 +2,14 @@ import json
 import math
 import streamlit as st
 from streamlit.components.v1 import html as st_html
-import json  # For the JS part
+import json  # For passing data to JS
 
-# --- NEW: Import OpenCC for Traditional/Simplified conversion ---
+# --- IMPORT OpenCC for Traditional/Simplified Conversion ---
 try:
     from opencc import OpenCC
-    # Initialize converters: Traditional to Simplified AND Simplified to Traditional
-    cc_t2s = OpenCC('t2s')
-    cc_s2t = OpenCC('s2t')
+    # Initialize converters
+    cc_t2s = OpenCC('t2s') # Traditional -> Simplified
+    cc_s2t = OpenCC('s2t') # Simplified -> Traditional
 except ImportError:
     cc_t2s = None
     cc_s2t = None
@@ -40,7 +40,7 @@ def apply_dynamic_css():
             line-height: 1.2;
         }
         
-        /* 3. RESULTS: The White Description Card (Cleaner Layout) */
+        /* 3. RESULTS: The White Description Card */
         .char-card {
             background: white;
             padding: 20px;
@@ -53,7 +53,7 @@ def apply_dynamic_css():
             justify-content: center;
         }
         
-        /* Metdata Row (Pinyin, Strokes, Radical) */
+        /* Metadata Row */
         .meta-row {
             font-size: 0.95em;
             color: #555;
@@ -79,8 +79,8 @@ def apply_dynamic_css():
 
         /* NEW: Special style for Traditional -> Simplified tag */
         .meta-tag-trad {
-            background: #fff8e1; /* Light yellow background */
-            color: #856404;       /* Dark yellow text */
+            background: #fff8e1;
+            color: #856404;
             border: 1px solid #ffeeba;
         }
 
@@ -102,7 +102,7 @@ def apply_dynamic_css():
             margin-top: 4px;
         }
 
-        /* 4. BROWSING GRID: Large Tiles */
+        /* 4. BROWSING GRID */
         .comp-grid .stButton button {
             font-size: 2em;
             height: 80px;
@@ -119,7 +119,7 @@ def apply_dynamic_css():
             color: #c0392b;
         }
 
-        /* 5. INSTRUCTIONS: The Green Status Line */
+        /* 5. INSTRUCTIONS */
         .status-line {
             font-size: 1.1em;
             font-weight: 600;
@@ -132,7 +132,7 @@ def apply_dynamic_css():
             text-align: center;
         }
 
-        /* PILL TAGS FOR STATUS LINE */
+        /* Pill tags */
         .status-tag {
             background-color: #f1f3f5;
             color: #2c3e50;
@@ -152,7 +152,6 @@ def apply_dynamic_css():
             margin-left: 10px;
         }
 
-        /* Preview count line in browsing mode */
         .preview-count-line {
             font-size: 1.3em;
             text-align: center;
@@ -165,7 +164,7 @@ def apply_dynamic_css():
             color: #2c3e50;
         }
 
-        /* Jump input at bottom */
+        /* Jump input */
         .jump-footer {
             margin-top: 40px;
             padding: 20px;
@@ -174,7 +173,7 @@ def apply_dynamic_css():
             text-align: center;
         }
         
-        /* === UNIFIED GRID TILES FOR ALL FILTERS === */
+        /* Unified Grid Tiles */
         div[data-testid="stExpander"] .stButton button {
             font-size: 1.2rem;
             height: 40px;
@@ -184,14 +183,10 @@ def apply_dynamic_css():
             border: 1px solid #eee;
             transition: all 0.1s ease-in-out;
         }
-        
-        /* Hover effect for filter tiles */
         div[data-testid="stExpander"] .stButton button:hover {
             border-color: #bbb;
             background-color: #f0f0f0;
         }
-        
-        /* Subtle divider for stroke counts in Radical view */
         .stroke-header {
             font-size: 0.85em;
             color: #888;
@@ -230,38 +225,29 @@ def get_stroke_count(char):
     return None
 
 def get_etymology_text(meta):
-    """
-    Returns clean etymology string or None if it should be hidden.
-    Suppresses 'No hint' and empty details.
-    """
     etymology = meta.get("etymology", {})
     hint = clean_field(etymology.get("hint", ""))
-    
-    # Strictly suppress 'No hint'
     if not hint or hint.lower() == "no hint":
         hint = ""
-        
     details = clean_field(etymology.get("details", ""))
     if details == "—": 
         details = ""
-
-    # Combine available parts
     parts = []
     if hint: parts.append(hint)
     if details: parts.append(details)
-    
     return "; ".join(parts) if parts else None
 
 def format_decomposition(char):
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     return "—" if not d or '?' in d else d
 
-# State init — includes script_variant
+# State init
 defaults = {
     "selected_comp": "", "stroke_count": 0, "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
     "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None,
-    "stroke_view_active": False, "stroke_view_char": "", "script_variant": "none"
+    "stroke_view_active": False, "stroke_view_char": "",
+    "script_variant": "None" # NEW: Default script filter
 }
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
@@ -278,7 +264,7 @@ def sync_idc():
 
 def sync_script():
     st.session_state.script_variant = st.session_state.w_script
-    # No page reset needed here since it's in results mode
+    st.session_state.page = 1
 
 def sync_display():
     st.session_state.display_mode = st.session_state.w_display
@@ -300,26 +286,21 @@ def sync_text():
 
 def tile_click(c):
     if st.session_state.show_inputs:
-        # In browsing mode: single click → preview in sidebar
         if st.session_state.preview_comp == c:
-            # Second click → commit to full results view
             st.session_state.selected_comp = c
             st.session_state.last_valid_selected_comp = c
             st.session_state.show_inputs = False
             st.session_state.preview_comp = None
-            st.session_state.text_input_comp = c  # Sync jump input
+            st.session_state.text_input_comp = c
         else:
-            # First click → preview
             st.session_state.preview_comp = c
-    else:
-        pass
 
 def back():
     st.session_state.show_inputs = True
     st.session_state.preview_comp = None
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
-    st.session_state.text_input_comp = ""          # Clear jump input
+    st.session_state.text_input_comp = ""
     st.session_state.text_input_warning = None
 
 def end_stroke_view():
@@ -330,7 +311,7 @@ def reset():
     st.session_state.stroke_count = 0
     st.session_state.radical = "none"
     st.session_state.component_idc = "none"
-    st.session_state.script_variant = "none"
+    st.session_state.script_variant = "None"
     st.session_state.page = 1
     st.session_state.show_inputs = True
     st.session_state.preview_comp = None
@@ -340,13 +321,11 @@ def reset():
     st.session_state.text_input_warning = None
 
 def generate_clean_card_html(c):
-    """Generates the minimalist HTML card for a character"""
     if not c or c not in component_map:
         return ""
         
     meta = component_map.get(c, {}).get("meta", {})
     
-    # 1. Gather Data
     pinyin = clean_field(meta.get("pinyin", ""))
     strokes = get_stroke_count(c)
     radical = clean_field(meta.get("radical", ""))
@@ -354,42 +333,28 @@ def generate_clean_card_html(c):
     definition = clean_field(meta.get("definition", ""))
     etymology = get_etymology_text(meta)
     
-    # 2. Build HTML Parts
-    
-    # -- Metadata Row (Pinyin | Strokes | Radical | Structure) --
     meta_items = []
-    
-    # Pinyin (Bold, Primary)
     if pinyin and pinyin != "—":
         meta_items.append(f"<span class='meta-pinyin'>{pinyin}</span>")
-    
-    # Strokes (Simple tag)
     if strokes:
         meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
-        
-    # Radical (Simple tag)
     if radical and radical != "—":
         meta_items.append(f"<span class='meta-tag'>Rad. {radical}</span>")
-        
-    # Structure (Simple tag, no label needed if it's visually distinct)
     if decomp and decomp != "—":
         meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
 
-    # --- NEW: Check if Traditional and get Simplified ---
+    # Check Traditional/Simplified
     if cc_t2s:
         simplified = cc_t2s.convert(c)
         if simplified != c:
-            # If the simplified version is different, then 'c' is Traditional
             meta_items.append(f"<span class='meta-tag meta-tag-trad'>Trad. → {simplified}</span>")
         
     meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
     
-    # -- Definition Row --
     def_html = ""
     if definition and definition != "—":
         def_html = f"<div class='def-row'>{definition}</div>"
         
-    # -- Etymology Row --
     ety_html = ""
     if etymology:
         ety_html = f"<div class='ety-row'>{etymology}</div>"
@@ -406,13 +371,9 @@ def render_sidebar_preview(c):
         f"<div class='preview-count-line'>{count} characters with <span class='char'>{c}</span></div>",
         unsafe_allow_html=True
     )
-    
-    # Use the shared minimalist card generator
     st.markdown(generate_clean_card_html(c), unsafe_allow_html=True)
 
 def render_stroke_order_view(char: str):
-    # ... (your original stroke order code unchanged) ...
-    # [Kept exactly as in your original]
     char = (char or "").strip()
     char = char[0] if char else ""
 
@@ -437,11 +398,9 @@ def render_stroke_order_view(char: str):
             <div id="hw-error" style="margin-top:10px; color:#b00020;"></div>
           </div>
         </div>
-
         <script>
           (function() {{
             const char = {json.dumps(char, ensure_ascii=False)};
-            
             const statusEl = document.getElementById('hw-status');
             const errEl = document.getElementById('hw-error');
 
@@ -582,7 +541,6 @@ def main():
 
     apply_dynamic_css()
 
-    # === SIDEBAR ===
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
@@ -595,172 +553,127 @@ def main():
             st.button("← Back to list", on_click=back, use_container_width=True)
 
         elif st.session_state.show_inputs:
-            # Browsing mode - Filters (NO script filter here anymore)
             st.markdown("### Filters")
 
-            # --- PRE-CALCULATE COUNTS (CACHE) ---
+            # 0. Script Filter (NEW)
+            st.selectbox(
+                "Script Variant",
+                options=["None", "Simplified", "Traditional"],
+                key="w_script",
+                index=["None", "Simplified", "Traditional"].index(st.session_state.script_variant),
+                on_change=sync_script
+            )
+
+            # --- PRE-CALCULATE COUNTS ---
             if "rad_groups" not in st.session_state:
                 r_counts = {}
                 s_counts = {}
                 idc_counts = {}
-                
                 for c, data in component_map.items():
-                    # Radical
                     r = data.get("meta", {}).get("radical")
                     if r: r_counts[r] = r_counts.get(r, 0) + 1
-                    
-                    # Stroke
                     s = get_stroke_count(c)
                     if s: s_counts[s] = s_counts.get(s, 0) + 1
-
-                    # IDC
                     d = data.get("meta", {}).get("decomposition", "")
                     if d and d[0] in IDC_CHARS:
                         idc = d[0]
                         idc_counts[idc] = idc_counts.get(idc, 0) + 1
-                
-                # Group Radicals by strokes
                 r_groups = {}
                 for r in r_counts.keys():
                     s = get_stroke_count(r) or 999
                     if s not in r_groups: r_groups[s] = []
                     r_groups[s].append(r)
                 for s in r_groups: r_groups[s].sort()
-                    
                 st.session_state.rad_groups = r_groups
                 st.session_state.rad_counts = r_counts
                 st.session_state.stroke_counts = s_counts
                 st.session_state.idc_counts = idc_counts
 
-            # 1. Stroke Filter (Grid)
+            # 1. Stroke Filter
             s_label = f"Total Strokes: {st.session_state.stroke_count}" if st.session_state.stroke_count > 0 else "Total Strokes (Any)"
             with st.expander(s_label, expanded=False):
                 if st.button("Clear Strokes", use_container_width=True):
                     st.session_state.stroke_count = 0
                     st.session_state.page = 1
                     st.rerun()
-                
                 s_keys = sorted(st.session_state.stroke_counts.keys())
-                s_cols = st.columns(6) # 6 tiles per row for numbers
+                s_cols = st.columns(6)
                 for i, s in enumerate(s_keys):
                     count = st.session_state.stroke_counts[s]
                     is_selected = (st.session_state.stroke_count == s)
                     with s_cols[i % 6]:
-                        if st.button(str(s), key=f"str_{s}", 
-                                     type="primary" if is_selected else "secondary",
-                                     help=f"{s} Strokes\nFrequency: {count} characters"):
+                        if st.button(str(s), key=f"str_{s}", type="primary" if is_selected else "secondary", help=f"{s} Strokes\n{count} chars"):
                             st.session_state.stroke_count = s
                             st.session_state.page = 1
                             st.rerun()
 
-            # 2. Radical Filter (Grid)
+            # 2. Radical Filter
             r_label = f"Radical: {st.session_state.radical}" if st.session_state.radical != "none" else "Radical (Any)"
             with st.expander(r_label, expanded=False):
                 if st.button("Clear Radical", use_container_width=True):
                     st.session_state.radical = "none"
                     st.session_state.page = 1
                     st.rerun()
-                
                 groups = st.session_state.rad_groups
-                sorted_strokes = sorted(groups.keys())
-                
-                for s in sorted_strokes:
-                    section_header = f"{s} Strokes" if s != 999 else "Unknown Strokes"
-                    st.markdown(f"<div class='stroke-header'>{section_header}</div>", unsafe_allow_html=True)
-                    
+                for s in sorted(groups.keys()):
+                    st.markdown(f"<div class='stroke-header'>{s if s!=999 else '?'} Strokes</div>", unsafe_allow_html=True)
                     rads = groups[s]
-                    cols = st.columns(5) # 5 tiles per row for chars
+                    cols = st.columns(5)
                     for i, r in enumerate(rads):
-                        count = st.session_state.rad_counts.get(r, 0)
                         is_selected = (st.session_state.radical == r)
                         with cols[i % 5]:
-                            if st.button(r, key=f"rad_{r}", 
-                                         type="primary" if is_selected else "secondary", 
-                                         help=f"Radical: {r}\nFrequency: {count} characters"):
+                            if st.button(r, key=f"rad_{r}", type="primary" if is_selected else "secondary"):
                                 st.session_state.radical = r
                                 st.session_state.page = 1
                                 st.rerun()
 
-            # 3. Structure Filter (Grid)
+            # 3. Structure Filter
             idc_label = f"Structure: {st.session_state.component_idc}" if st.session_state.component_idc != "none" else "Structure (Any)"
             with st.expander(idc_label, expanded=False):
                 if st.button("Clear Structure", use_container_width=True):
                     st.session_state.component_idc = "none"
                     st.session_state.page = 1
                     st.rerun()
-                
                 idc_keys = sorted(st.session_state.idc_counts.keys())
-                idc_cols = st.columns(5) # 5 tiles per row
+                idc_cols = st.columns(5)
                 for i, idc in enumerate(idc_keys):
-                    count = st.session_state.idc_counts[idc]
                     is_selected = (st.session_state.component_idc == idc)
                     with idc_cols[i % 5]:
-                        if st.button(idc, key=f"idc_{idc}",
-                                     type="primary" if is_selected else "secondary",
-                                     help=f"Structure: {idc}\nFrequency: {count} characters"):
+                        if st.button(idc, key=f"idc_{idc}", type="primary" if is_selected else "secondary"):
                             st.session_state.component_idc = idc
                             st.session_state.page = 1
                             st.rerun()
-
             st.markdown("---")
-            # Preview in sidebar when browsing
             if st.session_state.preview_comp:
                 render_sidebar_preview(st.session_state.preview_comp)
 
         else:
-            # === RESULTS MODE: Script Variant filter appears HERE ===
             st.button("← Back to list", on_click=back, use_container_width=True)
-
             so_char = (st.session_state.selected_comp or "").strip()[:1]
             if so_char and st.button("View stroke order", use_container_width=True):
                 st.session_state.stroke_view_char = so_char
                 st.session_state.stroke_view_active = True
                 st.rerun()
-
-            # Large red character
             st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
-
-            # Count line
             related = component_map[st.session_state.selected_comp].get("related_characters", [])
             chars_unique = list(set([c for c in related if len(c) == 1]))
             n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
             compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars_unique}
             valid_chars = [c for c in chars_unique if n == 0 or compounds[c]]
             count = len(valid_chars)
-
-            st.markdown(
-                f"<div class='count-line'>{count} characters with <span class='char'>{st.session_state.selected_comp}</span></div>",
-                unsafe_allow_html=True
-            )
-
-            # NEW: Script Variant filter — only shown after character is selected
-            script_options = ["Any", "Simplified only", "Traditional only"]
-            script_values = ["none", "simplified", "traditional"]
-
-            current_value = st.session_state.script_variant
-            if current_value not in script_values:
-                current_value = "none"
-            current_index = script_values.index(current_value)
-
-            st.selectbox(
-                "Show results in",
-                options=script_options,
-                index=current_index,
-                key="w_script",
-                on_change=sync_script
-            )
-
+            st.markdown(f"<div class='count-line'>{count} characters with <span class='char'>{st.session_state.selected_comp}</span></div>", unsafe_allow_html=True)
             modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
             st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
 
-    # === MAIN CONTENT ===
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
         return
 
     if st.session_state.show_inputs:
-        # Browsing mode — no script filter here
         filter_parts = []
+        # Add Script filter pill if active
+        if st.session_state.script_variant != "None":
+            filter_parts.append(f"<span class='status-tag'>{st.session_state.script_variant}</span>")
         if st.session_state.stroke_count > 0:
             filter_parts.append(f"<span class='status-tag'>{st.session_state.stroke_count} strokes</span>")
         if st.session_state.radical != "none":
@@ -772,11 +685,33 @@ def main():
         instruction = "<span class='status-text'>· 🖱to preview in sidebar · 🖱🖱 to select</span>"
         st.markdown(f"<div class='status-line'>{filter_summary} {instruction}</div>", unsafe_allow_html=True)
 
-        filtered = [c for c in component_map if
-            (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
-            (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
-            (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
-        ]
+        # === FILTER LOGIC ===
+        def is_match(c):
+            # 1. Script Filter
+            if st.session_state.script_variant == "Simplified":
+                # Must be simplified or invariant (converts to self when doing Trad->Simp)
+                if not cc_t2s or cc_t2s.convert(c) != c:
+                    return False
+            elif st.session_state.script_variant == "Traditional":
+                # Must be traditional or invariant (converts to self when doing Simp->Trad)
+                if not cc_s2t or cc_s2t.convert(c) != c:
+                    return False
+            
+            # 2. Strokes
+            if st.session_state.stroke_count > 0 and get_stroke_count(c) != st.session_state.stroke_count:
+                return False
+            
+            # 3. Radical
+            if st.session_state.radical != "none" and component_map.get(c, {}).get("meta", {}).get("radical") != st.session_state.radical:
+                return False
+            
+            # 4. Structure
+            if st.session_state.component_idc != "none" and not component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc):
+                return False
+                
+            return True
+
+        filtered = [c for c in component_map if is_match(c)]
 
         def _result_count(comp: str) -> int:
             rel = component_map.get(comp, {}).get("related_characters", [])
@@ -817,35 +752,18 @@ def main():
                           type="primary" if is_preview else "secondary", on_click=tile_click, args=(ch,))
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # === JUMP INPUT AT BOTTOM (only in browsing mode) ===
         st.markdown("<div class='jump-footer'>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.session_state.text_input_warning:
                 st.warning(st.session_state.text_input_warning)
-            st.text_input(
-                "Jump to character",
-                value=st.session_state.text_input_comp,
-                key="w_text",
-                on_change=sync_text,
-                placeholder="Type a single Hanzi, e.g. 水",
-                label_visibility="collapsed"
-            )
+            st.text_input("Jump", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="Type a single Hanzi, e.g. 水", label_visibility="collapsed")
             st.caption("Enter one Chinese character to jump directly to its details")
         st.markdown("</div>", unsafe_allow_html=True)
 
     else:
-        # Results mode — now filtered by script_variant
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         chars = list(set([c for c in related if len(c)==1]))
-
-        # Apply script variant filter to results
-        if st.session_state.script_variant == "simplified" and cc_t2s:
-            chars = [c for c in chars if cc_t2s.convert(c) == c]
-        elif st.session_state.script_variant == "traditional" and cc_s2t:
-            chars = [c for c in chars if cc_s2t.convert(c) == c]
-        # "none" = show all
-
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
         chars = [c for c in chars if n==0 or compounds[c]]
@@ -853,23 +771,18 @@ def main():
 
         for c in chars:
             col_btn, col_char, col_details = st.columns([1, 2, 12])
-            
             with col_btn:
                 st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
                 if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order"):
                     st.session_state.stroke_view_char = c
                     st.session_state.stroke_view_active = True
                     st.rerun()
-
             with col_char:
                 st.markdown(f"<div style='font-size: 3.5em; font-weight: bold; text-align: center; color: #111; line-height: 1.2;'>{c}</div>", unsafe_allow_html=True)
-
             with col_details:
                 st.markdown(generate_clean_card_html(c), unsafe_allow_html=True)
-                
                 if compounds.get(c):
                     st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:5px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
-            
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
         if chars and n:
