@@ -37,26 +37,60 @@ def apply_dynamic_css():
             margin: 15px 0 10px 0;
             font-weight: bold;
         }
-        .preview-details-sidebar {
-            font-size: 1.05em;
-            line-height: 1.5;
-            color: #2c3e50;
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-        }
-
-        /* 3. RESULTS: The White Description Card */
+        
+        /* 3. RESULTS: The White Description Card (Cleaner Layout) */
         .char-card {
             background: white;
-            padding: 18px;
+            padding: 20px;
             border-radius: 10px;
             margin-bottom: 0px; 
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             height: 100%; 
             display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        /* Metdata Row (Pinyin, Strokes, Radical) */
+        .meta-row {
+            font-size: 0.95em;
+            color: #555;
+            margin-bottom: 8px;
+            display: flex;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .meta-pinyin {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #2c3e50;
+            margin-right: 5px;
+        }
+        .meta-tag {
+            background: #f1f3f5;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            color: #495057;
+        }
+
+        /* Definition Text */
+        .def-row {
+            font-size: 1.1em;
+            line-height: 1.4;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        /* Etymology Text */
+        .ety-row {
+            font-size: 0.9em;
+            color: #666;
+            font-style: italic;
+            border-top: 1px solid #eee;
+            padding-top: 8px;
+            margin-top: 4px;
         }
 
         /* 4. BROWSING GRID: Large Tiles */
@@ -112,7 +146,6 @@ def apply_dynamic_css():
         }
         
         /* === UNIFIED GRID TILES FOR ALL FILTERS === */
-        /* Targets ALL buttons inside ANY expander (Strokes, Radical, Structure) */
         div[data-testid="stExpander"] .stButton button {
             font-size: 1.2rem;
             height: 40px;
@@ -168,10 +201,27 @@ def get_stroke_count(char):
     return None
 
 def get_etymology_text(meta):
+    """
+    Returns clean etymology string or None if it should be hidden.
+    Suppresses 'No hint' and empty details.
+    """
     etymology = meta.get("etymology", {})
-    hint = clean_field(etymology.get("hint", "No hint"))
+    hint = clean_field(etymology.get("hint", ""))
+    
+    # Strictly suppress 'No hint'
+    if not hint or hint.lower() == "no hint":
+        hint = ""
+        
     details = clean_field(etymology.get("details", ""))
-    return f"{hint}{'; ' + details if details and details != '—' else ''}"
+    if details == "—": 
+        details = ""
+
+    # Combine available parts
+    parts = []
+    if hint: parts.append(hint)
+    if details: parts.append(details)
+    
+    return "; ".join(parts) if parts else None
 
 def format_decomposition(char):
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
@@ -255,31 +305,68 @@ def reset():
     st.session_state.text_input_comp = ""
     st.session_state.text_input_warning = None
 
-def render_sidebar_preview(c):
+def generate_clean_card_html(c):
+    """Generates the minimalist HTML card for a character"""
     if not c or c not in component_map:
-        return
+        return ""
+        
+    meta = component_map.get(c, {}).get("meta", {})
+    
+    # 1. Gather Data
+    pinyin = clean_field(meta.get("pinyin", ""))
+    strokes = get_stroke_count(c)
+    radical = clean_field(meta.get("radical", ""))
+    decomp = format_decomposition(c)
+    definition = clean_field(meta.get("definition", ""))
+    etymology = get_etymology_text(meta)
+    
+    # 2. Build HTML Parts
+    
+    # -- Metadata Row (Pinyin | Strokes | Radical | Structure) --
+    meta_items = []
+    
+    # Pinyin (Bold, Primary)
+    if pinyin and pinyin != "—":
+        meta_items.append(f"<span class='meta-pinyin'>{pinyin}</span>")
+    
+    # Strokes (Simple tag)
+    if strokes:
+        meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
+        
+    # Radical (Simple tag)
+    if radical and radical != "—":
+        meta_items.append(f"<span class='meta-tag'>Rad. {radical}</span>")
+        
+    # Structure (Simple tag, no label needed if it's visually distinct)
+    if decomp and decomp != "—":
+        meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
+        
+    meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
+    
+    # -- Definition Row --
+    def_html = ""
+    if definition and definition != "—":
+        def_html = f"<div class='def-row'>{definition}</div>"
+        
+    # -- Etymology Row --
+    ety_html = ""
+    if etymology:
+        ety_html = f"<div class='ety-row'>{etymology}</div>"
+        
+    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}</div>"
 
+def render_sidebar_preview(c):
     related = component_map.get(c, {}).get("related_characters", [])
     chars_unique = list(set([ch for ch in related if len(ch) == 1]))
     count = len(chars_unique)
-
-    meta = component_map.get(c, {}).get("meta", {})
-    f = {
-        "Pinyin": clean_field(meta.get("pinyin", "—")),
-        "Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else "unknown",
-        "Radical": clean_field(meta.get("radical", "—")),
-        "Decomposition": format_decomposition(c),
-        "Definition": clean_field(meta.get("definition", "—")),
-        "Etymology": get_etymology_text(meta),
-    }
-    details = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in f.items())
 
     st.markdown(
         f"<div class='preview-count-line'>{count} characters with <span class='char'>{c}</span></div>",
         unsafe_allow_html=True
     )
-
-    st.markdown(f"<div style='font-size:1.05em;line-height:1.5;color:#2c3e50;background:#f8f9fa;padding:12px;border-radius:8px;border:1px solid #e0e0e0;'>{details}</div>", unsafe_allow_html=True)
+    
+    # Use the shared minimalist card generator
+    st.markdown(generate_clean_card_html(c), unsafe_allow_html=True)
 
 # ... [stroke order view code remains the same] ...
 def render_stroke_order_view(char: str):
@@ -698,17 +785,6 @@ def main():
         chars = sorted(chars, key=lambda x: get_stroke_count(x) or 999)
 
         for c in chars:
-            meta = component_map.get(c, {}).get("meta", {})
-            fd = {
-                "Pinyin": clean_field(meta.get("pinyin", "—")),
-                "Strokes": f"{get_stroke_count(c)} strokes" if get_stroke_count(c) else "unknown",
-                "Radical": clean_field(meta.get("radical", "—")),
-                "Decomposition": format_decomposition(c),
-                "Definition": clean_field(meta.get("definition", "—")),
-                "Etymology": get_etymology_text(meta),
-            }
-            det = " · ".join(f"<strong>{k}:</strong> {v}" for k, v in fd.items())
-            
             # --- MODIFIED LAYOUT ---
             col_btn, col_char, col_details = st.columns([1, 2, 12])
             
@@ -723,7 +799,9 @@ def main():
                 st.markdown(f"<div style='font-size: 3.5em; font-weight: bold; text-align: center; color: #111; line-height: 1.2;'>{c}</div>", unsafe_allow_html=True)
 
             with col_details:
-                st.markdown(f"<div class='char-card'><div class='details'>{det}</div></div>", unsafe_allow_html=True)
+                # USE THE NEW CLEAN GENERATOR
+                st.markdown(generate_clean_card_html(c), unsafe_allow_html=True)
+                
                 if compounds.get(c):
                     st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:5px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
             
