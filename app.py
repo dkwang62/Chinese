@@ -4,6 +4,14 @@ import streamlit as st
 from streamlit.components.v1 import html as st_html
 import json  # For the JS part
 
+# --- NEW: Import OpenCC for Traditional/Simplified conversion ---
+try:
+    from opencc import OpenCC
+    # Initialize converter: Traditional to Simplified
+    cc_t2s = OpenCC('t2s')
+except ImportError:
+    cc_t2s = None
+
 st.set_page_config(layout="wide")
 
 IDC_CHARS = {'⿰', '⿱', '⿲', '⿳', '⿴', '⿵', '⿶', '⿷', '⿸', '⿹', '⿺', '⿻'}
@@ -20,7 +28,7 @@ def apply_dynamic_css():
             text-align: center;
         }
 
-        /* 2. SIDEBAR: The Big Red Selected Character (Used for both Preview and Selection) */
+        /* 2. SIDEBAR: The Big Red Selected Character */
         .selected-char-sidebar {
             font-size: 3em; 
             text-align: center;
@@ -67,6 +75,13 @@ def apply_dynamic_css():
             color: #495057;
         }
 
+        /* NEW: Special style for Traditional -> Simplified tag */
+        .meta-tag-trad {
+            background: #fff8e1; /* Light yellow background */
+            color: #856404;       /* Dark yellow text */
+            border: 1px solid #ffeeba;
+        }
+
         /* Definition Text */
         .def-row {
             font-size: 1.1em;
@@ -105,19 +120,14 @@ def apply_dynamic_css():
         /* 5. INSTRUCTIONS: The Green Status Line */
         .status-line {
             font-size: 1.1em;
-            font-weight: 500;
+            font-weight: 600;
             color: #0f5132;
             background-color: #d1e7dd;
             border: 1px solid #badbcc;
-            padding: 12px 15px;
+            padding: 15px;
             border-radius: 8px;
             margin: 20px 0 30px 0;
             text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            flex-wrap: wrap;
         }
 
         /* PILL TAGS FOR STATUS LINE */
@@ -357,6 +367,13 @@ def generate_clean_card_html(c):
     # Structure (Simple tag, no label needed if it's visually distinct)
     if decomp and decomp != "—":
         meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
+
+    # --- NEW: Check if Traditional and get Simplified ---
+    if cc_t2s:
+        simplified = cc_t2s.convert(c)
+        if simplified != c:
+            # If the simplified version is different, then 'c' is Traditional
+            meta_items.append(f"<span class='meta-tag meta-tag-trad'>Trad. → {simplified}</span>")
         
     meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
     
@@ -373,21 +390,17 @@ def generate_clean_card_html(c):
     return f"<div class='char-card'>{meta_html}{def_html}{ety_html}</div>"
 
 def render_sidebar_preview(c):
-    """Renders the sidebar preview when a tile is clicked once."""
     related = component_map.get(c, {}).get("related_characters", [])
     chars_unique = list(set([ch for ch in related if len(ch) == 1]))
     count = len(chars_unique)
 
-    # 1. Big Red Character (reusing the same class as selected state)
     st.markdown(f"<div class='selected-char-sidebar'>{c}</div>", unsafe_allow_html=True)
-
-    # 2. Count Line
     st.markdown(
         f"<div class='preview-count-line'>{count} characters with <span class='char'>{c}</span></div>",
         unsafe_allow_html=True
     )
     
-    # 3. Info Card
+    # Use the shared minimalist card generator
     st.markdown(generate_clean_card_html(c), unsafe_allow_html=True)
 
 # ... [stroke order view code remains the same] ...
@@ -697,7 +710,7 @@ def main():
                 st.session_state.stroke_view_active = True
                 st.rerun()
 
-            # Large red character (reused class)
+            # Large red character
             st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
 
             # Count line
@@ -722,7 +735,7 @@ def main():
         return
 
     if st.session_state.show_inputs:
-        # Browsing mode - UPDATED STATUS BAR LOGIC
+        # Browsing mode
         filter_parts = []
         if st.session_state.stroke_count > 0:
             filter_parts.append(f"<span class='status-tag'>{st.session_state.stroke_count} strokes</span>")
@@ -731,11 +744,9 @@ def main():
         if st.session_state.component_idc != "none":
             filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
 
-        # Join with just spaces, no "and" text, as the pills provide visual separation
-        filter_html = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
-        
+        filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
         instruction = "<span class='status-text'>· 🖱to preview in sidebar · 🖱🖱 to select</span>"
-        st.markdown(f"<div class='status-line'>{filter_html} {instruction}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='status-line'>{filter_summary} {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
