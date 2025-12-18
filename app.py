@@ -174,22 +174,6 @@ def apply_dynamic_css():
             text-align: center;
         }
         
-        if st.session_state.script_variant == "simplified":
-            filter_parts.append("<span class='status-tag'>Simplified only</span>")
-        elif st.session_state.script_variant == "traditional":
-            filter_parts.append("<span class='status-tag'>Traditional only</span>")
-        elif st.session_state.script_variant != "none":
-            filter_parts.append("<span class='status-tag'>Any</span>")  # won't happen, but safe
-
-
-
-
-
-
-
-
-
-
         /* === UNIFIED GRID TILES FOR ALL FILTERS === */
         div[data-testid="stExpander"] .stButton button {
             font-size: 1.2rem;
@@ -272,7 +256,7 @@ def format_decomposition(char):
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     return "—" if not d or '?' in d else d
 
-# State init — ADDED script_variant
+# State init — includes script_variant
 defaults = {
     "selected_comp": "", "stroke_count": 0, "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
@@ -282,7 +266,7 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# Callbacks — ADDED sync_script
+# Callbacks
 def sync_stroke():
     val = st.session_state.w_stroke
     st.session_state.stroke_count = int(val) if val != 0 else 0
@@ -294,7 +278,7 @@ def sync_idc():
 
 def sync_script():
     st.session_state.script_variant = st.session_state.w_script
-    st.session_state.page = 1
+    # No page reset needed here since it's in results mode
 
 def sync_display():
     st.session_state.display_mode = st.session_state.w_display
@@ -346,7 +330,7 @@ def reset():
     st.session_state.stroke_count = 0
     st.session_state.radical = "none"
     st.session_state.component_idc = "none"
-    st.session_state.script_variant = "none"   # Reset script filter
+    st.session_state.script_variant = "none"
     st.session_state.page = 1
     st.session_state.show_inputs = True
     st.session_state.preview_comp = None
@@ -426,8 +410,9 @@ def render_sidebar_preview(c):
     # Use the shared minimalist card generator
     st.markdown(generate_clean_card_html(c), unsafe_allow_html=True)
 
-# ... [stroke order view code remains the same] ...
 def render_stroke_order_view(char: str):
+    # ... (your original stroke order code unchanged) ...
+    # [Kept exactly as in your original]
     char = (char or "").strip()
     char = char[0] if char else ""
 
@@ -456,7 +441,6 @@ def render_stroke_order_view(char: str):
         <script>
           (function() {{
             const char = {json.dumps(char, ensure_ascii=False)};
-            /* ... (keep existing script logic intact if referencing the file provided) ... */
             
             const statusEl = document.getElementById('hw-status');
             const errEl = document.getElementById('hw-error');
@@ -611,28 +595,8 @@ def main():
             st.button("← Back to list", on_click=back, use_container_width=True)
 
         elif st.session_state.show_inputs:
-            # Browsing mode - Filters
+            # Browsing mode - Filters (NO script filter here anymore)
             st.markdown("### Filters")
-
-            # NEW: Script Variant Filter (added at the top)
-            script_options = ["Any", "Simplified only", "Traditional only"]
-            script_values = ["none", "simplified", "traditional"]
-
-            # Determine current index safely
-            current_value = st.session_state.script_variant
-            if current_value not in script_values:
-                current_value = "none"  # Fallback to "Any" if invalid
-
-            current_index = script_values.index(current_value)
-
-            st.selectbox(
-                "Script Variant",
-                options=script_options,
-                index=current_index,
-                key="w_script",
-                on_change=sync_script
-            )
-
 
             # --- PRE-CALCULATE COUNTS (CACHE) ---
             if "rad_groups" not in st.session_state:
@@ -744,7 +708,7 @@ def main():
                 render_sidebar_preview(st.session_state.preview_comp)
 
         else:
-            # Results mode sidebar
+            # === RESULTS MODE: Script Variant filter appears HERE ===
             st.button("← Back to list", on_click=back, use_container_width=True)
 
             so_char = (st.session_state.selected_comp or "").strip()[:1]
@@ -769,6 +733,23 @@ def main():
                 unsafe_allow_html=True
             )
 
+            # NEW: Script Variant filter — only shown after character is selected
+            script_options = ["Any", "Simplified only", "Traditional only"]
+            script_values = ["none", "simplified", "traditional"]
+
+            current_value = st.session_state.script_variant
+            if current_value not in script_values:
+                current_value = "none"
+            current_index = script_values.index(current_value)
+
+            st.selectbox(
+                "Show results in",
+                options=script_options,
+                index=current_index,
+                key="w_script",
+                on_change=sync_script
+            )
+
             modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
             st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
 
@@ -778,12 +759,8 @@ def main():
         return
 
     if st.session_state.show_inputs:
-        # Browsing mode
+        # Browsing mode — no script filter here
         filter_parts = []
-        if st.session_state.script_variant == "simplified":
-            filter_parts.append("<span class='status-tag'>Simplified only</span>")
-        elif st.session_state.script_variant == "traditional":
-            filter_parts.append("<span class='status-tag'>Traditional only</span>")
         if st.session_state.stroke_count > 0:
             filter_parts.append(f"<span class='status-tag'>{st.session_state.stroke_count} strokes</span>")
         if st.session_state.radical != "none":
@@ -796,11 +773,6 @@ def main():
         st.markdown(f"<div class='status-line'>{filter_summary} {instruction}</div>", unsafe_allow_html=True)
 
         filtered = [c for c in component_map if
-            # Script variant filter
-            (st.session_state.script_variant == "none" or
-             (st.session_state.script_variant == "simplified" and cc_t2s and cc_t2s.convert(c) == c) or
-             (st.session_state.script_variant == "traditional" and cc_s2t and cc_s2t.convert(c) == c)) and
-            # Existing filters
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
             (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
             (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
@@ -863,16 +835,23 @@ def main():
         st.markdown("</div>", unsafe_allow_html=True)
 
     else:
-        # Results mode — unchanged
+        # Results mode — now filtered by script_variant
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         chars = list(set([c for c in related if len(c)==1]))
+
+        # Apply script variant filter to results
+        if st.session_state.script_variant == "simplified" and cc_t2s:
+            chars = [c for c in chars if cc_t2s.convert(c) == c]
+        elif st.session_state.script_variant == "traditional" and cc_s2t:
+            chars = [c for c in chars if cc_s2t.convert(c) == c]
+        # "none" = show all
+
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
         chars = [c for c in chars if n==0 or compounds[c]]
         chars = sorted(chars, key=lambda x: get_stroke_count(x) or 999)
 
         for c in chars:
-            # --- MODIFIED LAYOUT ---
             col_btn, col_char, col_details = st.columns([1, 2, 12])
             
             with col_btn:
@@ -886,7 +865,6 @@ def main():
                 st.markdown(f"<div style='font-size: 3.5em; font-weight: bold; text-align: center; color: #111; line-height: 1.2;'>{c}</div>", unsafe_allow_html=True)
 
             with col_details:
-                # USE THE NEW CLEAN GENERATOR
                 st.markdown(generate_clean_card_html(c), unsafe_allow_html=True)
                 
                 if compounds.get(c):
