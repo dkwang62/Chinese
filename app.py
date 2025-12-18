@@ -79,8 +79,8 @@ def apply_dynamic_css():
 
         /* NEW: Special style for Traditional -> Simplified tag */
         .meta-tag-trad {
-            background: #fff8e1;
-            color: #856404;
+            background: #fff8e1; /* Light yellow background */
+            color: #856404;       /* Dark yellow text */
             border: 1px solid #ffeeba;
         }
 
@@ -132,7 +132,7 @@ def apply_dynamic_css():
             text-align: center;
         }
 
-        /* Pill tags */
+        /* PILL TAGS FOR STATUS LINE */
         .status-tag {
             background-color: #f1f3f5;
             color: #2c3e50;
@@ -152,6 +152,7 @@ def apply_dynamic_css():
             margin-left: 10px;
         }
 
+        /* Preview count line in browsing mode */
         .preview-count-line {
             font-size: 1.3em;
             text-align: center;
@@ -164,7 +165,7 @@ def apply_dynamic_css():
             color: #2c3e50;
         }
 
-        /* Jump input */
+        /* Jump input at bottom */
         .jump-footer {
             margin-top: 40px;
             padding: 20px;
@@ -173,7 +174,7 @@ def apply_dynamic_css():
             text-align: center;
         }
         
-        /* Unified Grid Tiles */
+        /* === UNIFIED GRID TILES FOR ALL FILTERS === */
         div[data-testid="stExpander"] .stButton button {
             font-size: 1.2rem;
             height: 40px;
@@ -247,7 +248,7 @@ defaults = {
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
     "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None,
     "stroke_view_active": False, "stroke_view_char": "",
-    "script_variant": "None" # NEW: Default script filter
+    "script_variant": "None" # Default script filter
 }
 for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
@@ -264,8 +265,8 @@ def sync_idc():
 
 def sync_script():
     st.session_state.script_variant = st.session_state.w_script
-    st.session_state.page = 1
-
+    # No page reset needed for results view, but good practice
+    
 def sync_display():
     st.session_state.display_mode = st.session_state.w_display
 
@@ -302,6 +303,7 @@ def back():
     st.session_state.stroke_view_char = ""
     st.session_state.text_input_comp = ""
     st.session_state.text_input_warning = None
+    st.session_state.script_variant = "None" # Reset filter on back? Optional.
 
 def end_stroke_view():
     st.session_state.stroke_view_active = False
@@ -555,15 +557,6 @@ def main():
         elif st.session_state.show_inputs:
             st.markdown("### Filters")
 
-            # 0. Script Filter (NEW)
-            st.selectbox(
-                "Script Variant",
-                options=["None", "Simplified", "Traditional"],
-                key="w_script",
-                index=["None", "Simplified", "Traditional"].index(st.session_state.script_variant),
-                on_change=sync_script
-            )
-
             # --- PRE-CALCULATE COUNTS ---
             if "rad_groups" not in st.session_state:
                 r_counts = {}
@@ -655,13 +648,35 @@ def main():
                 st.session_state.stroke_view_active = True
                 st.rerun()
             st.markdown(f"<div class='selected-char-sidebar'>{st.session_state.selected_comp}</div>", unsafe_allow_html=True)
+            
+            # --- NEW: SCRIPT VARIANT FILTER IN RESULTS SIDEBAR ---
+            st.markdown("### Filters")
+            st.selectbox(
+                "Script Variant",
+                options=["None", "Simplified", "Traditional"],
+                key="w_script",
+                index=["None", "Simplified", "Traditional"].index(st.session_state.script_variant),
+                on_change=sync_script
+            )
+            
             related = component_map[st.session_state.selected_comp].get("related_characters", [])
             chars_unique = list(set([c for c in related if len(c) == 1]))
+            
+            # --- APPLY FILTER TO COUNT ---
+            filtered_chars_for_count = chars_unique
+            if st.session_state.script_variant == "Simplified":
+                if cc_t2s:
+                    filtered_chars_for_count = [c for c in chars_unique if cc_t2s.convert(c) == c]
+            elif st.session_state.script_variant == "Traditional":
+                if cc_s2t:
+                    filtered_chars_for_count = [c for c in chars_unique if cc_s2t.convert(c) == c]
+            
+            # Get compounds count based on filtered chars
             n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
-            compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars_unique}
-            valid_chars = [c for c in chars_unique if n == 0 or compounds[c]]
-            count = len(valid_chars)
-            st.markdown(f"<div class='count-line'>{count} characters with <span class='char'>{st.session_state.selected_comp}</span></div>", unsafe_allow_html=True)
+            compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in filtered_chars_for_count}
+            valid_chars_count = len([c for c in filtered_chars_for_count if n == 0 or compounds[c]])
+            
+            st.markdown(f"<div class='count-line'>{valid_chars_count} characters with <span class='char'>{st.session_state.selected_comp}</span></div>", unsafe_allow_html=True)
             modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
             st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
 
@@ -671,9 +686,6 @@ def main():
 
     if st.session_state.show_inputs:
         filter_parts = []
-        # Add Script filter pill if active
-        if st.session_state.script_variant != "None":
-            filter_parts.append(f"<span class='status-tag'>{st.session_state.script_variant}</span>")
         if st.session_state.stroke_count > 0:
             filter_parts.append(f"<span class='status-tag'>{st.session_state.stroke_count} strokes</span>")
         if st.session_state.radical != "none":
@@ -685,33 +697,11 @@ def main():
         instruction = "<span class='status-text'>· 🖱to preview in sidebar · 🖱🖱 to select</span>"
         st.markdown(f"<div class='status-line'>{filter_summary} {instruction}</div>", unsafe_allow_html=True)
 
-        # === FILTER LOGIC ===
-        def is_match(c):
-            # 1. Script Filter
-            if st.session_state.script_variant == "Simplified":
-                # Must be simplified or invariant (converts to self when doing Trad->Simp)
-                if not cc_t2s or cc_t2s.convert(c) != c:
-                    return False
-            elif st.session_state.script_variant == "Traditional":
-                # Must be traditional or invariant (converts to self when doing Simp->Trad)
-                if not cc_s2t or cc_s2t.convert(c) != c:
-                    return False
-            
-            # 2. Strokes
-            if st.session_state.stroke_count > 0 and get_stroke_count(c) != st.session_state.stroke_count:
-                return False
-            
-            # 3. Radical
-            if st.session_state.radical != "none" and component_map.get(c, {}).get("meta", {}).get("radical") != st.session_state.radical:
-                return False
-            
-            # 4. Structure
-            if st.session_state.component_idc != "none" and not component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc):
-                return False
-                
-            return True
-
-        filtered = [c for c in component_map if is_match(c)]
+        filtered = [c for c in component_map if
+            (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
+            (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and
+            (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
+        ]
 
         def _result_count(comp: str) -> int:
             rel = component_map.get(comp, {}).get("related_characters", [])
@@ -764,10 +754,24 @@ def main():
     else:
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         chars = list(set([c for c in related if len(c)==1]))
+        
+        # --- APPLY SCRIPT FILTER TO RESULTS LIST ---
+        if st.session_state.script_variant == "Simplified":
+            if cc_t2s:
+                # Keep if converting T2S results in no change (implies it's already simplified)
+                chars = [c for c in chars if cc_t2s.convert(c) == c]
+        elif st.session_state.script_variant == "Traditional":
+            if cc_s2t:
+                # Keep if converting S2T results in no change (implies it's already traditional)
+                chars = [c for c in chars if cc_s2t.convert(c) == c]
+
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
         chars = [c for c in chars if n==0 or compounds[c]]
         chars = sorted(chars, key=lambda x: get_stroke_count(x) or 999)
+
+        if st.session_state.script_variant != "None":
+             st.markdown(f"<div class='status-line'><span class='status-tag'>{st.session_state.script_variant} Only</span></div>", unsafe_allow_html=True)
 
         for c in chars:
             col_btn, col_char, col_details = st.columns([1, 2, 12])
