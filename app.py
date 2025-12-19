@@ -1,5 +1,6 @@
 import json
 import math
+import asyncio
 import streamlit as st
 from streamlit.components.v1 import html as st_html
 
@@ -20,13 +21,21 @@ def apply_dynamic_css():
     css = """
     <style>
     .results-header-sidebar {font-size: 1.4em; font-weight: bold; color: #2c3e50; margin: 20px 0 10px 0; text-align: center;}
-
+    
     /* Char card styling */
     .char-card {background: white; padding: 20px; border-radius: 10px; margin-bottom: 0px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);}
     .meta-row {font-size: 0.95em; color: #555; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;}
     .meta-pinyin {font-weight: bold; font-size: 1.1em; color: #2c3e50;}
+    
+    /* Tags */
     .meta-tag {background: #f1f3f5; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; color: #495057;}
+    
+    /* Traditional Tag (Yellow) */
     .meta-tag-trad {background: #fff8e1; color: #856404; border: 1px solid #ffeeba;}
+    
+    /* Simplified Tag (Green) - NEW */
+    .meta-tag-simp {background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;}
+
     .def-row {font-size: 1.1em; line-height: 1.4; color: #2c3e50; margin-bottom: 8px;}
     .ety-row {font-size: 0.9em; color: #666; font-style: italic; border-top: 1px solid #eee; padding-top: 8px; margin-top: 4px;}
     
@@ -114,7 +123,6 @@ def sync_idc():
 
 def sync_script():
     st.session_state.script_variant = st.session_state.w_script
-    # Note: We do NOT reset page here, as this filter is for the result list only
 
 def sync_display():
     st.session_state.display_mode = st.session_state.w_display
@@ -171,9 +179,11 @@ def reset():
     st.session_state.text_input_warning = None
 
 def generate_clean_card_html(c):
-    if not c or c not in component_map:
+    if not c:
         return ""
+    # Look up data if exists, otherwise display minimal info (e.g. for a variant not in map)
     meta = component_map.get(c, {}).get("meta", {})
+    
     pinyin = clean_field(meta.get("pinyin", ""))
     strokes = get_stroke_count(c)
     radical = clean_field(meta.get("radical", ""))
@@ -187,10 +197,17 @@ def generate_clean_card_html(c):
     if radical and radical != "—": meta_items.append(f"<span class='meta-tag'>Rad. {radical}</span>")
     if decomp and decomp != "—": meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
     
+    # Yellow tag: If current c is Traditional, show Simplified conversion
     if cc_t2s:
         simplified = cc_t2s.convert(c)
         if simplified != c:
             meta_items.append(f"<span class='meta-tag meta-tag-trad'>Trad. → {simplified}</span>")
+
+    # Green tag: If current c is Simplified, show Traditional conversion
+    if cc_s2t:
+        traditional = cc_s2t.convert(c)
+        if traditional != c:
+            meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. → {traditional}</span>")
 
     meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
     def_html = f"<div class='def-row'>{definition}</div>" if definition and definition != "—" else ""
@@ -253,73 +270,130 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
         height=h
     )
 
-def render_stroke_order_view(char: str):
-    char = (char or "").strip()[:1]
-    if not char:
+def render_stroke_order_view(char_input: str):
+    primary_char = (char_input or "").strip()[:1]
+    if not primary_char:
         st.info("No character selected for stroke order.")
         return
-    st.markdown(f"## Stroke order — {char}")
+    
+    # Calculate variants (Simplified/Traditional)
+    chars_to_show = []
+    
+    # Logic: Always try to show [Simplified, Traditional] if they differ
+    s_char = cc_t2s.convert(primary_char) if cc_t2s else primary_char
+    t_char = cc_s2t.convert(primary_char) if cc_s2t else primary_char
+    
+    # If converted s_char is different from primary (implied primary was trad), or converted t_char different (implied primary was simp)
+    if s_char != t_char:
+        # Show both: Simplified first, then Traditional (or user pref, but let's stick to s/t order or input order)
+        # Requirement: "show BOTH the drawings - traditional and simplified"
+        chars_to_show = [s_char, t_char] if s_char != t_char else [primary_char]
+    else:
+        chars_to_show = [primary_char]
+
+    # Clean duplicates just in case
+    chars_to_show = list(dict.fromkeys(chars_to_show))
+
+    # Generate container HTML
+    container_html = ""
+    for i, c in enumerate(chars_to_show):
+        label = "Simplified" if c == s_char and s_char != t_char else "Traditional" if c == t_char and s_char != t_char else ""
+        label_html = f"<div style='text-align:center; font-weight:bold; color:#555; margin-bottom:5px;'>{label}</div>" if label else ""
+        container_html += f"""
+        <div style="display:flex; flex-direction:column; align-items:center;">
+             {label_html}
+            <div id="hw-target-{i}" style="width:400px;height:400px;border:1px solid #e0e0e0;border-radius:12px; background:white;"></div>
+        </div>
+        """
+
     st_html(
         f"""
-        <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap;">
-            <div>
-                <div id="hw-target" style="width:420px;height:420px;border:1px solid #e0e0e0;border-radius:12px;"></div>
-                <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-                    <button id="hw-prev">Back</button><button id="hw-next">Next</button>
-                    <button id="hw-reset">Reset</button><button id="hw-animate">Animate</button>
-                </div>
-                <div id="hw-status" style="margin-top:10px; font-family: ui-monospace; color:#444;"></div>
-                <div id="hw-error" style="margin-top:10px; color:#b00020;"></div>
-            </div>
+        <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; justify-content:center;">
+            {container_html}
         </div>
+        <div style="display:flex; justify-content:center; margin-top:15px; gap:8px;">
+             <button id="hw-reset">Reset</button><button id="hw-animate">Replay Animation</button>
+        </div>
+        <div id="hw-error" style="margin-top:10px; color:#b00020; text-align:center;"></div>
+
         <script>
         (function() {{
-            const char = {json.dumps(char, ensure_ascii=False)};
-            const statusEl = document.getElementById('hw-status');
+            const chars = {json.dumps(chars_to_show, ensure_ascii=False)};
             const errEl = document.getElementById('hw-error');
+            
             function loadScript(src) {{ return new Promise((resolve, reject) => {{
                 const s = document.createElement('script'); s.src = src; s.async = true; 
                 s.onload = () => resolve(src); s.onerror = () => reject();
                 document.head.appendChild(s);
             }}); }}
+
             async function ensureLibLoaded() {{
                 if (window.HanziWriter) return;
                 const sources = ['https://cdn.jsdelivr.net/npm/hanzi-writer@3/dist/hanzi-writer.min.js', 
                                  'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'];
                 for (const src of sources) {{ try {{ await loadScript(src); if (window.HanziWriter) return; }} catch (e) {{}} }}
             }}
-            const dataUrls = [`https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/${{char}}.json`,`https://unpkg.com/hanzi-writer-data@2.0.1/${{char}}.json`];
-            async function loadCharData() {{
-                for (const url of dataUrls) {{ try {{ const res = await fetch(url); if (!res.ok) continue; return await res.json(); }} catch (e) {{}} }}
-                throw new Error('Stroke data not found.');
-            }}
-            let writer = null; let i = -1; let total = 0;
-            function setStatus() {{ statusEl.textContent = `Stroke: ${{Math.max(i+1, 0)}} / ${{total}}`; }}
+
+            const writers = [];
+
             async function init() {{
                 try {{
                     await ensureLibLoaded();
-                    const charData = await loadCharData();
-                    total = (charData.medians || []).length || 0;
-                    writer = window.HanziWriter.create('hw-target', char, {{
-                        width: 420, height: 420, padding: 14, showOutline: true, showCharacter: false, 
-                        strokeAnimationSpeed: 1, delayBetweenStrokes: 120
-                    }});
-                    i = -1; writer.hideCharacter(); setStatus();
+                    
+                    for (let idx = 0; idx < chars.length; idx++) {{
+                        const char = chars[idx];
+                        const targetId = 'hw-target-' + idx;
+                        
+                        // Attempt to load data check
+                        const dataUrls = [`https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/${{char}}.json`,`https://unpkg.com/hanzi-writer-data@2.0.1/${{char}}.json`];
+                        let hasData = false;
+                        for (const url of dataUrls) {{ try {{ const res = await fetch(url); if (res.ok) {{ hasData = true; break; }} }} catch (e) {{}} }}
+                        
+                        if(hasData) {{
+                            const writer = window.HanziWriter.create(targetId, char, {{
+                                width: 400, height: 400, padding: 14, showOutline: true, showCharacter: false, 
+                                strokeAnimationSpeed: 1, delayBetweenStrokes: 60
+                            }});
+                            writers.push(writer);
+                        }} else {{
+                            document.getElementById(targetId).innerHTML = `<div style="line-height:400px; text-align:center; font-size:200px; color:#ddd;">${{char}}</div>`;
+                        }}
+                    }}
+                    
+                    // Auto animate on load (3 times)
+                    autoAnimateAll();
+
                 }} catch (e) {{ errEl.textContent = e.message || String(e); }}
             }}
-            async function nextStroke() {{ if (!writer || i + 1 >= total) return; i += 1; await writer.animateStroke(i); setStatus(); }}
-            async function prevStroke() {{ if (!writer || i <= -1) return; i -= 1; writer.hideCharacter(); for (let k = 0; k <= i; k++) await writer.animateStroke(k); setStatus(); }}
-            function resetAll() {{ if (!writer) return; i = -1; writer.hideCharacter(); setStatus(); }}
-            async function animateAll() {{ if (!writer) return; i = -1; writer.hideCharacter(); await writer.animateCharacter(); i = total - 1; setStatus(); }}
-            document.getElementById('hw-next').addEventListener('click', nextStroke);
-            document.getElementById('hw-prev').addEventListener('click', prevStroke);
+
+            async function playSequence(writer) {{
+                for (let k = 0; k < 3; k++) {{
+                    writer.hideCharacter();
+                    await writer.animateCharacter();
+                    // Small pause between loops
+                    await new Promise(r => setTimeout(r, 800));
+                }}
+                writer.showCharacter();
+            }}
+
+            function autoAnimateAll() {{
+                writers.forEach(w => {{
+                    playSequence(w);
+                }});
+            }}
+
+            function resetAll() {{ 
+                writers.forEach(w => {{ w.hideCharacter(); }}); 
+            }}
+
             document.getElementById('hw-reset').addEventListener('click', resetAll);
-            document.getElementById('hw-animate').addEventListener('click', animateAll);
+            document.getElementById('hw-animate').addEventListener('click', autoAnimateAll);
+            
             init();
         }})();
         </script>
         """,
-        height=560,
+        height=520,
     )
 
 def main():
@@ -337,6 +411,27 @@ def main():
         if st.session_state.stroke_view_active:
             st.button("← Back", on_click=end_stroke_view, use_container_width=True)
             st.button("← Back to list", on_click=back, use_container_width=True)
+            
+            st.markdown("---")
+            st.markdown("### Character Info")
+            
+            # Show Info for the Primary Character
+            p_char = st.session_state.stroke_view_char
+            st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{p_char}</div>", unsafe_allow_html=True)
+            st.markdown(generate_clean_card_html(p_char), unsafe_allow_html=True)
+            
+            # Logic to find counterpart for Sidebar display
+            s_char = cc_t2s.convert(p_char) if cc_t2s else p_char
+            t_char = cc_s2t.convert(p_char) if cc_s2t else p_char
+            
+            counterpart = None
+            if p_char == s_char and t_char != p_char: counterpart = t_char
+            elif p_char == t_char and s_char != p_char: counterpart = s_char
+            
+            if counterpart:
+                st.markdown("---")
+                st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px; color:#666;'>{counterpart}</div>", unsafe_allow_html=True)
+                st.markdown(generate_clean_card_html(counterpart), unsafe_allow_html=True)
 
         elif st.session_state.show_inputs:
             st.markdown("### Filters")
