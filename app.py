@@ -425,7 +425,7 @@ def main():
                 related = component_map.get(preview_char, {}).get("related_characters", [])
                 count = len(set([c for c in related if len(c) == 1]))
                 
-                st.markdown(f"<div class='preview-count-line'>{count} characters with <span class='char'>{preview_char}</span></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='preview-count-line'>{count} characters has <span class='char'>{preview_char}</span></div>", unsafe_allow_html=True)
 
         else:
             # SELECTED VIEW
@@ -461,7 +461,7 @@ def main():
 
                 count_filtered = len(chars_filtered)
                 
-                st.markdown(f"<div class='preview-count-line'>{count_filtered} characters with <span class='char'>{selected_char}</span></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='preview-count-line'>{count_filtered} characters has <span class='char'>{selected_char}</span></div>", unsafe_allow_html=True)
                 
                 modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
                 st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
