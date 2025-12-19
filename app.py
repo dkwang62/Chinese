@@ -100,7 +100,7 @@ def format_decomposition(char):
     return "—" if not d or '?' in d else d
 
 # --- State init ---
-# MODIFIED: Changed "stroke_count" to "stroke_range" (tuple)
+# "stroke_range" stores the tuple (min, max)
 defaults = {
     "selected_comp": "", "stroke_range": (1, 60), "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
@@ -114,9 +114,9 @@ for k, v in defaults.items():
 
 # --- Callbacks ---
 
-# MODIFIED: Callback for slider change
+# CORRECTED: Properly sync the widget value to the state variable
 def sync_stroke_range():
-    # Value is updated via widget key binding, just reset page
+    st.session_state.stroke_range = st.session_state.w_stroke_range
     st.session_state.page = 1
 
 def sync_idc():
