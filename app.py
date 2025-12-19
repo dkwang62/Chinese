@@ -429,7 +429,7 @@ def main():
                 count = len(set([c for c in related if len(c) == 1]))
                 
                 # Using preview-count-line for red character color
-                st.markdown(f"<div class='preview-count-line'>{count} characters with <span class='char'>{preview_char}</span></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='preview-count-line'>{count} characters has <span class='char'>{preview_char}</span></div>", unsafe_allow_html=True)
                 
                 # Removed generate_clean_card_html call
 
@@ -467,7 +467,7 @@ def main():
                 count = len([c for c in chars_unique if c in component_map])
                 
                 # Using preview-count-line here too to ensure visual consistency (Red Char) as requested
-                st.markdown(f"<div class='preview-count-line'>{count} characters with <span class='char'>{selected_char}</span></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='preview-count-line'>{count} characters has <span class='char'>{selected_char}</span></div>", unsafe_allow_html=True)
                 
                 modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
                 st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
