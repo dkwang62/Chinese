@@ -100,8 +100,9 @@ def format_decomposition(char):
     return "—" if not d or '?' in d else d
 
 # --- State init ---
+# MODIFIED: Changed "stroke_count" to "stroke_range" (tuple)
 defaults = {
-    "selected_comp": "", "stroke_count": 0, "radical": "none", "component_idc": "none",
+    "selected_comp": "", "stroke_range": (1, 60), "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
     "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None,
     "stroke_view_active": False, "stroke_view_char": "",
@@ -112,9 +113,10 @@ for k, v in defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
 # --- Callbacks ---
-def sync_stroke():
-    val = st.session_state.w_stroke
-    st.session_state.stroke_count = int(val) if val != 0 else 0
+
+# MODIFIED: Callback for slider change
+def sync_stroke_range():
+    # Value is updated via widget key binding, just reset page
     st.session_state.page = 1
 
 def sync_idc():
@@ -166,7 +168,7 @@ def end_stroke_view():
     st.session_state.stroke_view_char = ""
 
 def reset():
-    st.session_state.stroke_count = 0
+    st.session_state.stroke_range = (1, 60) # Reset to default wide range
     st.session_state.radical = "none"
     st.session_state.component_idc = "none"
     st.session_state.script_variant = "Simplified"
@@ -415,6 +417,11 @@ def main():
     if not component_map:
         st.stop()
     apply_dynamic_css()
+    
+    # Calculate Max Strokes dynamically
+    all_strokes = [get_stroke_count(c) for c in component_map]
+    valid_strokes = [s for s in all_strokes if s is not None]
+    max_s_val = max(valid_strokes) if valid_strokes else 30
 
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
@@ -474,21 +481,38 @@ def main():
                 st.session_state.stroke_counts = s_counts
                 st.session_state.idc_counts = idc_counts
 
-            # Stroke filter
-            s_label = f"Total Strokes: {st.session_state.stroke_count}" if st.session_state.stroke_count > 0 else "Total Strokes (Any)"
+            # MODIFIED: Stroke filter (Slider)
+            min_s, max_s = st.session_state.stroke_range
+            
+            # Format label for expander
+            if min_s == 1 and max_s == max_s_val:
+                s_label = "Filter by Strokes (All)"
+            elif min_s == max_s:
+                s_label = f"Strokes: {min_s}"
+            elif min_s == 1:
+                s_label = f"Strokes: ≤ {max_s}"
+            elif max_s == max_s_val:
+                s_label = f"Strokes: ≥ {min_s}"
+            else:
+                s_label = f"Strokes: {min_s} – {max_s}"
+
             with st.expander(s_label, expanded=False):
-                if st.button("Clear Strokes", use_container_width=True):
-                    st.session_state.stroke_count = 0
+                if st.button("Reset Range", use_container_width=True):
+                    st.session_state.stroke_range = (1, max_s_val)
                     st.session_state.page = 1
                     st.rerun()
-                s_keys = sorted(st.session_state.stroke_counts.keys())
-                s_cols = st.columns(6)
-                for i, s in enumerate(s_keys):
-                    with s_cols[i % 6]:
-                        if st.button(str(s), key=f"str_{s}", type="primary" if st.session_state.stroke_count == s else "secondary"):
-                            st.session_state.stroke_count = s
-                            st.session_state.page = 1
-                            st.rerun()
+                
+                st.slider(
+                    "Select Stroke Range",
+                    min_value=1,
+                    max_value=max_s_val,
+                    value=st.session_state.stroke_range,
+                    key="w_stroke_range",
+                    on_change=sync_stroke_range,
+                    label_visibility="collapsed"
+                )
+                st.caption(f"Showing characters with {min_s} to {max_s} strokes")
+
 
             # Radical filter
             r_label = f"Radical: {st.session_state.radical}" if st.session_state.radical != "none" else "Radical (Any)"
@@ -597,16 +621,32 @@ def main():
     # Main content
     if st.session_state.show_inputs:
         filter_parts = []
-        if st.session_state.stroke_count > 0: filter_parts.append(f"<span class='status-tag'>{st.session_state.stroke_count} strokes</span>")
+        
+        # MODIFIED: Logic for Stroke Status Tag
+        cur_min, cur_max = st.session_state.stroke_range
+        # Only show tag if it's NOT the full range
+        if not (cur_min == 1 and cur_max == max_s_val):
+            if cur_min == cur_max:
+                filter_parts.append(f"<span class='status-tag'>{cur_min} strokes</span>")
+            elif cur_min == 1:
+                filter_parts.append(f"<span class='status-tag'>≤ {cur_max} strokes</span>")
+            elif cur_max == max_s_val:
+                filter_parts.append(f"<span class='status-tag'>≥ {cur_min} strokes</span>")
+            else:
+                filter_parts.append(f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>")
+
         if st.session_state.radical != "none": filter_parts.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
         if st.session_state.component_idc != "none": filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
         st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· 🖱click to preview in sidebar · 🖱🖱double-click to select</span></div>", unsafe_allow_html=True)
         
-        # Filters applied ONLY to the Grid listing
+        # MODIFIED: Logic for Filter List Comprehension
         filtered = [c for c in component_map if 
-            (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
+            # Stroke Range Check (Inclusive)
+            (lambda s: s is not None and cur_min <= s <= cur_max)(get_stroke_count(c)) and
+            # Radical Check
             (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and 
+            # IDC Check
             (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
         ]
 
