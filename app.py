@@ -60,7 +60,10 @@ except Exception as e:
     st.error(f"Failed to load data: {e}")
 
 def clean_field(field):
-    return field,[object Object], if isinstance(field, list) and field else field or "—"
+    # Check if field is a list and has elements
+    if isinstance(field, list) and field:
+        return field,[object Object],  # Return the first element of the list
+    return field or "—"  # Return the field or "—" if field is None or empty
 
 def get_stroke_count(char):
     strokes = component_map.get(char, {}).get("meta", {}).get("strokes", None)
