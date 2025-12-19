@@ -15,6 +15,29 @@ except ImportError:
     cc_s2t = None
 
 # ------------------------------
+# NEW: Robust component map loader
+# ------------------------------
+def load_component_map():
+    """Load the component map with fallback filenames and graceful error handling."""
+    possible_files = [
+        "enhanced_component_map_with_etymology.json",
+        "component_map.json"
+    ]
+    for filename in possible_files:
+        try:
+            with open(filename, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                st.success(f"Loaded component data from `{filename}`")
+                return data
+        except FileNotFoundError:
+            continue
+        except json.JSONDecodeError as e:
+            st.warning(f"JSON decode error in `{filename}`: {e}")
+            continue
+    st.error("No valid component map file found. Tried: " + ", ".join(possible_files))
+    return {}
+
+# ------------------------------
 # Global CSS
 # ------------------------------
 st.set_page_config(page_title="汉字 Radix", layout="wide")
@@ -191,10 +214,16 @@ st.markdown(
 )
 
 # ------------------------------
-# Data Load
+# Data Load (replaced with robust loader)
 # ------------------------------
-with open("component_map.json", "r", encoding="utf-8") as f:
-    component_map = json.load(f)
+component_map = load_component_map()
+
+# Critical early exit if no data loaded
+if not component_map:
+    st.error("No component data loaded. Ensure one of the following files is present in the app directory:\n"
+             "- enhanced_component_map_with_etymology.json\n"
+             "- component_map.json")
+    st.stop()
 
 # Precompute stroke counts and group components (for sidebar filters)
 stroke_groups = {}
