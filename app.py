@@ -1,7 +1,8 @@
 import json
 import math
 import asyncio
-import html  # Added for escaping text
+import html
+import re  # Added regex for pinyin conversion
 import streamlit as st
 from streamlit.components.v1 import html as st_html
 
@@ -76,6 +77,55 @@ def load_component_map():
             return json.load(f)
     except FileNotFoundError:
         return {}
+
+# --- Helper: Pinyin Number to Accent Converter ---
+def convert_pinyin(pinyin_str):
+    """Converts numbered pinyin (shu4) to accented pinyin (shù)."""
+    if not pinyin_str: return ""
+    
+    # Standardize umlaut
+    pinyin_str = pinyin_str.replace("u:", "ü").replace("v", "ü")
+    
+    tone_map = {
+        'a': 'āáǎà', 'e': 'ēéěè', 'i': 'īíǐì', 'o': 'ōóǒò', 'u': 'ūúǔù', 'ü': 'ǖǘǚǜ'
+    }
+    
+    def replace_syllable(match):
+        syll = match.group(0)
+        # Separate base and tone digit
+        try:
+            tone = int(syll[-1])
+            base = syll[:-1]
+        except ValueError:
+            return syll # No tone number found
+            
+        # Neutral tone (5) usually means no accent
+        if tone == 5:
+            return base
+
+        # Priority rules for placing tone mark:
+        # 1. a or e
+        # 2. ou
+        # 3. last vowel
+        if 'a' in base: v = 'a'
+        elif 'e' in base: v = 'e'
+        elif 'ou' in base: v = 'o'
+        else:
+            # Find the last vowel present
+            vowels = [c for c in base if c in "aiouü"]
+            if not vowels: return base
+            v = vowels[-1]
+            
+        # Replace the vowel with its accented version
+        if 0 < tone <= 4:
+            accented_char = tone_map[v][tone-1]
+            return base.replace(v, accented_char)
+        
+        return base
+
+    # Regex looks for syllables ending in 1-5
+    # We apply this to each word in the string
+    return re.sub(r'[a-zA-ZüÜ:]+\d', replace_syllable, pinyin_str)
 
 # --- Load CC-CEDICT Dictionary ---
 @st.cache_data
@@ -790,6 +840,10 @@ def main():
                         pinyin = entry.get('pinyin', '') if entry else ''
                         meanings = entry.get('meanings', '') if entry else ''
                         
+                        # --- CONVERT PINYIN NUMBER TO ACCENT ---
+                        # Convert shu4 -> shù
+                        display_pinyin = convert_pinyin(pinyin)
+                        
                         # --- TRUNCATION LOGIC ---
                         limit = 100
                         if len(meanings) > limit:
@@ -800,9 +854,9 @@ def main():
                         # Safe escape to prevent HTML breaking
                         display_meanings = html.escape(display_meanings)
 
-                        # --- FIX: No indentation in f-string to prevent markdown code block issue ---
+                        # --- FIX: No indentation, REMOVED BRACKETS [] around pinyin ---
                         if entry:
-                            item_str = f"<div class='compound-item'><span class='cp-word'>{word}</span><span class='cp-pinyin'>[{pinyin}]</span><span class='cp-mean'>{display_meanings}</span></div>"
+                            item_str = f"<div class='compound-item'><span class='cp-word'>{word}</span><span class='cp-pinyin'>{display_pinyin}</span><span class='cp-mean'>{display_meanings}</span></div>"
                             items_html.append(item_str)
                         else:
                             # Fallback if not found
