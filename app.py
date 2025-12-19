@@ -638,7 +638,7 @@ def main():
                 st.markdown(f"""
                     <div style='text-align:center; padding:10px 0; color:#555;'>
                         <div style='font-size:1.1em; font-weight:bold;'>{start}–{end} of {total}</div>
-                        <div style='font-size:0.85em; color:#e74c3c;'>📉 Sorted by Frequency</div>
+                        <div style='font-size:0.85em; color:#e74c3c;'>Sorted from most to least common</div>
                     </div>
                 """, unsafe_allow_html=True)
 
