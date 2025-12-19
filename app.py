@@ -118,34 +118,22 @@ def format_decomposition(char):
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     return "—" if not d or '?' in d else d
 
-# --- State init (Shadow Key Pattern Rule #2 & #6) ---
-# Initialize Data Keys only if they don't exist.
-# defaults contains the Source of Truth values.
+# --- State init ---
+# UPDATED: Defaults stroke range 3-8, component_only True
 defaults = {
-    "selected_comp": "",
-    "stroke_range": (3, 8),
-    "radical": "none",
-    "component_idc": "none",
-    "display_mode": "Single Character",
-    "text_input_comp": "",
-    "page": 1,
-    "text_input_warning": None,
-    "show_inputs": True,
-    "last_valid_selected_comp": "",
-    "preview_comp": None,
-    "stroke_view_active": False,
-    "stroke_view_char": "",
+    "selected_comp": "", "stroke_range": (3, 8), "radical": "none", "component_idc": "none",
+    "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
+    "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None,
+    "stroke_view_active": False, "stroke_view_char": "",
     "script_variant": "Simplified",
     "component_only": True,
-    "used_components": set() # Initialize empty set for safety
+    "used_components": set() 
 }
 
 for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+    if k not in st.session_state: st.session_state[k] = v
 
-# --- Callbacks (Shadow Key Pattern Rule #4) ---
-# These transfer the widget state (w_key) to the application state (key)
+# --- Callbacks ---
 
 def sync_stroke_range():
     st.session_state.stroke_range = st.session_state.w_stroke_range
@@ -203,11 +191,9 @@ def end_stroke_view():
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
 
-# --- CORRECTED RESET FUNCTION (Shadow Key Pattern Rule #3) ---
-# We ONLY update the Data Keys. We DO NOT touch the Widget Keys (w_...).
-# The widgets will update automatically because their `value` argument 
-# reads from these Data Keys.
+# --- CORRECTED RESET FUNCTION (Delete Strategy) ---
 def reset():
+    # 1. Reset underlying state variables to defaults
     st.session_state.stroke_range = (3, 8) 
     st.session_state.radical = "none"
     st.session_state.component_idc = "none"
@@ -220,6 +206,12 @@ def reset():
     st.session_state.stroke_view_char = ""
     st.session_state.text_input_comp = ""
     st.session_state.text_input_warning = None
+    
+    # 2. DELETE widget keys so they re-initialize from 'value=' argument
+    keys_to_delete = ["w_stroke_range", "w_component_only", "w_text", "w_idc", "w_script"]
+    for key in keys_to_delete:
+        if key in st.session_state:
+            del st.session_state[key]
 
 def generate_clean_card_html(c):
     if not c:
@@ -473,10 +465,12 @@ def main():
             st.markdown("---")
             st.markdown("### Character Info")
             
+            # Show Info for the Primary Character
             p_char = st.session_state.stroke_view_char
             st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{p_char}</div>", unsafe_allow_html=True)
             st.markdown(generate_clean_card_html(p_char), unsafe_allow_html=True)
             
+            # Logic to find counterpart for Sidebar display
             s_char = cc_t2s.convert(p_char) if cc_t2s else p_char
             t_char = cc_s2t.convert(p_char) if cc_s2t else p_char
             
@@ -492,11 +486,11 @@ def main():
         elif st.session_state.show_inputs:
             st.markdown("### Filters")
 
-            # Data prep for filters
-            if "rad_groups" not in st.session_state or "used_components" not in st.session_state:
+            if "rad_groups" not in st.session_state:
                 r_counts = {}
                 s_counts = {}
                 idc_counts = {}
+                # New: Set for Component Only filter
                 used_comps = set()
 
                 for c, data in component_map.items():
@@ -506,10 +500,12 @@ def main():
                     if s: s_counts[s] = s_counts.get(s, 0) + 1
                     d = data.get("meta", {}).get("decomposition", "")
                     if d:
+                        # Add structure count
                         if d[0] in IDC_CHARS:
                             idc = d[0]
                             idc_counts[idc] = idc_counts.get(idc, 0) + 1
                         
+                        # Gather all used components (removing IDC markers)
                         clean_d = "".join([char for char in d if char not in IDC_CHARS])
                         for char in clean_d:
                             used_comps.add(char)
@@ -526,19 +522,17 @@ def main():
                 st.session_state.idc_counts = idc_counts
                 st.session_state.used_components = used_comps
 
-            # Shadow Key Pattern Implementation for Widgets:
-            # 1. Read 'value' from st.session_state[DATA_KEY]
-            # 2. Write to 'key' = "w_" + DATA_KEY
-            # 3. Use on_change callback to sync w_KEY -> DATA_KEY
-
+            # 4TH FILTER: COMPONENT ONLY CHECKBOX
             st.checkbox("Show Components Only", 
                         key="w_component_only", 
                         value=st.session_state.component_only,
                         on_change=sync_component_only,
                         help="Only show characters that appear as parts of other characters")
 
+            # MODIFIED: Stroke filter (Slider)
             min_s, max_s = st.session_state.stroke_range
             
+            # Format label for expander
             if min_s == 1 and max_s == max_s_val:
                 s_label = "Filter by Strokes (All)"
             elif min_s == max_s:
@@ -552,7 +546,8 @@ def main():
 
             with st.expander(s_label, expanded=False):
                 if st.button("Reset Range", use_container_width=True):
-                    st.session_state.stroke_range = (3, 8)
+                    st.session_state.stroke_range = (3, 8) # Reset to updated default
+                    if "w_stroke_range" in st.session_state: del st.session_state.w_stroke_range
                     st.session_state.page = 1
                     st.rerun()
                 
@@ -567,6 +562,8 @@ def main():
                 )
                 st.caption(f"Showing characters with {min_s} to {max_s} strokes")
 
+
+            # Radical filter
             r_label = f"Radical: {st.session_state.radical}" if st.session_state.radical != "none" else "Radical (Any)"
             with st.expander(r_label, expanded=False):
                 if st.button("Clear Radical", use_container_width=True):
@@ -584,6 +581,7 @@ def main():
                                 st.session_state.page = 1
                                 st.rerun()
 
+            # Structure filter
             idc_label = f"Structure: {st.session_state.component_idc}" if st.session_state.component_idc != "none" else "Structure (Any)"
             with st.expander(idc_label, expanded=False):
                 if st.button("Clear Structure", use_container_width=True):
@@ -600,10 +598,12 @@ def main():
                             st.rerun()
 
             st.markdown("---")
+            # PREVIEW (Main view hover/click)
             if st.session_state.preview_comp:
                 preview_char = st.session_state.preview_comp
                 render_stroke_order_sidebar(preview_char, size=110)
 
+                # --- NEW BUTTON ADDED HERE ---
                 if st.button(f"👉 Select {preview_char}", key="sb_select_btn", use_container_width=True, type="primary"):
                     st.session_state.selected_comp = preview_char
                     st.session_state.last_valid_selected_comp = preview_char
@@ -612,13 +612,19 @@ def main():
                     st.session_state.text_input_comp = preview_char
                     st.session_state.text_input_warning = None
                     st.rerun()
+                # -----------------------------
 
+                
+                
+                # Count calculation: RAW TOTAL.
+                # The first line filters (Stroke/Rad/IDC) are NOT used here.
                 related = component_map.get(preview_char, {}).get("related_characters", [])
                 count = len(set([c for c in related if len(c) == 1]))
                 
                 st.markdown(f"<div class='preview-count-line'>{count} characters has <span class='char'>{preview_char}</span></div>", unsafe_allow_html=True)
 
         else:
+            # SELECTED VIEW
             st.button("← Back to list", on_click=back, use_container_width=True)
             selected_char = st.session_state.selected_comp
             if selected_char:
@@ -629,15 +635,19 @@ def main():
                 
                 render_stroke_order_sidebar(selected_char, size=140)
                 
+                # Filter Radio Button
                 st.radio("Filter Results", ["Simplified", "Traditional"],
                              key="w_script", 
                              index=0 if st.session_state.script_variant == "Simplified" else 1,
                              on_change=sync_script)
                 
+                # Logic for count
+                # 1. Get ALL related characters (Ignore Stroke/Radical filters)
                 related = component_map.get(selected_char, {}).get("related_characters", [])
                 chars_all = list(set([c for c in related if len(c) == 1]))
                 chars_all = [c for c in chars_all if c in component_map]
 
+                # 2. Apply ONLY the Simp/Trad filter (because it's the active view filter)
                 if st.session_state.script_variant == "Simplified":
                     chars_filtered = [c for c in chars_all if not cc_t2s or cc_t2s.convert(c) == c]
                 elif st.session_state.script_variant == "Traditional":
@@ -652,14 +662,18 @@ def main():
                 modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
                 st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
 
+    # Full stroke view
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
         st.stop()
 
+    # Main content
     if st.session_state.show_inputs:
         filter_parts = []
         
+        # Logic for Stroke Status Tag
         cur_min, cur_max = st.session_state.stroke_range
+        # Only show tag if it's NOT the full range
         if not (cur_min == 1 and cur_max == max_s_val):
             if cur_min == cur_max:
                 filter_parts.append(f"<span class='status-tag'>{cur_min} strokes</span>")
@@ -677,10 +691,15 @@ def main():
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
         st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· 🖱click to preview in sidebar · 🖱🖱double-click to select</span></div>", unsafe_allow_html=True)
         
+        # Logic for Filter List Comprehension
         filtered = [c for c in component_map if 
+            # Stroke Range Check (Inclusive)
             (lambda s: s is not None and cur_min <= s <= cur_max)(get_stroke_count(c)) and
+            # Radical Check
             (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and 
+            # IDC Check
             (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc)) and
+            # Component Only Check
             (not st.session_state.component_only or c in st.session_state.used_components)
         ]
 
@@ -688,6 +707,7 @@ def main():
             rel = component_map.get(comp, {}).get("related_characters", [])
             return len({x for x in rel if isinstance(x, str) and len(x) == 1})
 
+        # Sorting uses raw count (unfiltered)
         _counts = {c: _result_count(c) for c in filtered}
         sorted_comps = sorted(filtered, key=lambda c: (-_counts.get(c, 0), get_stroke_count(c) or 999, c))
 
@@ -740,6 +760,7 @@ def main():
             st.markdown("</div>", unsafe_allow_html=True)
 
     else:
+        # Results view (The actual cards)
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         chars = list(set([c for c in related if len(c)==1]))
         
@@ -748,6 +769,7 @@ def main():
         chars = [c for c in chars if n==0 or compounds[c]]
         chars = sorted(chars, key=lambda x: get_stroke_count(x) or 999)
 
+        # Apply Simp/Trad filter to the displayed list
         if st.session_state.script_variant == "Simplified":
             chars = [c for c in chars if not cc_t2s or cc_t2s.convert(c) == c]
         elif st.session_state.script_variant == "Traditional":
@@ -766,33 +788,42 @@ def main():
             with col_details:
                 st.markdown(generate_clean_card_html(c), unsafe_allow_html=True)
                 
+                # --- MODIFIED COMPOUND DISPLAY ---
                 if compounds.get(c):
+                    # Sort alphabetical
                     sorted_compounds = sorted(compounds[c])
                     
+                    # Generate HTML list with lookup
                     items_html = []
                     for word in sorted_compounds:
+                        # Lookup in JSON dictionary
                         entry = phrases_dict.get(word)
                         pinyin = entry.get('pinyin', '') if entry else ''
                         meanings = entry.get('meanings', '') if entry else ''
                         
+                        # Note: Pinyin and Meanings are already converted in the JSON
                         display_pinyin = pinyin 
                         
+                        # --- TRUNCATION LOGIC ---
                         limit = 100
                         if len(meanings) > limit:
                             display_meanings = meanings[:limit] + "..."
                         else:
                             display_meanings = meanings
                         
+                        # Safe escape to prevent HTML breaking
                         display_meanings = html.escape(display_meanings)
 
                         if entry:
                             item_str = f"<div class='compound-item'><span class='cp-word'>{word}</span><span class='cp-pinyin'>{display_pinyin}</span><span class='cp-mean'>{display_meanings}</span></div>"
                             items_html.append(item_str)
                         else:
+                            # Fallback if not found
                             items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
                     
                     full_list_html = "".join(items_html)
                     
+                    # No indentation in the wrapper
                     st.markdown(f"""<div style='padding:15px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; border-bottom:2px solid #a5d6a7; padding-bottom:5px;'>{st.session_state.display_mode}</div>{full_list_html}</div>""", unsafe_allow_html=True)
 
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
