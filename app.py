@@ -119,12 +119,14 @@ def format_decomposition(char):
     return "—" if not d or '?' in d else d
 
 # --- State init ---
+# UPDATED: Defaults stroke range 3-8, component_only True
 defaults = {
-    "selected_comp": "", "stroke_range": (1, 60), "radical": "none", "component_idc": "none",
+    "selected_comp": "", "stroke_range": (3, 8), "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
     "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None,
     "stroke_view_active": False, "stroke_view_char": "",
-    "script_variant": "Simplified" 
+    "script_variant": "Simplified",
+    "component_only": True
 }
 
 for k, v in defaults.items():
@@ -145,6 +147,10 @@ def sync_script():
 
 def sync_display():
     st.session_state.display_mode = st.session_state.w_display
+
+def sync_component_only():
+    st.session_state.component_only = st.session_state.w_component_only
+    st.session_state.page = 1
 
 def sync_text():
     v = st.session_state.w_text.strip()
@@ -185,10 +191,11 @@ def end_stroke_view():
     st.session_state.stroke_view_char = ""
 
 def reset():
-    st.session_state.stroke_range = (1, 60) # Reset to default wide range
+    st.session_state.stroke_range = (3, 8) # Reset to updated default
     st.session_state.radical = "none"
     st.session_state.component_idc = "none"
     st.session_state.script_variant = "Simplified"
+    st.session_state.component_only = True
     st.session_state.page = 1
     st.session_state.show_inputs = True
     st.session_state.preview_comp = None
@@ -479,26 +486,46 @@ def main():
                 r_counts = {}
                 s_counts = {}
                 idc_counts = {}
+                # New: Set for Component Only filter
+                used_comps = set()
+
                 for c, data in component_map.items():
                     r = data.get("meta", {}).get("radical")
                     if r: r_counts[r] = r_counts.get(r, 0) + 1
                     s = get_stroke_count(c)
                     if s: s_counts[s] = s_counts.get(s, 0) + 1
                     d = data.get("meta", {}).get("decomposition", "")
-                    if d and d[0] in IDC_CHARS:
-                        idc = d[0]
-                        idc_counts[idc] = idc_counts.get(idc, 0) + 1
+                    if d:
+                        # Add structure count
+                        if d[0] in IDC_CHARS:
+                            idc = d[0]
+                            idc_counts[idc] = idc_counts.get(idc, 0) + 1
+                        
+                        # Gather all used components (removing IDC markers)
+                        clean_d = "".join([char for char in d if char not in IDC_CHARS])
+                        for char in clean_d:
+                            used_comps.add(char)
+
                 r_groups = {}
                 for r in r_counts:
                     gs = get_stroke_count(r) or 999
                     r_groups.setdefault(gs, []).append(r)
                 for gs in r_groups: r_groups[gs].sort()
+                
                 st.session_state.rad_groups = r_groups
                 st.session_state.rad_counts = r_counts
                 st.session_state.stroke_counts = s_counts
                 st.session_state.idc_counts = idc_counts
+                st.session_state.used_components = used_comps
 
-            # Stroke filter (Slider)
+            # 4TH FILTER: COMPONENT ONLY CHECKBOX
+            st.checkbox("Show Components Only", 
+                        key="w_component_only", 
+                        value=st.session_state.component_only,
+                        on_change=sync_component_only,
+                        help="Only show characters that appear as parts of other characters")
+
+            # MODIFIED: Stroke filter (Slider)
             min_s, max_s = st.session_state.stroke_range
             
             # Format label for expander
@@ -515,7 +542,7 @@ def main():
 
             with st.expander(s_label, expanded=False):
                 if st.button("Reset Range", use_container_width=True):
-                    st.session_state.stroke_range = (1, max_s_val)
+                    st.session_state.stroke_range = (3, 8) # Reset to updated default
                     st.session_state.page = 1
                     st.rerun()
                 
@@ -654,6 +681,8 @@ def main():
 
         if st.session_state.radical != "none": filter_parts.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
         if st.session_state.component_idc != "none": filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
+        if st.session_state.component_only: filter_parts.append(f"<span class='status-tag'>Components Only</span>")
+
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
         st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· 🖱click to preview in sidebar · 🖱🖱double-click to select</span></div>", unsafe_allow_html=True)
         
@@ -664,7 +693,9 @@ def main():
             # Radical Check
             (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and 
             # IDC Check
-            (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
+            (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc)) and
+            # Component Only Check
+            (not st.session_state.component_only or c in st.session_state.used_components)
         ]
 
         def _result_count(comp: str) -> int:
