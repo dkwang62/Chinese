@@ -190,8 +190,10 @@ def end_stroke_view():
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
 
+# --- CORRECTED RESET FUNCTION ---
 def reset():
-    st.session_state.stroke_range = (3, 8) # Reset to updated default
+    # 1. Reset underlying state variables
+    st.session_state.stroke_range = (3, 8) 
     st.session_state.radical = "none"
     st.session_state.component_idc = "none"
     st.session_state.script_variant = "Simplified"
@@ -203,6 +205,14 @@ def reset():
     st.session_state.stroke_view_char = ""
     st.session_state.text_input_comp = ""
     st.session_state.text_input_warning = None
+    
+    # 2. Force-update Widget Keys to visually reflect changes immediately
+    if "w_stroke_range" in st.session_state:
+        st.session_state.w_stroke_range = (3, 8)
+    if "w_component_only" in st.session_state:
+        st.session_state.w_component_only = True
+    if "w_text" in st.session_state:
+        st.session_state.w_text = ""
 
 def generate_clean_card_html(c):
     if not c:
@@ -543,6 +553,7 @@ def main():
             with st.expander(s_label, expanded=False):
                 if st.button("Reset Range", use_container_width=True):
                     st.session_state.stroke_range = (3, 8) # Reset to updated default
+                    st.session_state.w_stroke_range = (3, 8) # Fix reset button inside expander
                     st.session_state.page = 1
                     st.rerun()
                 
@@ -684,7 +695,7 @@ def main():
         if st.session_state.component_only: filter_parts.append(f"<span class='status-tag'>Components Only</span>")
 
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
-        st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>[click 🖱 to preview in sidebar]</span></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· 🖱click to preview in sidebar · 🖱🖱double-click to select</span></div>", unsafe_allow_html=True)
         
         # Logic for Filter List Comprehension
         filtered = [c for c in component_map if 
