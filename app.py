@@ -635,7 +635,13 @@ def main():
             with p2:
                 start = (st.session_state.page-1)*PAGE_SIZE + 1
                 end = min(st.session_state.page*PAGE_SIZE, total)
-                st.markdown(f"<div style='text-align:center; padding:10px 0; font-size:1.1em; color:#555;'>{start}–{end} of {total}</div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div style='text-align:center; padding:10px 0; color:#555;'>
+                        <div style='font-size:1.1em; font-weight:bold;'>{start}–{end} of {total}</div>
+                        <div style='font-size:0.85em; color:#e74c3c;'>📉 Sorted by Frequency</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
             with p3:
                 if st.button("Next ▶", disabled=st.session_state.page>=max_page):
                     st.session_state.page += 1
