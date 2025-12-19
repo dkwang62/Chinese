@@ -601,8 +601,18 @@ def main():
         if st.session_state.radical != "none": filter_parts.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
         if st.session_state.component_idc != "none": filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
-        st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· 🖱click to preview in sidebar · 🖱🖱double-click to select</span></div>", unsafe_allow_html=True)
-
+        st.markdown(
+            f"""
+            <div class='status-line'>
+              {filter_summary}
+              <ul style="margin: 8px 0 0 0; padding-left: 18px; text-align:left;">
+                <li><strong>Click:</strong> 🖱️</li>
+                <li><strong>Double-click:</strong> 🖱️🖱️</li>
+              </ul>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
         # Filters applied ONLY to the Grid listing
         filtered = [c for c in component_map if 
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
