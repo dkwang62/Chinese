@@ -1,8 +1,6 @@
 import json
 import math
-import asyncio
 import html
-import re
 import streamlit as st
 from streamlit.components.v1 import html as st_html
 
@@ -78,103 +76,23 @@ def load_component_map():
     except FileNotFoundError:
         return {}
 
-# --- Helper: Pinyin Number to Accent Converter ---
-def convert_pinyin(pinyin_str):
-    """Converts numbered pinyin (shu4) to accented pinyin (shù)."""
-    if not pinyin_str: return ""
-    
-    # Standardize umlaut
-    pinyin_str = pinyin_str.replace("u:", "ü").replace("v", "ü")
-    
-    tone_map = {
-        'a': 'āáǎà', 'e': 'ēéěè', 'i': 'īíǐì', 'o': 'ōóǒò', 'u': 'ūúǔù', 'ü': 'ǖǘǚǜ'
-    }
-    
-    def replace_syllable(match):
-        syll = match.group(0)
-        # Separate base and tone digit
-        try:
-            tone = int(syll[-1])
-            base = syll[:-1]
-        except ValueError:
-            return syll # No tone number found
-            
-        # Neutral tone (5) usually means no accent
-        if tone == 5:
-            return base
-
-        # Priority rules for placing tone mark:
-        # 1. a or e
-        # 2. ou
-        # 3. last vowel
-        if 'a' in base: v = 'a'
-        elif 'e' in base: v = 'e'
-        elif 'ou' in base: v = 'o'
-        else:
-            # Find the last vowel present
-            vowels = [c for c in base if c in "aiouü"]
-            if not vowels: return base
-            v = vowels[-1]
-            
-        # Replace the vowel with its accented version
-        if 0 < tone <= 4:
-            accented_char = tone_map[v][tone-1]
-            return base.replace(v, accented_char)
-        
-        return base
-
-    # Regex looks for syllables ending in 1-5
-    return re.sub(r'[a-zA-ZüÜ:]+\d', replace_syllable, pinyin_str)
-
-# --- Load Dictionary (Support both JSON mini and Raw Text) ---
+# --- Load Phrases Dictionary (JSON) ---
 @st.cache_data
-def load_cedict():
-    # 1. Try to load the Optimized JSON first (if it exists)
+def load_phrases():
     try:
-        with open("mini_dict.json", "r", encoding="utf-8") as f:
+        with open("phrases_dict.json", "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        pass # Fallback to parsing the big text file
-
-    # 2. Fallback: Parse raw CEDICT
-    cedict = {}
-    try:
-        with open("cedict_ts.u8", "r", encoding="utf-8") as f:
-            for line in f:
-                if line.startswith("#") or not line.strip(): 
-                    continue
-                # Format: Traditional Simplified [pin yin] /meaning 1/meaning 2/
-                parts = line.split(" ", 2)
-                if len(parts) < 3: continue
-                
-                simp = parts[1]
-                rest = parts[2]
-                
-                # Extract Pinyin
-                p_start = rest.find('[')
-                p_end = rest.find(']')
-                if p_start == -1 or p_end == -1: continue
-                
-                pinyin = rest[p_start+1:p_end]
-                
-                # Extract Meanings
-                meanings_raw = rest[p_end+1:].strip()
-                meanings = meanings_raw.strip('/').replace('/', '; ')
-                
-                if simp not in cedict:
-                    cedict[simp] = {"pinyin": pinyin, "meanings": meanings}
-    except FileNotFoundError:
-        pass 
-    return cedict
+        return {}
 
 try:
     component_map = load_component_map()
 except Exception as e:
     component_map = {}
-    st.error(f"Failed to load data: {e}")
+    st.error(f"Failed to load component data: {e}")
 
 # Load dictionary
-cedict_data = load_cedict()
+phrases_dict = load_phrases()
 
 def clean_field(field):
     return field[0] if isinstance(field, list) and field else field or "—"
@@ -580,7 +498,7 @@ def main():
                 st.session_state.stroke_counts = s_counts
                 st.session_state.idc_counts = idc_counts
 
-            # MODIFIED: Stroke filter (Slider)
+            # Stroke filter (Slider)
             min_s, max_s = st.session_state.stroke_range
             
             # Format label for expander
@@ -646,80 +564,6 @@ def main():
                             st.session_state.component_idc = idc
                             st.session_state.page = 1
                             st.rerun()
-
-            # --- DICTIONARY TOOL ---
-            st.markdown("---")
-            with st.expander("Dictionary Tools", expanded=False):
-                st.caption("Generate a minimized dictionary containing ONLY the phrases found in your component map, with pinyin pre-converted to accents.")
-                
-                if st.button("Generate & Convert Dictionary", type="primary", use_container_width=True):
-                    with st.spinner("Processing... this may take a moment."):
-                        # 1. Collect all compounds from component_map
-                        needed_phrases = set()
-                        for char_data in component_map.values():
-                            compounds = char_data.get("meta", {}).get("compounds", [])
-                            for c in compounds:
-                                needed_phrases.add(c)
-                        
-                        # 2. Parse raw dictionary, filter, and convert
-                        mini_dict = {}
-                        count = 0
-                        try:
-                            with open("cedict_ts.u8", "r", encoding="utf-8") as f:
-                                for line in f:
-                                    if line.startswith("#") or not line.strip(): continue
-                                    parts = line.split(" ", 2)
-                                    if len(parts) < 3: continue
-                                    
-                                    simp = parts[1]
-                                    if simp not in needed_phrases:
-                                        continue # SKIP if not needed
-                                    
-                                    rest = parts[2]
-                                    p_start = rest.find('[')
-                                    p_end = rest.find(']')
-                                    if p_start == -1 or p_end == -1: continue
-                                    
-                                    raw_pinyin = rest[p_start+1:p_end]
-                                    meanings_raw = rest[p_end+1:].strip()
-                                    meanings_list = meanings_raw.strip('/').split('/')
-                                    
-                                    # --- CONVERSIONS ---
-                                    # 1. Main Pinyin
-                                    final_pinyin = convert_pinyin(raw_pinyin)
-                                    
-                                    # 2. Meanings (convert pinyin inside [brackets])
-                                    # Example: "see also [ma3]" -> "see also [mǎ]"
-                                    final_meanings_list = []
-                                    for m in meanings_list:
-                                        # Regex to find [contents] and convert them
-                                        def repl(match):
-                                            return f"[{convert_pinyin(match.group(1))}]"
-                                        
-                                        converted_m = re.sub(r'\[([a-zA-Z0-9\s:ü]+)\]', repl, m)
-                                        final_meanings_list.append(converted_m)
-                                        
-                                    final_meanings_str = "; ".join(final_meanings_list)
-                                    
-                                    if simp not in mini_dict:
-                                        mini_dict[simp] = {"pinyin": final_pinyin, "meanings": final_meanings_str}
-                                        count += 1
-                                        
-                            st.success(f"Generated mini dictionary with {count} entries!")
-                            
-                            # 3. Serialize to JSON
-                            json_str = json.dumps(mini_dict, ensure_ascii=False, indent=2)
-                            st.download_button(
-                                label="Download mini_dict.json",
-                                data=json_str,
-                                file_name="mini_dict.json",
-                                mime="application/json",
-                                use_container_width=True
-                            )
-                            
-                        except FileNotFoundError:
-                            st.error("Could not find 'cedict_ts.u8' to generate from.")
-
 
             st.markdown("---")
             # PREVIEW (Main view hover/click)
@@ -795,7 +639,7 @@ def main():
     if st.session_state.show_inputs:
         filter_parts = []
         
-        # MODIFIED: Logic for Stroke Status Tag
+        # Logic for Stroke Status Tag
         cur_min, cur_max = st.session_state.stroke_range
         # Only show tag if it's NOT the full range
         if not (cur_min == 1 and cur_max == max_s_val):
@@ -813,7 +657,7 @@ def main():
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
         st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· 🖱click to preview in sidebar · 🖱🖱double-click to select</span></div>", unsafe_allow_html=True)
         
-        # MODIFIED: Logic for Filter List Comprehension
+        # Logic for Filter List Comprehension
         filtered = [c for c in component_map if 
             # Stroke Range Check (Inclusive)
             (lambda s: s is not None and cur_min <= s <= cur_max)(get_stroke_count(c)) and
@@ -916,18 +760,13 @@ def main():
                     # Generate HTML list with lookup
                     items_html = []
                     for word in sorted_compounds:
-                        # Lookup in CEDICT
-                        entry = cedict_data.get(word)
-                        
-                        # --- USE PRE-CONVERTED OR CONVERT ON FLY ---
-                        # If loaded from JSON, it's already converted. If from Text, it's raw.
-                        # We can just run convert_pinyin() safely because if it's already accent, nothing happens.
-                        
+                        # Lookup in JSON dictionary
+                        entry = phrases_dict.get(word)
                         pinyin = entry.get('pinyin', '') if entry else ''
                         meanings = entry.get('meanings', '') if entry else ''
                         
-                        # Apply conversion (Handles both cases seamlessly)
-                        display_pinyin = convert_pinyin(pinyin)
+                        # Note: Pinyin and Meanings are already converted in the JSON
+                        display_pinyin = pinyin 
                         
                         # --- TRUNCATION LOGIC ---
                         limit = 100
@@ -948,6 +787,7 @@ def main():
                     
                     full_list_html = "".join(items_html)
                     
+                    # No indentation in the wrapper
                     st.markdown(f"""<div style='padding:15px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; border-bottom:2px solid #a5d6a7; padding-bottom:5px;'>{st.session_state.display_mode}</div>{full_list_html}</div>""", unsafe_allow_html=True)
 
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
