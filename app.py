@@ -779,7 +779,8 @@ with sidebar:
 # ------------------------------
 if st.session_state.stroke_view_active:
     render_stroke_order_view(st.session_state.stroke_view_char)
-    return
+    st.stop()
+
 
 if st.session_state.show_inputs:
     filter_parts = []
