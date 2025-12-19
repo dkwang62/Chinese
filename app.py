@@ -529,6 +529,19 @@ def main():
             if st.session_state.preview_comp:
                 preview_char = st.session_state.preview_comp
                 render_stroke_order_sidebar(preview_char, size=110)
+
+                # --- NEW BUTTON ADDED HERE ---
+                if st.button(f"👉 Select {preview_char}", key="sb_select_btn", use_container_width=True, type="primary"):
+                    st.session_state.selected_comp = preview_char
+                    st.session_state.last_valid_selected_comp = preview_char
+                    st.session_state.show_inputs = False
+                    st.session_state.preview_comp = None
+                    st.session_state.text_input_comp = preview_char
+                    st.session_state.text_input_warning = None
+                    st.rerun()
+                # -----------------------------
+
+                
                 
                 # Count calculation: RAW TOTAL.
                 # The first line filters (Stroke/Rad/IDC) are NOT used here.
