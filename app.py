@@ -1,6 +1,7 @@
 import json
 import math
 import asyncio
+import html  # Added for escaping text
 import streamlit as st
 from streamlit.components.v1 import html as st_html
 
@@ -76,7 +77,7 @@ def load_component_map():
     except FileNotFoundError:
         return {}
 
-# --- NEW: Load CC-CEDICT Dictionary ---
+# --- Load CC-CEDICT Dictionary ---
 @st.cache_data
 def load_cedict():
     cedict = {}
@@ -86,7 +87,6 @@ def load_cedict():
                 if line.startswith("#") or not line.strip(): 
                     continue
                 # Format: Traditional Simplified [pin yin] /meaning 1/meaning 2/
-                # We typically want to map Simplified -> Data
                 parts = line.split(" ", 2)
                 if len(parts) < 3: continue
                 
@@ -101,18 +101,13 @@ def load_cedict():
                 pinyin = rest[p_start+1:p_end]
                 
                 # Extract Meanings
-                # Everything after the closing bracket, remove slashes
                 meanings_raw = rest[p_end+1:].strip()
                 meanings = meanings_raw.strip('/').replace('/', '; ')
                 
-                # Store. Note: A word might have multiple entries (pronunciations).
-                # We will store the first one encountered or a list. 
-                # For simplicity in this app, we store the first valid one, 
-                # or you could store a list if you want to be exhaustive.
                 if simp not in cedict:
                     cedict[simp] = {"pinyin": pinyin, "meanings": meanings}
     except FileNotFoundError:
-        pass # Graceful fail if file not found
+        pass 
     return cedict
 
 try:
@@ -149,7 +144,6 @@ def format_decomposition(char):
     return "—" if not d or '?' in d else d
 
 # --- State init ---
-# "stroke_range" stores the tuple (min, max)
 defaults = {
     "selected_comp": "", "stroke_range": (1, 60), "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
@@ -793,16 +787,22 @@ def main():
                     for word in sorted_compounds:
                         # Lookup in CEDICT
                         entry = cedict_data.get(word)
+                        pinyin = entry.get('pinyin', '') if entry else ''
+                        meanings = entry.get('meanings', '') if entry else ''
+                        
+                        # --- TRUNCATION LOGIC ---
+                        limit = 100
+                        if len(meanings) > limit:
+                            display_meanings = meanings[:limit] + "..."
+                        else:
+                            display_meanings = meanings
+                        
+                        # Safe escape to prevent HTML breaking
+                        display_meanings = html.escape(display_meanings)
+
+                        # --- FIX: No indentation in f-string to prevent markdown code block issue ---
                         if entry:
-                            pinyin = entry.get('pinyin', '')
-                            meanings = entry.get('meanings', '')
-                            item_str = f"""
-                            <div class='compound-item'>
-                                <span class='cp-word'>{word}</span>
-                                <span class='cp-pinyin'>[{pinyin}]</span>
-                                <span class='cp-mean'>{meanings}</span>
-                            </div>
-                            """
+                            item_str = f"<div class='compound-item'><span class='cp-word'>{word}</span><span class='cp-pinyin'>[{pinyin}]</span><span class='cp-mean'>{display_meanings}</span></div>"
                             items_html.append(item_str)
                         else:
                             # Fallback if not found
@@ -810,14 +810,8 @@ def main():
                     
                     full_list_html = "".join(items_html)
                     
-                    st.markdown(f"""
-                        <div style='padding:15px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>
-                            <div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; border-bottom:2px solid #a5d6a7; padding-bottom:5px;'>
-                                {st.session_state.display_mode}
-                            </div>
-                            {full_list_html}
-                        </div>
-                    """, unsafe_allow_html=True)
+                    # No indentation in the wrapper either
+                    st.markdown(f"""<div style='padding:15px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; border-bottom:2px solid #a5d6a7; padding-bottom:5px;'>{st.session_state.display_mode}</div>{full_list_html}</div>""", unsafe_allow_html=True)
 
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
         
