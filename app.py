@@ -60,7 +60,7 @@ except Exception as e:
     st.error(f"Failed to load data: {e}")
 
 def clean_field(field):
-    return field[0] if isinstance(field, list) and field else field or "—"
+    return field,[object Object], if isinstance(field, list) and field else field or "—"
 
 def get_stroke_count(char):
     strokes = component_map.get(char, {}).get("meta", {}).get("strokes", None)
@@ -252,7 +252,6 @@ def render_stroke_order_view(char: str):
         st.info("No character selected for stroke order.")
         return
     st.markdown(f"## Stroke order — {char}")
-    # (full stroke order view unchanged — same as your original)
     st_html(
         f"""
         <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap;">
