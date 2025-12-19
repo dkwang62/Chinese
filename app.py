@@ -102,7 +102,7 @@ def format_decomposition(char):
 # --- State init ---
 # "stroke_range" stores the tuple (min, max)
 defaults = {
-    "selected_comp": "", "stroke_range": (1, 60), "radical": "none", "component_idc": "none",
+    "selected_comp": "", "stroke_range": (1, 33), "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
     "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None,
     "stroke_view_active": False, "stroke_view_char": "",
@@ -168,7 +168,7 @@ def end_stroke_view():
     st.session_state.stroke_view_char = ""
 
 def reset():
-    st.session_state.stroke_range = (1, 60) # Reset to default wide range
+    st.session_state.stroke_range = (1, 33) # Reset to default wide range
     st.session_state.radical = "none"
     st.session_state.component_idc = "none"
     st.session_state.script_variant = "Simplified"
