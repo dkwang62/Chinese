@@ -62,7 +62,7 @@ def apply_dynamic_css():
     .compound-item { display: flex; align-items: baseline; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e0e0e0; }
     .compound-item:last-child { border-bottom: none; margin-bottom: 0; }
     .cp-word { font-weight: bold; font-size: 1.1em; color: #2c3e50; min-width: 80px; margin-right: 10px; }
-    .cp-pinyin { color: #555; font-family: monospace; margin-right: 10px; color: #d35400;}
+    .cp-pinyin { color: #d35400; font-family: monospace; margin-right: 10px; font-weight: 500;}
     .cp-mean { color: #333; font-size: 0.95em; flex: 1; }
     </style>
     """
