@@ -39,12 +39,9 @@ def apply_dynamic_css():
     .status-tag {background-color: #f1f3f5; color: #2c3e50; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.9em; border: 1px solid #e9ecef; display: inline-flex; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);}
     .status-text {color: #0f5132; font-size: 0.95em; margin-left: 10px;}
     
-    /* Sidebar Count Lines - UPDATED for Red Character */
+    /* Sidebar Count Lines */
     .preview-count-line {font-size: 1.3em; text-align: center; color: #2c3e50; margin: 20px 0 25px 0;}
     .preview-count-line .char {font-size: 1.4em; font-weight: bold; color: #e74c3c;}
-    
-    .count-line {font-size: 1.2em; text-align: center; color: #333; margin: 15px 0;}
-    .count-line .char {font-weight: bold; color: #e74c3c;}
     
     /* General UI */
     .jump-footer {margin-top: 40px; padding: 20px; background: #f8f9fa; border-top: 1px solid #e0e0e0; text-align: center;}
@@ -99,7 +96,7 @@ defaults = {
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
     "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None,
     "stroke_view_active": False, "stroke_view_char": "",
-    "script_variant": "Simplified" # Changed default from None to Simplified
+    "script_variant": "Simplified" 
 }
 
 for k, v in defaults.items():
@@ -117,7 +114,7 @@ def sync_idc():
 
 def sync_script():
     st.session_state.script_variant = st.session_state.w_script
-    st.session_state.page = 1
+    # Note: We do NOT reset page here, as this filter is for the result list only
 
 def sync_display():
     st.session_state.display_mode = st.session_state.w_display
@@ -155,7 +152,6 @@ def back():
     st.session_state.stroke_view_char = ""
     st.session_state.text_input_comp = ""
     st.session_state.text_input_warning = None
-    # No longer resetting script_variant to "None", keeping user selection or Simplified default
     
 def end_stroke_view():
     st.session_state.stroke_view_active = False
@@ -165,7 +161,7 @@ def reset():
     st.session_state.stroke_count = 0
     st.session_state.radical = "none"
     st.session_state.component_idc = "none"
-    st.session_state.script_variant = "Simplified" # Reset to Simplified
+    st.session_state.script_variant = "Simplified"
     st.session_state.page = 1
     st.session_state.show_inputs = True
     st.session_state.preview_comp = None
@@ -419,22 +415,20 @@ def main():
                             st.rerun()
 
             st.markdown("---")
-            # PREVIEW WITH ANIMATED STROKE ORDER
+            # PREVIEW (Main view hover/click)
             if st.session_state.preview_comp:
                 preview_char = st.session_state.preview_comp
-                # Removed static text header, kept only animation and count line
                 render_stroke_order_sidebar(preview_char, size=110)
                 
+                # Count calculation: RAW TOTAL.
+                # The first line filters (Stroke/Rad/IDC) are NOT used here.
                 related = component_map.get(preview_char, {}).get("related_characters", [])
                 count = len(set([c for c in related if len(c) == 1]))
                 
-                # Using preview-count-line for red character color
-                st.markdown(f"<div class='preview-count-line'>{count} characters has <span class='char'>{preview_char}</span></div>", unsafe_allow_html=True)
-                
-                # Removed generate_clean_card_html call
+                st.markdown(f"<div class='preview-count-line'>{count} characters with <span class='char'>{preview_char}</span></div>", unsafe_allow_html=True)
 
         else:
-            # SELECTED VIEW WITH ANIMATED STROKE ORDER
+            # SELECTED VIEW
             st.button("← Back to list", on_click=back, use_container_width=True)
             selected_char = st.session_state.selected_comp
             if selected_char:
@@ -445,29 +439,29 @@ def main():
                 
                 render_stroke_order_sidebar(selected_char, size=140)
                 
-                # CHANGED to Radio button, default Simplified
+                # Filter Radio Button
                 st.radio("Filter Results", ["Simplified", "Traditional"],
                              key="w_script", 
                              index=0 if st.session_state.script_variant == "Simplified" else 1,
                              on_change=sync_script)
                 
                 # Logic for count
+                # 1. Get ALL related characters (Ignore Stroke/Radical filters)
                 related = component_map.get(selected_char, {}).get("related_characters", [])
-                chars_unique = list(set([c for c in related if len(c) == 1]))
+                chars_all = list(set([c for c in related if len(c) == 1]))
+                chars_all = [c for c in chars_all if c in component_map]
+
+                # 2. Apply ONLY the Simp/Trad filter (because it's the active view filter)
+                if st.session_state.script_variant == "Simplified":
+                    chars_filtered = [c for c in chars_all if not cc_t2s or cc_t2s.convert(c) == c]
+                elif st.session_state.script_variant == "Traditional":
+                    chars_filtered = [c for c in chars_all if not cc_s2t or cc_s2t.convert(c) == c]
+                else:
+                    chars_filtered = chars_all
+
+                count_filtered = len(chars_filtered)
                 
-                if cc_t2s and cc_s2t:
-                    filtered = []
-                    for c in chars_unique:
-                        if st.session_state.script_variant == "Simplified":
-                            if cc_t2s.convert(c) == c and cc_s2t.convert(c) != c: filtered.append(c)
-                        elif st.session_state.script_variant == "Traditional":
-                            if cc_s2t.convert(c) == c and cc_t2s.convert(c) != c: filtered.append(c)
-                    chars_unique = filtered
-                
-                count = len([c for c in chars_unique if c in component_map])
-                
-                # Using preview-count-line here too to ensure visual consistency (Red Char) as requested
-                st.markdown(f"<div class='preview-count-line'>{count} characters has <span class='char'>{selected_char}</span></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='preview-count-line'>{count_filtered} characters with <span class='char'>{selected_char}</span></div>", unsafe_allow_html=True)
                 
                 modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
                 st.radio("", options=modes, index=modes.index(st.session_state.display_mode), key="w_display", on_change=sync_display)
@@ -486,6 +480,7 @@ def main():
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
         st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· 🖱to preview in sidebar · 🖱🖱 to select</span></div>", unsafe_allow_html=True)
 
+        # Filters applied ONLY to the Grid listing
         filtered = [c for c in component_map if 
             (st.session_state.stroke_count == 0 or get_stroke_count(c) == st.session_state.stroke_count) and
             (st.session_state.radical == "none" or component_map.get(c, {}).get("meta", {}).get("radical") == st.session_state.radical) and 
@@ -496,6 +491,7 @@ def main():
             rel = component_map.get(comp, {}).get("related_characters", [])
             return len({x for x in rel if isinstance(x, str) and len(x) == 1})
 
+        # Sorting uses raw count (unfiltered)
         _counts = {c: _result_count(c) for c in filtered}
         sorted_comps = sorted(filtered, key=lambda c: (-_counts.get(c, 0), get_stroke_count(c) or 999, c))
 
@@ -542,14 +538,16 @@ def main():
             st.markdown("</div>", unsafe_allow_html=True)
 
     else:
-        # Results view
+        # Results view (The actual cards)
         related = component_map[st.session_state.selected_comp].get("related_characters", [])
         chars = list(set([c for c in related if len(c)==1]))
+        
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w)==n] for c in chars} if n else {c:[] for c in chars}
         chars = [c for c in chars if n==0 or compounds[c]]
         chars = sorted(chars, key=lambda x: get_stroke_count(x) or 999)
 
+        # Apply Simp/Trad filter to the displayed list
         if st.session_state.script_variant == "Simplified":
             chars = [c for c in chars if not cc_t2s or cc_t2s.convert(c) == c]
         elif st.session_state.script_variant == "Traditional":
