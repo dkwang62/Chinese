@@ -57,6 +57,13 @@ def apply_dynamic_css():
     div[data-testid="stExpander"] .stButton button {font-size: 1.2rem; height: 40px; padding: 0; line-height: 1.2; border-radius: 4px; border: 1px solid #eee; transition: all 0.1s ease-in-out;}
     div[data-testid="stExpander"] .stButton button:hover {border-color: #bbb; background-color: #f0f0f0;}
     .stroke-header {font-size: 0.85em; color: #888; border-bottom: 1px solid #eee; margin: 10px 0 5px 0; padding-bottom: 2px;}
+
+    /* Compound List Styling */
+    .compound-item { display: flex; align-items: baseline; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e0e0e0; }
+    .compound-item:last-child { border-bottom: none; margin-bottom: 0; }
+    .cp-word { font-weight: bold; font-size: 1.1em; color: #2c3e50; min-width: 80px; margin-right: 10px; }
+    .cp-pinyin { color: #555; font-family: monospace; margin-right: 10px; color: #d35400;}
+    .cp-mean { color: #333; font-size: 0.95em; flex: 1; }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -69,11 +76,53 @@ def load_component_map():
     except FileNotFoundError:
         return {}
 
+# --- NEW: Load CC-CEDICT Dictionary ---
+@st.cache_data
+def load_cedict():
+    cedict = {}
+    try:
+        with open("cedict_ts.u8", "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("#") or not line.strip(): 
+                    continue
+                # Format: Traditional Simplified [pin yin] /meaning 1/meaning 2/
+                # We typically want to map Simplified -> Data
+                parts = line.split(" ", 2)
+                if len(parts) < 3: continue
+                
+                simp = parts[1]
+                rest = parts[2]
+                
+                # Extract Pinyin
+                p_start = rest.find('[')
+                p_end = rest.find(']')
+                if p_start == -1 or p_end == -1: continue
+                
+                pinyin = rest[p_start+1:p_end]
+                
+                # Extract Meanings
+                # Everything after the closing bracket, remove slashes
+                meanings_raw = rest[p_end+1:].strip()
+                meanings = meanings_raw.strip('/').replace('/', '; ')
+                
+                # Store. Note: A word might have multiple entries (pronunciations).
+                # We will store the first one encountered or a list. 
+                # For simplicity in this app, we store the first valid one, 
+                # or you could store a list if you want to be exhaustive.
+                if simp not in cedict:
+                    cedict[simp] = {"pinyin": pinyin, "meanings": meanings}
+    except FileNotFoundError:
+        pass # Graceful fail if file not found
+    return cedict
+
 try:
     component_map = load_component_map()
 except Exception as e:
     component_map = {}
     st.error(f"Failed to load data: {e}")
+
+# Load dictionary
+cedict_data = load_cedict()
 
 def clean_field(field):
     return field[0] if isinstance(field, list) and field else field or "—"
@@ -102,7 +151,7 @@ def format_decomposition(char):
 # --- State init ---
 # "stroke_range" stores the tuple (min, max)
 defaults = {
-    "selected_comp": "", "stroke_range": (1, 33), "radical": "none", "component_idc": "none",
+    "selected_comp": "", "stroke_range": (1, 60), "radical": "none", "component_idc": "none",
     "display_mode": "Single Character", "text_input_comp": "", "page": 1, "text_input_warning": None,
     "show_inputs": True, "last_valid_selected_comp": "", "preview_comp": None,
     "stroke_view_active": False, "stroke_view_char": "",
@@ -114,7 +163,6 @@ for k, v in defaults.items():
 
 # --- Callbacks ---
 
-# CORRECTED: Properly sync the widget value to the state variable
 def sync_stroke_range():
     st.session_state.stroke_range = st.session_state.w_stroke_range
     st.session_state.page = 1
@@ -168,7 +216,7 @@ def end_stroke_view():
     st.session_state.stroke_view_char = ""
 
 def reset():
-    st.session_state.stroke_range = (1, 33) # Reset to default wide range
+    st.session_state.stroke_range = (1, 60) # Reset to default wide range
     st.session_state.radical = "none"
     st.session_state.component_idc = "none"
     st.session_state.script_variant = "Simplified"
@@ -734,8 +782,43 @@ def main():
                 st.markdown(f"<div style='font-size: 3.5em; font-weight: bold; text-align: center; color: #111; line-height: 1.2;'>{c}</div>", unsafe_allow_html=True)
             with col_details:
                 st.markdown(generate_clean_card_html(c), unsafe_allow_html=True)
+                
+                # --- MODIFIED COMPOUND DISPLAY ---
                 if compounds.get(c):
-                    st.markdown(f"<div style='padding:10px; background:#f1f8e9; border-radius:8px; margin-top:5px;'><strong>{st.session_state.display_mode}:</strong> {' '.join(sorted(compounds[c]))}</div>", unsafe_allow_html=True)
+                    # Sort alphabetical
+                    sorted_compounds = sorted(compounds[c])
+                    
+                    # Generate HTML list with lookup
+                    items_html = []
+                    for word in sorted_compounds:
+                        # Lookup in CEDICT
+                        entry = cedict_data.get(word)
+                        if entry:
+                            pinyin = entry.get('pinyin', '')
+                            meanings = entry.get('meanings', '')
+                            item_str = f"""
+                            <div class='compound-item'>
+                                <span class='cp-word'>{word}</span>
+                                <span class='cp-pinyin'>[{pinyin}]</span>
+                                <span class='cp-mean'>{meanings}</span>
+                            </div>
+                            """
+                            items_html.append(item_str)
+                        else:
+                            # Fallback if not found
+                            items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
+                    
+                    full_list_html = "".join(items_html)
+                    
+                    st.markdown(f"""
+                        <div style='padding:15px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>
+                            <div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; border-bottom:2px solid #a5d6a7; padding-bottom:5px;'>
+                                {st.session_state.display_mode}
+                            </div>
+                            {full_list_html}
+                        </div>
+                    """, unsafe_allow_html=True)
+
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
         
         if chars and n:
