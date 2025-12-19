@@ -21,9 +21,6 @@ def apply_dynamic_css():
     <style>
     .results-header-sidebar {font-size: 1.4em; font-weight: bold; color: #2c3e50; margin: 20px 0 10px 0; text-align: center;}
 
-    section.main > div.block-container { padding-top: 0rem; }
-    .status-line { margin-top: 0px; }
-
     /* Char card styling */
     .char-card {background: white; padding: 20px; border-radius: 10px; margin-bottom: 0px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);}
     .meta-row {font-size: 0.95em; color: #555; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;}
