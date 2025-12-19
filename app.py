@@ -277,38 +277,52 @@ def render_stroke_order_view(char_input: str):
         return
     
     # Calculate variants (Simplified/Traditional)
-    chars_to_show = []
-    
-    # Logic: Always try to show [Simplified, Traditional] if they differ
     s_char = cc_t2s.convert(primary_char) if cc_t2s else primary_char
     t_char = cc_s2t.convert(primary_char) if cc_s2t else primary_char
     
-    # If converted s_char is different from primary (implied primary was trad), or converted t_char different (implied primary was simp)
+    # Logic: Determine display order based on what the user clicked
+    chars_to_show = []
+    
     if s_char != t_char:
-        # Show both: Simplified first, then Traditional (or user pref, but let's stick to s/t order or input order)
-        # Requirement: "show BOTH the drawings - traditional and simplified"
-        chars_to_show = [s_char, t_char] if s_char != t_char else [primary_char]
+        # If the user input matches the Traditional version, show Traditional FIRST
+        if primary_char == t_char:
+            chars_to_show = [t_char, s_char]
+        # Otherwise (User clicked Simplified), show Simplified FIRST
+        else:
+            chars_to_show = [s_char, t_char]
     else:
+        # No difference, just show one
         chars_to_show = [primary_char]
 
     # Clean duplicates just in case
     chars_to_show = list(dict.fromkeys(chars_to_show))
 
     # Generate container HTML
+    # CHANGED: Reduced width/height from 400px to 280px for mobile/tablet compatibility
+    BOX_SIZE = 280 
+    
     container_html = ""
     for i, c in enumerate(chars_to_show):
-        label = "Simplified" if c == s_char and s_char != t_char else "Traditional" if c == t_char and s_char != t_char else ""
-        label_html = f"<div style='text-align:center; font-weight:bold; color:#555; margin-bottom:5px;'>{label}</div>" if label else ""
+        # Determine label based on character type
+        label_text = ""
+        if s_char != t_char:
+            if c == s_char:
+                label_text = "Simplified"
+            elif c == t_char:
+                label_text = "Traditional"
+        
+        label_html = f"<div style='text-align:center; font-weight:bold; color:#555; margin-bottom:5px;'>{label_text}</div>" if label_text else ""
+        
         container_html += f"""
         <div style="display:flex; flex-direction:column; align-items:center;">
              {label_html}
-            <div id="hw-target-{i}" style="width:400px;height:400px;border:1px solid #e0e0e0;border-radius:12px; background:white;"></div>
+            <div id="hw-target-{i}" style="width:{BOX_SIZE}px;height:{BOX_SIZE}px;border:1px solid #e0e0e0;border-radius:12px; background:white;"></div>
         </div>
         """
 
     st_html(
         f"""
-        <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; justify-content:center;">
+        <div style="display:flex; gap:15px; align-items:flex-start; flex-wrap:wrap; justify-content:center;">
             {container_html}
         </div>
         <div style="display:flex; justify-content:center; margin-top:15px; gap:8px;">
@@ -319,6 +333,7 @@ def render_stroke_order_view(char_input: str):
         <script>
         (function() {{
             const chars = {json.dumps(chars_to_show, ensure_ascii=False)};
+            const boxSize = {BOX_SIZE};
             const errEl = document.getElementById('hw-error');
             
             function loadScript(src) {{ return new Promise((resolve, reject) => {{
@@ -351,12 +366,12 @@ def render_stroke_order_view(char_input: str):
                         
                         if(hasData) {{
                             const writer = window.HanziWriter.create(targetId, char, {{
-                                width: 400, height: 400, padding: 14, showOutline: true, showCharacter: false, 
+                                width: boxSize, height: boxSize, padding: 10, showOutline: true, showCharacter: false, 
                                 strokeAnimationSpeed: 1, delayBetweenStrokes: 60
                             }});
                             writers.push(writer);
                         }} else {{
-                            document.getElementById(targetId).innerHTML = `<div style="line-height:400px; text-align:center; font-size:200px; color:#ddd;">${{char}}</div>`;
+                            document.getElementById(targetId).innerHTML = `<div style="line-height:${{boxSize}}px; text-align:center; font-size:${{boxSize/2}}px; color:#ddd;">${{char}}</div>`;
                         }}
                     }}
                     
@@ -393,7 +408,7 @@ def render_stroke_order_view(char_input: str):
         }})();
         </script>
         """,
-        height=520,
+        height=400, # Reduced overall iframe height since boxes are smaller
     )
 
 def main():
