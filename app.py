@@ -486,7 +486,7 @@ def render_splash():
             <div class="splash-title">Radix 🈑 Explore Characters by Components</div>
             <div class="splash-sub">
               Read and write Chinese characters by breaking them into <b>components</b> 
-              those recurring parts that often hint at meaning or pronunciation.
+              - those recurring parts that often hint at meaning or pronunciation.
               The same components appear across many characters in consistent patterns,
               learning one structure helps you recognise and understand many more.
             </div>
