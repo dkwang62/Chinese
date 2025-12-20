@@ -191,29 +191,7 @@ def end_stroke_view():
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
 
-# --- CORRECTED RESET FUNCTION (Delete Strategy) ---
-def reset():
-    # Reset underlying state variables to defaults
-    st.session_state.stroke_range = (3, 8) 
-    st.session_state.radical = "none"
-    st.session_state.component_idc = "none"
-    st.session_state.script_variant = "Simplified"
-    st.session_state.component_only = True
-    st.session_state.page = 1
-    st.session_state.show_inputs = True
-    st.session_state.preview_comp = None
-    st.session_state.stroke_view_active = False
-    st.session_state.stroke_view_char = ""
-    st.session_state.text_input_comp = ""
-    st.session_state.text_input_warning = None
-    
-    # Update widget keys to match reset values (don't delete them)
-    st.session_state.w_stroke_range = (3, 8)
-    st.session_state.w_component_only = True
-    st.session_state.w_text = ""
-    st.session_state.w_script = "Simplified"
-    # Note: w_idc doesn't need to be reset as it's in an expander and only set when changed
-    
+# REMOVED RESET FUNCTION AND BUTTONS TO AVOID WIDGET CONFLICTS
 
 def generate_clean_card_html(c):
     if not c:
@@ -456,9 +434,7 @@ def main():
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
-        if st.button("🔄 Reset All Filters & Selection", use_container_width=True, type="primary"):
-            reset()
-            st.rerun()
+        # REMOVED RESET BUTTON FROM HERE
 
         if st.session_state.stroke_view_active:
             st.button("← Back", on_click=end_stroke_view, use_container_width=True)
@@ -547,12 +523,7 @@ def main():
                 s_label = f"Strokes: {min_s} – {max_s}"
 
             with st.expander(s_label, expanded=False):
-                if st.button("Reset Range", use_container_width=True):
-                    st.session_state.stroke_range = (3, 8) # Reset to updated default
-                    if "w_stroke_range" in st.session_state: del st.session_state.w_stroke_range
-                    st.session_state.page = 1
-                    st.rerun()
-                
+                # REMOVED RESET BUTTON FROM HERE
                 st.slider(
                     "Select Stroke Range",
                     min_value=1,
@@ -568,10 +539,7 @@ def main():
             # Radical filter
             r_label = f"Radical: {st.session_state.radical}" if st.session_state.radical != "none" else "Radical (Any)"
             with st.expander(r_label, expanded=False):
-                if st.button("Clear Radical", use_container_width=True):
-                    st.session_state.radical = "none"
-                    st.session_state.page = 1
-                    st.rerun()
+                # REMOVED RESET BUTTON FROM HERE
                 for s in sorted(st.session_state.rad_groups.keys()):
                     st.markdown(f"<div class='stroke-header'>{s if s!=999 else '?'} Strokes</div>", unsafe_allow_html=True)
                     rads = st.session_state.rad_groups[s]
@@ -586,10 +554,7 @@ def main():
             # Structure filter
             idc_label = f"Structure: {st.session_state.component_idc}" if st.session_state.component_idc != "none" else "Structure (Any)"
             with st.expander(idc_label, expanded=False):
-                if st.button("Clear Structure", use_container_width=True):
-                    st.session_state.component_idc = "none"
-                    st.session_state.page = 1
-                    st.rerun()
+                # REMOVED RESET BUTTON FROM HERE
                 idc_keys = sorted(st.session_state.idc_counts.keys())
                 idc_cols = st.columns(5)
                 for i, idc in enumerate(idc_keys):
