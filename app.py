@@ -577,7 +577,7 @@ def render_splash():
             st.session_state.onboarding_done = True
             st.rerun()
 
-    st.markdown("<div class='splash-tip'>Tip: Single-click previews in the sidebar. Double-click selects.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='splash-tip'>Tip: Single-click previews. Double-click explores.</div>", unsafe_allow_html=True)
 
 
 def main():
@@ -844,7 +844,7 @@ def main():
 
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
         st.markdown(
-            f"<div class='status-line'>{filter_summary} <span class='status-text'>· click to preview in sidebar · double-click to select</span></div>",
+            f"<div class='status-line'>{filter_summary} <span class='status-text'>· Single-click previews. Double-click explores.</span></div>",
             unsafe_allow_html=True,
         )
 
