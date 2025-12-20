@@ -491,7 +491,7 @@ def render_splash():
               learning one structure helps you recognise and understand many more.
             </div>
             <div class="splash-sub">
-              Choose a <b>components</b> to reveal its <b>character family</b>, with stroke order and phrases 
+              Choose a <b>component</b> to reveal its <b>character family</b>, with stroke order and phrases 
               to reinforce your understanding.
             </div>
             <div class="splash-demo">
@@ -576,8 +576,6 @@ def render_splash():
         if st.button("Enter Radix", use_container_width=True):
             st.session_state.onboarding_done = True
             st.rerun()
-
-    st.markdown("<div class='splash-tip'>Tip: Single-click previews. Double-click explores.</div>", unsafe_allow_html=True)
 
 
 def main():
