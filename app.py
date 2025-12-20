@@ -485,7 +485,7 @@ def render_splash():
         <div class="splash-card">
             <div class="splash-title">Build Chinese characters, don’t just look them up.</div>
             <div class="splash-sub">
-            Radix helps you read and write Chinese characters by breaking them into <b>components</b>
+            Radix 🈑 helps you read and write Chinese characters by breaking them into <b>components</b>
             that often hint at meaning or pronunciation. These components recur across different
             characters in recognisable patterns—so learning one structure helps you understand and
             read many more. Pick one piece and reveal the full <b>character family</b> it creates
