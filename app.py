@@ -465,13 +465,17 @@ def render_stroke_order_view(char_input: str):
     )
 
 
-def enter_component(comp: str):
+def enter_component(comp: str, script_override: str | None = None):
     st.session_state.selected_comp = comp
     st.session_state.last_valid_selected_comp = comp
     st.session_state.show_inputs = False
     st.session_state.preview_comp = None
     st.session_state.text_input_comp = comp
     st.session_state.text_input_warning = None
+
+    # Special handling for Traditional mode when starting with 貝
+    if script_override:
+        st.session_state.script_variant = script_override
 
 
 def render_splash():
