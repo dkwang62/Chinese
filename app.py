@@ -582,7 +582,6 @@ def main():
         st.error("Component dataset not loaded. Ensure enhanced_component_map_with_etymology.json exists.")
         st.stop()
 
-    st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
     
     apply_dynamic_css()
 
