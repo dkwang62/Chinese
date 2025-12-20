@@ -483,16 +483,16 @@ def render_splash():
         """
         <div class="splash-wrap">
           <div class="splash-card">
-            <div class="splash-title">Radix 🈑 Explore Characters through components</div>
+            <div class="splash-title">Radix 🈑 Explore Characters through <b>components</b></div>
             <div class="splash-sub">
-              Read and write Chinese characters by breaking them into <b>components</b>
-              recurring parts that often hint at meaning or pronunciation.
+              Read and write Chinese characters by breaking them into <b>components</b> 
+              those recurring parts that often hint at meaning or pronunciation.
               The same components appear across many characters in consistent patterns,
               learning one structure helps you recognise and understand many more.
             </div>
             <div class="splash-sub">
-              Choose a component to reveal its <b>character family</b>, with stroke order and phrases to help you
-              practice and retain what you learn.
+              Choose a <b>components</b> to reveal its <b>character family</b>, with stroke order and phrases 
+              to reinforce your understanding.
             </div>
             <div class="splash-demo">
               <div class="splash-demo-h">Demo: pick a component to unlock its character family</div>
