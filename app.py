@@ -494,7 +494,6 @@ def render_splash():
               Choose a component to reveal its <b>character family</b>, with stroke order and phrases to help you
               practice and retain what you learn.
             </div>
-
             <div class="splash-demo">
               <div class="splash-demo-h">Demo: pick a component to unlock its character family</div>
             </div>
