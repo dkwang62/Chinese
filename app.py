@@ -482,19 +482,25 @@ def render_splash():
     st.markdown(
         """
         <div class="splash-wrap">
-        <div class="splash-card">
-            <div class="splash-title">Radix 🈑 Build Chinese characters, don’t just look them up.</div>
+          <div class="splash-card">
+            <div class="splash-title">Radix 🈑 Explore Chinese characters through components</div>
+
             <div class="splash-sub">
-            Radix 🈑 helps you read and write Chinese characters by breaking them into <b>components</b>
-            that often hint at meaning or pronunciation. These components recur across different
-            characters in recognisable patterns—so learning one structure helps you understand and
-            read many more. Pick one piece and reveal the full <b>character family</b> it creates
-            — plus stroke order and phrases.
+              Learn to read and write Chinese characters by breaking them into <b>components</b> —
+              recurring parts that often hint at meaning or pronunciation.
+              Because the same components appear across many characters in consistent patterns,
+              learning one structure helps you recognise and understand many more.
             </div>
+
+            <div class="splash-sub">
+              Choose a component to reveal its <b>character family</b>, with stroke order and phrases to help you
+              practice and retain what you learn.
+            </div>
+
             <div class="splash-demo">
-            <div class="splash-demo-h">Demo: choose a component to unlock its character family</div>
+              <div class="splash-demo-h">Demo: pick a component to unlock its character family</div>
             </div>
-        </div>
+          </div>
         </div>
         """,
         unsafe_allow_html=True,
