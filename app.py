@@ -193,7 +193,6 @@ def end_stroke_view():
 
 # --- CORRECTED RESET FUNCTION (Delete Strategy) ---
 def reset():
-def reset():
     # Reset underlying state variables to defaults
     st.session_state.stroke_range = (3, 8) 
     st.session_state.radical = "none"
