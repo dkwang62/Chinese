@@ -490,7 +490,6 @@ def render_splash():
               The same components appear across many characters in consistent patterns,
               learning one structure helps you recognise and understand many more.
             </div>
-
             <div class="splash-sub">
               Choose a component to reveal its <b>character family</b>, with stroke order and phrases to help you
               practice and retain what you learn.
