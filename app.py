@@ -749,7 +749,7 @@ def main():
                 render_stroke_order_sidebar(preview_char, size=110)
 
                 if st.button(
-                    f"👉 Select {preview_char}",
+                    f"Select {preview_char}",
                     key="sb_select_btn",
                     use_container_width=True,
                     type="primary",
