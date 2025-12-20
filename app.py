@@ -483,7 +483,7 @@ def render_splash():
         """
         <div class="splash-wrap">
           <div class="splash-card">
-            <div class="splash-title">Radix 🈑 Explore Characters through <b>components</b></div>
+            <div class="splash-title">Radix 🈑 Explore Characters by Components</div>
             <div class="splash-sub">
               Read and write Chinese characters by breaking them into <b>components</b> 
               those recurring parts that often hint at meaning or pronunciation.
