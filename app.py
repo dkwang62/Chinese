@@ -485,7 +485,7 @@ def render_splash():
               Pick one piece, and reveal the full <b>character family</b> it creates — plus stroke order and phrases.
             </div>
             <div class="splash-demo">
-              <div class="splash-demo-h">10-second demo: choose a component</div>
+              <div class="splash-demo-h">Demo: choose a component to unlock its character family</div>
             </div>
           </div>
         </div>
@@ -493,26 +493,71 @@ def render_splash():
         unsafe_allow_html=True,
     )
 
-    # Choose demo components that exist in your dataset; fallback gracefully.
-    preferred = ["氵", "口", "艹"]
-    demo_choices = [c for c in preferred if c in component_map]
-    if not demo_choices:
-        # If those don't exist, pick 3 high-frequency components as demo.
-        # Frequency = number of related characters.
-        comps = list(component_map.keys())
-        comps = sorted(comps, key=lambda c: -component_family_count(c))
-        demo_choices = comps[:3]
+    # User-requested seeds (note: "言月" interpreted as 言 and 月)
+    preferred = ["夂", "言", "月", "罒", "臼", "貝"]
 
-    cols = st.columns(len(demo_choices))
-    for i, ch in enumerate(demo_choices):
-        with cols[i]:
-            label = f"Explore {ch}"
+    # Build a pool: only exclude components with < 3 strokes.
+    comps = []
+    for c in component_map.keys():
+        if not isinstance(c, str) or len(c) != 1:
+            continue
+        if c in IDC_CHARS:
+            continue
+        sc = get_stroke_count(c)
+        if sc is None or sc < 3:
+            continue
+        comps.append(c)
+
+    # Sort by family size (largest first) so the splash looks impressive.
+    comps_sorted = sorted(comps, key=lambda c: -component_family_count(c))
+
+    # Assemble demos: preferred first (if eligible), then fill with best remaining.
+    MAX_DEMOS = 20  # increase/decrease as you like; 20 fits well on wide layout with 5 cols
+    demos = []
+    seen = set()
+
+    for c in preferred:
+        if c in component_map:
+            sc = get_stroke_count(c)
+            if sc is not None and sc >= 3 and c not in IDC_CHARS:
+                demos.append(c)
+                seen.add(c)
+
+    for c in comps_sorted:
+        if len(demos) >= MAX_DEMOS:
+            break
+        if c in seen:
+            continue
+        demos.append(c)
+        seen.add(c)
+
+    # Render as many as fit: use 5 columns to pack more on one page.
+    COLS = 5
+    rows = (len(demos) + COLS - 1) // COLS
+
+    for r in range(rows):
+        cols = st.columns(COLS)
+        for j in range(COLS):
+            idx = r * COLS + j
+            if idx >= len(demos):
+                continue
+            ch = demos[idx]
             count = component_family_count(ch)
-            if st.button(label, use_container_width=True, type="primary"):
-                st.session_state.onboarding_done = True
-                enter_component(ch)
-                st.rerun()
-            st.caption(f"{count} characters")
+
+            with cols[j]:
+                # Special behavior: selecting 貝 switches to Traditional filter by default.
+                if ch == "貝":
+                    if st.button(f"Explore {ch} (Trad)", use_container_width=True, type="primary", key=f"splash_{ch}_{idx}"):
+                        st.session_state.onboarding_done = True
+                        enter_component(ch, script_override="Traditional")
+                        st.rerun()
+                else:
+                    if st.button(f"Explore {ch}", use_container_width=True, type="primary", key=f"splash_{ch}_{idx}"):
+                        st.session_state.onboarding_done = True
+                        enter_component(ch)
+                        st.rerun()
+
+                st.caption(f"{count} characters")
 
     st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
 
