@@ -193,7 +193,8 @@ def end_stroke_view():
 
 # --- CORRECTED RESET FUNCTION (Delete Strategy) ---
 def reset():
-    # 1. Reset underlying state variables to defaults
+def reset():
+    # Reset underlying state variables to defaults
     st.session_state.stroke_range = (3, 8) 
     st.session_state.radical = "none"
     st.session_state.component_idc = "none"
@@ -207,11 +208,13 @@ def reset():
     st.session_state.text_input_comp = ""
     st.session_state.text_input_warning = None
     
-    # 2. DELETE widget keys so they re-initialize from 'value=' argument
-    keys_to_delete = ["w_stroke_range", "w_component_only", "w_text", "w_idc", "w_script"]
-    for key in keys_to_delete:
-        if key in st.session_state:
-            del st.session_state[key]
+    # Update widget keys to match reset values (don't delete them)
+    st.session_state.w_stroke_range = (3, 8)
+    st.session_state.w_component_only = True
+    st.session_state.w_text = ""
+    st.session_state.w_script = "Simplified"
+    # Note: w_idc doesn't need to be reset as it's in an expander and only set when changed
+    
 
 def generate_clean_card_html(c):
     if not c:
