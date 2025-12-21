@@ -475,6 +475,17 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
                                  'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'];
                 for (const src of sources) {{ try {{ await loadScript(src); if (window.HanziWriter) return; }} catch(e) {{}} }}
             }}
+            
+            // --- AUDIO FUNCTION ---
+            function speak(text) {{
+                if ('speechSynthesis' in window) {{
+                    window.speechSynthesis.cancel();
+                    const u = new SpeechSynthesisUtterance(text);
+                    u.lang = 'zh-CN';
+                    window.speechSynthesis.speak(u);
+                }}
+            }}
+
             const dataUrls = [`https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/${{char}}.json`,`https://unpkg.com/hanzi-writer-data@2.0.1/${{char}}.json`];
             async function loadData() {{
                 for (const url of dataUrls) {{ try {{ const res = await fetch(url); if (res.ok) return await res.json(); }} catch(e) {{}} }}
@@ -493,6 +504,7 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
                     const el = document.getElementById(target);
                     el.style.cursor = 'pointer';
                     el.addEventListener('click', () => {{
+                        speak(char); // Trigger audio on click
                         writer.hideCharacter();
                         writer.animateCharacter();
                     }});
@@ -579,6 +591,17 @@ def render_stroke_order_view(char_input: str):
             const chars = {json.dumps(chars_to_show, ensure_ascii=False)};
             const boxSize = {BOX_SIZE};
             const errEl = document.getElementById('hw-error');
+            
+            // --- AUDIO FUNCTION ---
+            function speak(text) {{
+                if ('speechSynthesis' in window) {{
+                    window.speechSynthesis.cancel();
+                    const u = new SpeechSynthesisUtterance(text);
+                    u.lang = 'zh-CN';
+                    window.speechSynthesis.speak(u);
+                }}
+            }}
+            
             function loadScript(src) {{ return new Promise((resolve, reject) => {{
                 const s = document.createElement('script'); s.src = src; s.async = true;
                 s.onload = () => resolve(src); s.onerror = () => reject();
@@ -590,7 +613,8 @@ def render_stroke_order_view(char_input: str):
                                  'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'];
                 for (const src of sources) {{ try {{ await loadScript(src); if (window.HanziWriter) return; }} catch (e) {{}} }}
             }}
-            const writers = [];
+            const writers = []; // Array of objects {{w: writer, c: char}}
+            
             async function init() {{
                 try {{
                     await ensureLibLoaded();
@@ -605,7 +629,7 @@ def render_stroke_order_view(char_input: str):
                                 width: boxSize, height: boxSize, padding: 10, showOutline: true, showCharacter: false,
                                 strokeAnimationSpeed: 1, delayBetweenStrokes: 60
                             }});
-                            writers.push(writer);
+                            writers.push({{w: writer, c: char}});
                         }} else {{
                             document.getElementById(targetId).innerHTML = `<div style="line-height:${{boxSize}}px; text-align:center; font-size:${{boxSize/2}}px; color:#ddd;">${{char}}</div>`;
                         }}
@@ -613,20 +637,27 @@ def render_stroke_order_view(char_input: str):
                     autoAnimateAll();
                 }} catch (e) {{ errEl.textContent = e.message || String(e); }}
             }}
-            async function playSequence(writer) {{
+            
+            async function playSequence(item) {{
+                const writer = item.w;
+                const char = item.c;
                 for (let k = 0; k < 3; k++) {{
+                    speak(char); // Speak on each loop iteration
                     writer.hideCharacter();
                     await writer.animateCharacter();
                     await new Promise(r => setTimeout(r, 800));
                 }}
                 writer.showCharacter();
             }}
+            
             function autoAnimateAll() {{
-                writers.forEach(w => {{ playSequence(w); }});
+                writers.forEach(item => {{ playSequence(item); }});
             }}
+            
             function resetAll() {{
-                writers.forEach(w => {{ w.hideCharacter(); }});
+                writers.forEach(item => {{ item.w.hideCharacter(); }});
             }}
+            
             document.getElementById('hw-reset').addEventListener('click', resetAll);
             document.getElementById('hw-animate').addEventListener('click', autoAnimateAll);
             init();
