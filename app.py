@@ -1,5 +1,5 @@
 # app.py
-# Radix – Component-first Chinese character explorer (Final Production Version)
+# Radix – High Performance (Limit 60, Back + Root Nav)
 import json
 import math
 import html
@@ -39,14 +39,72 @@ def apply_dynamic_css():
     .comp-grid .stButton button {font-size: 2em; height: 80px; background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 0; line-height: 80px;}
     .comp-grid .stButton button:hover {background: #fff5f5; border-color: #f2c6c6; color: #c0392b;}
     
-    /* Character explore buttons in results */
-    div[data-testid="column"]:nth-child(2) .stButton button {font-size: 3.5em; font-weight: bold; background: white; border: 2px solid #e0e0e0; border-radius: 12px; padding: 10px; min-height: 100px; transition: all 0.2s ease;}
-    div[data-testid="column"]:nth-child(2) .stButton button:hover {background: #f0f9ff; border-color: #3b82f6; transform: scale(1.05); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);}
+    /* UNIFIED BUTTON STYLING FOR LIST VIEW */
+    div[data-testid="column"] .stButton button {
+        width: 100%;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
     
-    /* Status line */
-    .status-line {font-size: 1.1em; font-weight: 600; color: #0f5132; background-color: #d1e7dd; border: 1px solid #badbcc; padding: 15px; border-radius: 8px; margin: 20px 0 30px 0; text-align: center;}
-    .status-tag {background-color: #f1f3f5; color: #2c3e50; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.9em; border: 1px solid #e9ecef; display: inline-flex; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);}
-    .status-text {color: #0f5132; font-size: 0.95em; margin-left: 10px;}
+    /* Specifics for the big character button */
+    .char-btn-wrap button {
+        font-size: 3.5em !important; 
+        font-weight: bold !important; 
+        background: white !important; 
+        border: 2px solid #e0e0e0 !important; 
+        padding: 5px !important; 
+        min-height: 80px !important; 
+    }
+    .char-btn-wrap button:hover {
+        background: #f0f9ff !important; 
+        border-color: #3b82f6 !important;
+    }
+    
+    /* Specifics for the pen button */
+    .pen-btn-wrap button {
+        font-size: 1.5em !important;
+        border: 1px solid #eee !important;
+        background: #f8f9fa !important;
+        margin-top: 5px !important; 
+        height: 40px !important;
+        line-height: 1 !important;
+        color: #555 !important;
+    }
+    .pen-btn-wrap button:hover {
+        background: #e3f2fd !important;
+        border-color: #90caf9 !important;
+        color: #1565c0 !important;
+    }
+
+    /* Status line / Navigation Map */
+    .status-line {
+        font-size: 1.1em; 
+        font-weight: 600; 
+        color: #0f5132; 
+        background-color: #d1e7dd; 
+        border: 1px solid #badbcc; 
+        padding: 15px; 
+        border-radius: 8px; 
+        margin: 20px 0 30px 0; 
+    }
+    .status-tag {
+        background-color: #f1f3f5; 
+        color: #2c3e50; 
+        padding: 4px 10px; 
+        border-radius: 6px; 
+        font-weight: 600; 
+        font-size: 0.9em; 
+        border: 1px solid #e9ecef; 
+        display: inline-flex; 
+        align-items: center; 
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    
+    .map-path {
+        font-family: monospace;
+        color: #155724;
+        margin-left: 10px;
+    }
     
     /* Sidebar Count Lines */
     .preview-count-line {font-size: 1.3em; text-align: center; color: #2c3e50; margin: 20px 0 25px 0;}
@@ -77,7 +135,7 @@ def apply_dynamic_css():
     """
     st.markdown(css, unsafe_allow_html=True)
 
-# --- Data Loading (Clean Version) ---
+# --- Data Loading ---
 
 @st.cache_data
 def load_component_map():
@@ -89,13 +147,11 @@ def load_component_map():
 
 @st.cache_resource
 def get_db_connection():
-    # Connects to the permanent phrases.db file
     if not sqlite3: return None
     try:
         conn = sqlite3.connect("phrases.db", check_same_thread=False)
         return conn
     except Exception as e:
-        # If this errors, the user hasn't uploaded phrases.db yet
         return None
 
 component_map = {}
@@ -171,6 +227,7 @@ defaults = {
     "used_components": set(),
     "favourites_list": [],
     "fav_cursor": 0,
+    "history": [],
 }
 
 for k, v in defaults.items():
@@ -186,7 +243,7 @@ if not st.session_state.favourites_list:
                 valid_chars = [c for c in data if isinstance(c, str) and len(c) == 1]
                 st.session_state.favourites_list = valid_chars[:20]
     except FileNotFoundError:
-        st.error("Error: 'favourites.json' is missing. Please upload it to your repository.")
+        pass
 
 # --- Callbacks ---
 def sync_stroke_range():
@@ -208,6 +265,7 @@ def sync_text():
         st.session_state.text_input_warning = "One character only"
         return
     if v in component_map:
+        st.session_state.history = [] 
         st.session_state.selected_comp = v
         st.session_state.last_valid_selected_comp = v
         st.session_state.text_input_comp = v
@@ -216,9 +274,11 @@ def sync_text():
         st.session_state.preview_comp = None
     else:
         st.session_state.text_input_warning = "Not found"
+
 def tile_click(c):
     if st.session_state.show_inputs:
         if st.session_state.preview_comp == c:
+            st.session_state.history = []
             st.session_state.selected_comp = c
             st.session_state.last_valid_selected_comp = c
             st.session_state.show_inputs = False
@@ -226,13 +286,44 @@ def tile_click(c):
             st.session_state.text_input_comp = c
         else:
             st.session_state.preview_comp = c
-def back():
-    st.session_state.show_inputs = True
+
+def list_tile_click(c):
+    if st.session_state.preview_comp == c:
+        if st.session_state.selected_comp:
+            st.session_state.history.append(st.session_state.selected_comp)
+        st.session_state.selected_comp = c
+        st.session_state.last_valid_selected_comp = c
+        st.session_state.show_inputs = False
+        st.session_state.preview_comp = None
+        st.session_state.text_input_comp = c
+    else:
+        st.session_state.preview_comp = c
+
+def go_back():
     st.session_state.preview_comp = None
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
     st.session_state.text_input_comp = ""
     st.session_state.text_input_warning = None
+    
+    if st.session_state.history:
+        prev = st.session_state.history.pop()
+        st.session_state.selected_comp = prev
+        st.session_state.last_valid_selected_comp = prev
+        st.session_state.show_inputs = False
+    else:
+        st.session_state.show_inputs = True
+
+def go_to_root():
+    st.session_state.history = []
+    st.session_state.preview_comp = None
+    st.session_state.stroke_view_active = False
+    st.session_state.stroke_view_char = ""
+    st.session_state.text_input_comp = ""
+    st.session_state.text_input_warning = None
+    st.session_state.selected_comp = ""
+    st.session_state.show_inputs = True
+
 def end_stroke_view():
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
@@ -344,10 +435,14 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
                         width: {size}, height: {size}, padding: 8, showOutline: true, showCharacter: false,
                         strokeAnimationSpeed: 1.3, delayBetweenStrokes: 100
                     }});
-                    writer.animateCharacter();
+                    // STATIC START: Only animate on click
+                    writer.showCharacter();
                     const el = document.getElementById(target);
                     el.style.cursor = 'pointer';
-                    el.addEventListener('click', () => writer.animateCharacter());
+                    el.addEventListener('click', () => {{
+                        writer.hideCharacter();
+                        writer.animateCharacter();
+                    }});
                 }} catch(e) {{
                     document.getElementById(target).innerHTML = `<div style="font-size:${size*0.7}px; line-height:${size}px; text-align:center;">${{char}}</div>`;
                 }}
@@ -364,7 +459,24 @@ def render_stroke_order_view(char_input: str):
     if not primary_char:
         st.info("No character selected for stroke order.")
         return
-        
+    
+    st.markdown("### Stroke Order & Phrases")
+    modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
+    current_index = 0
+    if st.session_state.display_mode in modes:
+        current_index = modes.index(st.session_state.display_mode)
+    
+    new_mode = st.radio(
+        "Display Mode", 
+        options=modes, 
+        index=current_index, 
+        horizontal=True,
+        key="w_display_stroke_view"
+    )
+    if new_mode != st.session_state.display_mode:
+        st.session_state.display_mode = new_mode
+        st.rerun()
+
     s_char = cc_t2s.convert(primary_char) if cc_t2s else primary_char
     t_char = cc_s2t.convert(primary_char) if cc_s2t else primary_char
     
@@ -521,6 +633,8 @@ def render_stroke_order_view(char_input: str):
 
 
 def enter_component(comp: str, script_override: str | None = None):
+    # This is a helper for direct entry (e.g. from Splash)
+    st.session_state.history = []
     st.session_state.selected_comp = comp
     st.session_state.last_valid_selected_comp = comp
     st.session_state.show_inputs = False
@@ -625,7 +739,7 @@ def main():
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
         
         if st.button("Show Favourites", use_container_width=True):
-            back()
+            go_to_root()
             st.session_state.onboarding_done = False
             st.rerun()
             
@@ -633,8 +747,11 @@ def main():
         
         if st.session_state.stroke_view_active:
             current_char_for_sidebar = st.session_state.stroke_view_char
-            st.button("← Back", on_click=end_stroke_view, use_container_width=True)
-            st.button("← Back to list", on_click=back, use_container_width=True)
+            c1, c2 = st.columns(2)
+            with c1:
+                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+            with c2:
+                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
             st.markdown("---")
             st.markdown("### Character Info")
             
@@ -730,17 +847,27 @@ def main():
                 st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
                 
                 if st.button(f"Explore {current_char_for_sidebar}", key="sb_select_btn", use_container_width=True, type="primary"):
-                    enter_component(current_char_for_sidebar)
+                    st.session_state.history = []
+                    st.session_state.selected_comp = current_char_for_sidebar
+                    st.session_state.last_valid_selected_comp = current_char_for_sidebar
                     st.session_state.show_inputs = False
                     st.session_state.preview_comp = None
+                    st.session_state.text_input_comp = current_char_for_sidebar
                     st.rerun()
                 related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
                 count = len(set([c for c in related if isinstance(c, str) and len(c) == 1]))
                 st.markdown(f"<div class='preview-count-line'>{count} characters contain <span class='char'>{current_char_for_sidebar}</span></div>", unsafe_allow_html=True)
                 
         else:
-            st.button("← Back to list", on_click=back, use_container_width=True)
-            current_char_for_sidebar = st.session_state.selected_comp
+            # DETAIL VIEW Sidebar
+            c1, c2 = st.columns(2)
+            with c1:
+                st.button("← Back", on_click=go_back, use_container_width=True)
+            with c2:
+                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+            
+            current_char_for_sidebar = st.session_state.preview_comp if st.session_state.preview_comp else st.session_state.selected_comp
+            
             if current_char_for_sidebar:
                 if st.button("View full stroke order", use_container_width=True):
                     st.session_state.stroke_view_char = current_char_for_sidebar
@@ -827,13 +954,34 @@ def main():
                 st.caption("Enter one Chinese character to jump directly to its details")
             st.markdown("</div>", unsafe_allow_html=True)
     else:
+        # STATIC MAP (Optimized)
+        path_items = ["🏠 Root"] + st.session_state.history + [f"<b>{st.session_state.selected_comp}</b>"]
+        path_str = " &nbsp;→&nbsp; ".join(path_items)
+        
+        st.markdown(
+            f"""
+            <div class='status-line'>
+                <div style='margin-bottom:8px;'>
+                    <span class='status-tag'>Location</span> 
+                    <span class='map-path'>{path_str}</span>
+                </div>
+                <div class='status-text' style='font-size:0.85em; color:#666;'>Single-click previews. Double-click explores.</div>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+
         selected = st.session_state.selected_comp
         related = component_map[selected].get("related_characters", [])
         chars = list(set([c for c in related if isinstance(c, str) and len(c) == 1]))
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if isinstance(w, str) and len(w) == n] for c in chars} if n else {c: [] for c in chars}
-        chars = [c for c in chars if n == 0 or compounds[c]]
         chars = sorted(chars, key=lambda x: (-component_usage_count(x), get_stroke_count(x) or 999, x))
+        
+        # --- LIMIT RE-IMPOSED FOR PERFORMANCE ---
+        total_available = len(chars)
+        LIMIT = 60
+        chars = chars[:LIMIT]
         
         if st.session_state.script_variant == "Simplified":
             chars = [c for c in chars if not cc_t2s or cc_t2s.convert(c) == c]
@@ -843,17 +991,29 @@ def main():
         db_conn = get_db_connection()
 
         for c in chars:
-            col_btn, col_char, col_details = st.columns([1, 2, 12])
-            with col_btn:
-                st.markdown("<div style='height: 20px'></div>", unsafe_allow_html=True)
-                if st.button("🖊️", key=f"stroke_btn_{c}", help="View full stroke order"):
+            col_char, col_details = st.columns([2, 10])
+            with col_char:
+                is_preview = st.session_state.preview_comp == c
+                # Char Button Container
+                st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
+                st.button(
+                    c, 
+                    key=f"explore_char_{c}", 
+                    use_container_width=True, # Full width
+                    type="primary" if is_preview else "secondary",
+                    on_click=list_tile_click,
+                    args=(c,)
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+                # Pen Button Container - SAME WIDTH AS ABOVE
+                st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
+                if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order", use_container_width=True):
                     st.session_state.stroke_view_char = c
                     st.session_state.stroke_view_active = True
                     st.rerun()
-            with col_char:
-                if st.button(c, key=f"explore_char_{c}", use_container_width=True, help=f"Explore all characters that contain {c} as a component"):
-                    enter_component(c)
-                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+
             with col_details:
                 usage_count = component_usage_count(c)
                 st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
@@ -877,6 +1037,10 @@ def main():
                     full_list_html = "".join(items_html)
                     st.markdown(f"""<div style='padding:15px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; border-bottom:2px solid #a5d6a7; padding-bottom:5px;'>{st.session_state.display_mode}</div>{full_list_html}</div>""", unsafe_allow_html=True)
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
+        
+        if total_available > LIMIT:
+            st.caption(f"Showing top {LIMIT} of {total_available} characters. (Limited for performance)")
+
         if chars and n:
             with st.expander("Export Compounds"):
                 st.text_area("Copy list", "\n".join(w for c in chars for w in compounds[c]), height=150)
