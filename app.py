@@ -476,12 +476,18 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
                 for (const src of sources) {{ try {{ await loadScript(src); if (window.HanziWriter) return; }} catch(e) {{}} }}
             }}
             
-            // --- AUDIO FUNCTION ---
+            // --- AUDIO FUNCTION (iPad/iOS Optimized) ---
             function speak(text) {{
                 if ('speechSynthesis' in window) {{
                     window.speechSynthesis.cancel();
                     const u = new SpeechSynthesisUtterance(text);
                     u.lang = 'zh-CN';
+                    
+                    // iOS SPECIFIC: Explicitly find a Chinese voice or it might fail/use English
+                    const voices = window.speechSynthesis.getVoices();
+                    const zhVoice = voices.find(v => v.lang.replace('_', '-').toLowerCase().startsWith('zh'));
+                    if (zhVoice) u.voice = zhVoice;
+
                     window.speechSynthesis.speak(u);
                 }}
             }}
@@ -503,11 +509,18 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
                     writer.showCharacter();
                     const el = document.getElementById(target);
                     el.style.cursor = 'pointer';
-                    el.addEventListener('click', () => {{
+                    
+                    // Handler for click/touch
+                    const trigger = (e) => {{
+                        e.preventDefault(); 
                         speak(char); // Trigger audio on click
                         writer.hideCharacter();
                         writer.animateCharacter();
-                    }});
+                    }};
+                    
+                    el.addEventListener('click', trigger);
+                    el.addEventListener('touchend', trigger);
+
                 }} catch(e) {{
                     document.getElementById(target).innerHTML = `<div style="font-size:${size*0.7}px; line-height:${size}px; text-align:center;">${{char}}</div>`;
                 }}
@@ -592,12 +605,18 @@ def render_stroke_order_view(char_input: str):
             const boxSize = {BOX_SIZE};
             const errEl = document.getElementById('hw-error');
             
-            // --- AUDIO FUNCTION ---
+            // --- AUDIO FUNCTION (iPad/iOS Optimized) ---
             function speak(text) {{
                 if ('speechSynthesis' in window) {{
                     window.speechSynthesis.cancel();
                     const u = new SpeechSynthesisUtterance(text);
                     u.lang = 'zh-CN';
+                    
+                    // iOS SPECIFIC: Explicitly find a Chinese voice or it might fail/use English
+                    const voices = window.speechSynthesis.getVoices();
+                    const zhVoice = voices.find(v => v.lang.replace('_', '-').toLowerCase().startsWith('zh'));
+                    if (zhVoice) u.voice = zhVoice;
+
                     window.speechSynthesis.speak(u);
                 }}
             }}
@@ -634,15 +653,16 @@ def render_stroke_order_view(char_input: str):
                             document.getElementById(targetId).innerHTML = `<div style="line-height:${{boxSize}}px; text-align:center; font-size:${{boxSize/2}}px; color:#ddd;">${{char}}</div>`;
                         }}
                     }}
-                    autoAnimateAll();
+                    // SILENT START ON IPAD (Autoplay blocked anyway)
+                    autoAnimateAll(true); 
                 }} catch (e) {{ errEl.textContent = e.message || String(e); }}
             }}
             
-            async function playSequence(item) {{
+            async function playSequence(item, silent) {{
                 const writer = item.w;
                 const char = item.c;
                 for (let k = 0; k < 3; k++) {{
-                    speak(char); // Speak on each loop iteration
+                    if (!silent) speak(char); // Only speak if not silent
                     writer.hideCharacter();
                     await writer.animateCharacter();
                     await new Promise(r => setTimeout(r, 800));
@@ -650,8 +670,8 @@ def render_stroke_order_view(char_input: str):
                 writer.showCharacter();
             }}
             
-            function autoAnimateAll() {{
-                writers.forEach(item => {{ playSequence(item); }});
+            function autoAnimateAll(silent = false) {{
+                writers.forEach(item => {{ playSequence(item, silent); }});
             }}
             
             function resetAll() {{
@@ -659,7 +679,8 @@ def render_stroke_order_view(char_input: str):
             }}
             
             document.getElementById('hw-reset').addEventListener('click', resetAll);
-            document.getElementById('hw-animate').addEventListener('click', autoAnimateAll);
+            // Replay button is a user interaction -> Audio allowed
+            document.getElementById('hw-animate').addEventListener('click', () => autoAnimateAll(false));
             init();
         }})();
         </script>
