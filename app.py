@@ -27,7 +27,10 @@ def apply_dynamic_css():
     /* Char card styling */
     .char-card {background: white; padding: 20px; border-radius: 10px; margin-bottom: 0px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);}
     .meta-row {font-size: 0.95em; color: #555; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;}
-    .meta-pinyin {font-weight: bold; font-size: 1.1em; color: #2c3e50;}
+    
+    /* --- UPDATED: DOUBLED PINYIN SIZE --- */
+    .meta-pinyin {font-weight: bold; font-size: 2.2em; color: #d35400;} 
+    
     /* Tags */
     .meta-tag {background: #f1f3f5; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; color: #495057;}
     .meta-tag-trad {background: #fff8e1; color: #856404; border: 1px solid #ffeeba;}
@@ -137,7 +140,10 @@ def apply_dynamic_css():
     .compound-item { display: flex; align-items: baseline; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e0e0e0; }
     .compound-item:last-child { border-bottom: none; margin-bottom: 0; }
     .cp-word { font-weight: bold; font-size: 1.1em; color: #2c3e50; min-width: 80px; margin-right: 10px; }
-    .cp-pinyin { color: #d35400; font-family: monospace; margin-right: 10px; font-weight: 500;}
+    
+    /* --- UPDATED: LARGER PINYIN IN LISTS --- */
+    .cp-pinyin { color: #d35400; font-family: monospace; margin-right: 10px; font-weight: 500; font-size: 1.5em;}
+    
     .cp-mean { color: #333; font-size: 0.95em; flex: 1; }
     
     /* Favourites / Splash */
@@ -452,10 +458,16 @@ def generate_clean_card_html(c, usage_count=None):
 def render_stroke_order_sidebar(char: str, size: int = 110):
     char = (char or "").strip()[:1]
     if not char: return
-    h = size + 40
+    
+    # --- FETCH PINYIN ---
+    meta = component_map.get(char, {}).get("meta", {})
+    pinyin = clean_field(meta.get("pinyin", ""))
+    
+    h = size + 80 # increased height for pinyin
     st_html(
         f"""
-        <div style="display:flex; justify-content:center; margin:20px 0;">
+        <div style="display:flex; flex-direction:column; align-items:center; margin:20px 0;">
+            <div style="text-align:center; font-size:2.5rem; font-weight:bold; color:#e67e22; margin-bottom:10px;">{pinyin}</div>
             <div id="sb-hw-{hash(char)}" style="width:{size}px; height:{size}px;"></div>
         </div>
         <script>
@@ -583,9 +595,15 @@ def render_stroke_order_view(char_input: str):
             if c == s_char: label_text = "Simplified"
             elif c == t_char: label_text = "Traditional"
         label_html = f"<div style='text-align:center; font-weight:bold; color:#555; margin-bottom:5px;'>{label_text}</div>" if label_text else ""
+        
+        # --- FETCH PINYIN FOR THIS VARIANT ---
+        meta = component_map.get(c, {}).get("meta", {})
+        pinyin = clean_field(meta.get("pinyin", ""))
+        
         container_html += f"""
         <div style="display:flex; flex-direction:column; align-items:center;">
              {label_html}
+            <div style="font-size:2.5rem; color:#e67e22; font-weight:bold; margin-bottom:10px;">{pinyin}</div>
             <div id="hw-target-{i}" style="width:{BOX_SIZE}px;height:{BOX_SIZE}px;border:1px solid #e0e0e0;border-radius:12px; background:white;"></div>
         </div>
         """
