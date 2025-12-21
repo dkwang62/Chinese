@@ -1,11 +1,9 @@
 # app.py
-# Radix – Component-first Chinese character explorer (Self-Healing & Optimized)
+# Radix – Component-first Chinese character explorer (Final Production Version)
 import json
 import math
 import html
 import sqlite3
-import gc
-import os
 import streamlit as st
 from streamlit.components.v1 import html as st_html
 
@@ -79,70 +77,10 @@ def apply_dynamic_css():
     """
     st.markdown(css, unsafe_allow_html=True)
 
-# --- Auto-Optimization Logic ---
-def ensure_database_exists():
-    """
-    Checks for phrases.db. If missing, attempts to build it from phrases_dict.json.
-    This runs BEFORE loading the massive component map to avoid Memory Limit errors.
-    """
-    if os.path.exists("phrases.db"):
-        # Quick check to ensure it's not a 0-byte error file
-        if os.path.getsize("phrases.db") > 0:
-            return
-
-    # If we are here, DB is missing or empty.
-    if not os.path.exists("phrases_dict.json"):
-        st.error("Critical Error: 'phrases.db' is missing AND 'phrases_dict.json' is missing. Please upload one of them.")
-        st.stop()
-    
-    status = st.empty()
-    status.info("⚙️ First-time Setup: Optimizing dictionary database... (This prevents crashes)")
-    
-    try:
-        # Load the huge JSON
-        with open("phrases_dict.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
-        
-        # Create SQLite DB
-        conn = sqlite3.connect("phrases.db")
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS phrases (
-                word TEXT PRIMARY KEY,
-                pinyin TEXT,
-                meanings TEXT
-            )
-        """)
-        
-        # Insert Data
-        rows = []
-        for word, details in data.items():
-            rows.append((word, details.get("pinyin", ""), details.get("meanings", "")))
-        
-        cursor.executemany("INSERT OR IGNORE INTO phrases VALUES (?, ?, ?)", rows)
-        conn.commit()
-        conn.close()
-        
-        # MEMORY CLEANUP: Crucial step to prevent crash when loading next file
-        del data
-        del rows
-        gc.collect()
-        
-        status.success("Optimization complete! Reloading...")
-        st.rerun() # Reload to start fresh with the new DB
-        
-    except Exception as e:
-        st.error(f"Optimization failed: {e}")
-        st.stop()
-
-# Run optimization check immediately
-ensure_database_exists()
-
-# --- Data Loading (Optimized) ---
+# --- Data Loading (Clean Version) ---
 
 @st.cache_data
 def load_component_map():
-    # We still keep the component map in RAM as it drives the core logic
     try:
         with open("enhanced_component_map_with_etymology.json", "r", encoding="utf-8") as f:
             return json.load(f)
@@ -151,11 +89,13 @@ def load_component_map():
 
 @st.cache_resource
 def get_db_connection():
+    # Connects to the permanent phrases.db file
+    if not sqlite3: return None
     try:
         conn = sqlite3.connect("phrases.db", check_same_thread=False)
         return conn
     except Exception as e:
-        st.error(f"Could not connect to database: {e}")
+        # If this errors, the user hasn't uploaded phrases.db yet
         return None
 
 component_map = {}
@@ -164,7 +104,6 @@ try:
 except Exception as e:
     st.error(f"Failed to load component data: {e}")
 
-# Helper to fetch phrase from DB
 def get_phrase_details(word, conn):
     if not conn: return None
     try:
@@ -240,7 +179,6 @@ for k, v in defaults.items():
 
 # --- Initial Population of Favourites from JSON ---
 if not st.session_state.favourites_list:
-    # Requires favourites.json to exist (No Fallback as requested)
     try:
         with open("favourites.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -542,37 +480,42 @@ def render_stroke_order_view(char_input: str):
         db_conn = get_db_connection()
         sorted_compounds = sorted(relevant_compounds)
         items_html = []
-        for word in sorted_compounds:
-            entry = get_phrase_details(word, db_conn)
-            pinyin = entry.get("pinyin", "") if entry else ""
-            meanings = entry.get("meanings", "") if entry else ""
-            display_meanings = html.escape(meanings[:100] + ("..." if len(meanings) > 100 else ""))
-            
-            if entry:
-                items_html.append(
-                    f"<div class='compound-item'>"
-                    f"<span class='cp-word'>{word}</span>"
-                    f"<span class='cp-pinyin'>{pinyin}</span>"
-                    f"<span class='cp-mean'>{display_meanings}</span>"
-                    f"</div>"
-                )
-            else:
-                items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
+        
+        # Check if DB is ready
+        if not db_conn:
+            st.warning("⚠️ 'phrases.db' not found. Please upload it to your repository to see phrases.")
+        else:
+            for word in sorted_compounds:
+                entry = get_phrase_details(word, db_conn)
+                pinyin = entry.get("pinyin", "") if entry else ""
+                meanings = entry.get("meanings", "") if entry else ""
+                display_meanings = html.escape(meanings[:100] + ("..." if len(meanings) > 100 else ""))
                 
-        full_list_html = "".join(items_html)
-        st.markdown(
-            f"""
-            <div style='padding:15px; background:#f1f8e9; border-radius:8px; 
-                 margin:10px auto; border:1px solid #dcedc8; max-width:800px; max-height:400px; overflow-y:auto;'>
-              <div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; 
-                   border-bottom:2px solid #a5d6a7; padding-bottom:5px; text-align:center;'>
-                {mode} containing {primary_char}
-              </div>
-              {full_list_html}
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                if entry:
+                    items_html.append(
+                        f"<div class='compound-item'>"
+                        f"<span class='cp-word'>{word}</span>"
+                        f"<span class='cp-pinyin'>{pinyin}</span>"
+                        f"<span class='cp-mean'>{display_meanings}</span>"
+                        f"</div>"
+                    )
+                else:
+                    items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
+                
+            full_list_html = "".join(items_html)
+            st.markdown(
+                f"""
+                <div style='padding:15px; background:#f1f8e9; border-radius:8px; 
+                     margin:10px auto; border:1px solid #dcedc8; max-width:800px; max-height:400px; overflow-y:auto;'>
+                  <div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; 
+                       border-bottom:2px solid #a5d6a7; padding-bottom:5px; text-align:center;'>
+                    {mode} containing {primary_char}
+                  </div>
+                  {full_list_html}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
     elif n > 0:
         st.info(f"No {mode} found for {primary_char}.")
 
@@ -917,18 +860,20 @@ def main():
                 if compounds.get(c):
                     sorted_compounds = sorted(compounds[c])
                     items_html = []
-                    for word in sorted_compounds:
-                        entry = get_phrase_details(word, db_conn)
-                        pinyin = entry.get("pinyin", "") if entry else ""
-                        meanings = entry.get("meanings", "") if entry else ""
-                        display_pinyin = pinyin
-                        limit = 100
-                        display_meanings = meanings[:limit] + ("..." if len(meanings) > limit else "")
-                        display_meanings = html.escape(display_meanings)
-                        if entry:
-                            items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span><span class='cp-pinyin'>{display_pinyin}</span><span class='cp-mean'>{display_meanings}</span></div>")
-                        else:
-                            items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
+                    
+                    if not db_conn:
+                        items_html.append("<div style='color:#666; font-style:italic;'>Database not loaded. Words unavailable.</div>")
+                    else:
+                        for word in sorted_compounds:
+                            entry = get_phrase_details(word, db_conn)
+                            pinyin = entry.get("pinyin", "") if entry else ""
+                            meanings = entry.get("meanings", "") if entry else ""
+                            display_meanings = html.escape(meanings[:100] + ("..." if len(meanings) > 100 else ""))
+                            if entry:
+                                items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span><span class='cp-pinyin'>{pinyin}</span><span class='cp-mean'>{display_meanings}</span></div>")
+                            else:
+                                items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
+                    
                     full_list_html = "".join(items_html)
                     st.markdown(f"""<div style='padding:15px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; border-bottom:2px solid #a5d6a7; padding-bottom:5px;'>{st.session_state.display_mode}</div>{full_list_html}</div>""", unsafe_allow_html=True)
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
