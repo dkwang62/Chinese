@@ -1,5 +1,5 @@
 # app.py
-# Radix – High Performance (Limit 60, Back + Root Nav)
+# Radix – Component-first Chinese character explorer (Batch SQL Optimization)
 import json
 import math
 import html
@@ -74,6 +74,23 @@ def apply_dynamic_css():
         background: #e3f2fd !important;
         border-color: #90caf9 !important;
         color: #1565c0 !important;
+    }
+
+    /* STATIC CARD STYLING (For > 60 items) */
+    .char-static-box {
+        font-size: 3.5em;
+        font-weight: bold;
+        background: #fdfdfd;
+        color: #999;
+        border: 2px solid #eee;
+        border-radius: 12px;
+        padding: 5px;
+        min-height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        cursor: default;
     }
 
     /* Status line / Navigation Map */
@@ -160,7 +177,22 @@ try:
 except Exception as e:
     st.error(f"Failed to load component data: {e}")
 
+# --- BATCH OPTIMIZATION: Get many phrases at once ---
+def batch_get_phrase_details(words, conn):
+    """Fetches details for a list of words in a SINGLE query."""
+    if not conn or not words: return {}
+    try:
+        placeholders = ','.join(['?'] * len(words))
+        cursor = conn.cursor()
+        query = f"SELECT word, pinyin, meanings FROM phrases WHERE word IN ({placeholders})"
+        cursor.execute(query, list(words))
+        results = cursor.fetchall()
+        return {row[0]: {"pinyin": row[1], "meanings": row[2]} for row in results}
+    except Exception:
+        return {}
+
 def get_phrase_details(word, conn):
+    # Fallback for single lookups
     if not conn: return None
     try:
         cursor = conn.cursor()
@@ -260,6 +292,7 @@ def sync_component_only():
     st.session_state.component_only = st.session_state.w_component_only
     st.session_state.page = 1
 def sync_text():
+    # Footer input callback
     v = st.session_state.w_text.strip()
     if len(v) != 1:
         st.session_state.text_input_warning = "One character only"
@@ -274,6 +307,26 @@ def sync_text():
         st.session_state.preview_comp = None
     else:
         st.session_state.text_input_warning = "Not found"
+
+def sync_sidebar_text():
+    # Sidebar input callback
+    v = st.session_state.sb_search.strip()
+    if not v: return
+    if len(v) != 1:
+        st.toast("Please enter exactly one character.")
+        return
+    if v not in component_map:
+        st.toast("Character not found.")
+        return
+    
+    # Global jump logic
+    st.session_state.history = []
+    st.session_state.selected_comp = v
+    st.session_state.last_valid_selected_comp = v
+    st.session_state.text_input_comp = v
+    st.session_state.show_inputs = False
+    st.session_state.preview_comp = None
+    st.session_state.stroke_view_active = False
 
 def tile_click(c):
     if st.session_state.show_inputs:
@@ -459,9 +512,16 @@ def render_stroke_order_view(char_input: str):
     if not primary_char:
         st.info("No character selected for stroke order.")
         return
+        
+    # --- AUTO-SWITCH TO 2-CHAR PHRASES IF IN SINGLE MODE ---
+    if st.session_state.display_mode == "Single Character":
+        st.session_state.display_mode = "2-Character Phrases"
+        st.rerun()
     
     st.markdown("### Stroke Order & Phrases")
-    modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
+    # REMOVED "Single Character" from available modes in this view
+    modes = ["2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
+    
     current_index = 0
     if st.session_state.display_mode in modes:
         current_index = modes.index(st.session_state.display_mode)
@@ -593,12 +653,15 @@ def render_stroke_order_view(char_input: str):
         sorted_compounds = sorted(relevant_compounds)
         items_html = []
         
-        # Check if DB is ready
+        # BATCH FETCH OPTIMIZATION
         if not db_conn:
             st.warning("⚠️ 'phrases.db' not found. Please upload it to your repository to see phrases.")
         else:
+            # --- BATCH FETCH HERE ---
+            phrases_map = batch_get_phrase_details(sorted_compounds, db_conn)
+            
             for word in sorted_compounds:
-                entry = get_phrase_details(word, db_conn)
+                entry = phrases_map.get(word)
                 pinyin = entry.get("pinyin", "") if entry else ""
                 meanings = entry.get("meanings", "") if entry else ""
                 display_meanings = html.escape(meanings[:100] + ("..." if len(meanings) > 100 else ""))
@@ -743,6 +806,9 @@ def main():
             st.session_state.onboarding_done = False
             st.rerun()
             
+        # Global Sidebar Input
+        st.text_input("Shortcut: Paste/Type characters", key="sb_search", on_change=sync_sidebar_text)
+            
         current_char_for_sidebar = None
         
         if st.session_state.stroke_view_active:
@@ -869,10 +935,6 @@ def main():
             current_char_for_sidebar = st.session_state.preview_comp if st.session_state.preview_comp else st.session_state.selected_comp
             
             if current_char_for_sidebar:
-                if st.button("View full stroke order", use_container_width=True):
-                    st.session_state.stroke_view_char = current_char_for_sidebar
-                    st.session_state.stroke_view_active = True
-                    st.rerun()
                 render_stroke_order_sidebar(current_char_for_sidebar, size=140)
                 
                 is_fav = current_char_for_sidebar in st.session_state.favourites_list
@@ -978,23 +1040,27 @@ def main():
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if isinstance(w, str) and len(w) == n] for c in chars} if n else {c: [] for c in chars}
         chars = sorted(chars, key=lambda x: (-component_usage_count(x), get_stroke_count(x) or 999, x))
         
-        # --- LIMIT RE-IMPOSED FOR PERFORMANCE ---
-        total_available = len(chars)
+        # --- HYBRID RENDER: 60 Clickable + Rest Static ---
         LIMIT = 60
-        chars = chars[:LIMIT]
+        total_available = len(chars)
+        
+        clickable_chars = chars[:LIMIT]
+        static_chars = chars[LIMIT:]
         
         if st.session_state.script_variant == "Simplified":
-            chars = [c for c in chars if not cc_t2s or cc_t2s.convert(c) == c]
+            clickable_chars = [c for c in clickable_chars if not cc_t2s or cc_t2s.convert(c) == c]
+            static_chars = [c for c in static_chars if not cc_t2s or cc_t2s.convert(c) == c]
         else:
-            chars = [c for c in chars if not cc_s2t or cc_s2t.convert(c) == c]
+            clickable_chars = [c for c in clickable_chars if not cc_s2t or cc_s2t.convert(c) == c]
+            static_chars = [c for c in static_chars if not cc_s2t or cc_s2t.convert(c) == c]
 
         db_conn = get_db_connection()
 
-        for c in chars:
+        # 1. RENDER INTERACTIVE SECTION
+        for c in clickable_chars:
             col_char, col_details = st.columns([2, 10])
             with col_char:
                 is_preview = st.session_state.preview_comp == c
-                # Char Button Container
                 st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
                 st.button(
                     c, 
@@ -1006,7 +1072,6 @@ def main():
                 )
                 st.markdown("</div>", unsafe_allow_html=True)
                 
-                # Pen Button Container - SAME WIDTH AS ABOVE
                 st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
                 if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order", use_container_width=True):
                     st.session_state.stroke_view_char = c
@@ -1024,8 +1089,10 @@ def main():
                     if not db_conn:
                         items_html.append("<div style='color:#666; font-style:italic;'>Database not loaded. Words unavailable.</div>")
                     else:
+                        # BATCH FETCH HERE AS WELL
+                        phrases_map = batch_get_phrase_details(sorted_compounds, db_conn)
                         for word in sorted_compounds:
-                            entry = get_phrase_details(word, db_conn)
+                            entry = phrases_map.get(word)
                             pinyin = entry.get("pinyin", "") if entry else ""
                             meanings = entry.get("meanings", "") if entry else ""
                             display_meanings = html.escape(meanings[:100] + ("..." if len(meanings) > 100 else ""))
@@ -1038,8 +1105,38 @@ def main():
                     st.markdown(f"""<div style='padding:15px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; border-bottom:2px solid #a5d6a7; padding-bottom:5px;'>{st.session_state.display_mode}</div>{full_list_html}</div>""", unsafe_allow_html=True)
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
         
-        if total_available > LIMIT:
-            st.caption(f"Showing top {LIMIT} of {total_available} characters. (Limited for performance)")
+        # 2. RENDER STATIC SECTION (If more exist)
+        if len(static_chars) > 0:
+            st.markdown("---")
+            st.markdown(f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>⬇️ {len(static_chars)} More Results (Copy & Paste into Shortcut sidebar to explore) ⬇️</div>", unsafe_allow_html=True)
+            
+            for c in static_chars:
+                col_char, col_details = st.columns([2, 10])
+                with col_char:
+                    # Static Box (HTML only, no widget overhead)
+                    st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
+                    # No pen button here
+                
+                with col_details:
+                    usage_count = component_usage_count(c)
+                    st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
+                    if compounds.get(c):
+                        sorted_compounds = sorted(compounds[c])
+                        items_html = []
+                        if db_conn:
+                            phrases_map = batch_get_phrase_details(sorted_compounds, db_conn)
+                            for word in sorted_compounds:
+                                entry = phrases_map.get(word)
+                                pinyin = entry.get("pinyin", "") if entry else ""
+                                meanings = entry.get("meanings", "") if entry else ""
+                                display_meanings = html.escape(meanings[:100] + ("..." if len(meanings) > 100 else ""))
+                                if entry:
+                                    items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span><span class='cp-pinyin'>{pinyin}</span><span class='cp-mean'>{display_meanings}</span></div>")
+                                else:
+                                    items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
+                        full_list_html = "".join(items_html)
+                        st.markdown(f"""<div style='padding:15px; background:#f9f9f9; border-radius:8px; margin-top:10px; border:1px solid #eee; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; margin-bottom:10px; color:#555; border-bottom:2px solid #ddd; padding-bottom:5px;'>{st.session_state.display_mode}</div>{full_list_html}</div>""", unsafe_allow_html=True)
+                st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
         if chars and n:
             with st.expander("Export Compounds"):
