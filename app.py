@@ -809,7 +809,7 @@ def render_splash():
                     data=json_data,
                     file_name="favourites.json",
                     mime="application/json",
-                    use_container_width=True
+                    width="stretch"
                 )
             with c_ul:
                 st.file_uploader(
@@ -835,12 +835,12 @@ def render_splash():
             count = component_usage_count(ch)
             with cols[j]:
                 if ch == "貝":
-                    if st.button(f"Explore {ch} (Trad)", use_container_width=True, type="primary", key=f"splash_{ch}_{idx}"):
+                    if st.button(f"Explore {ch} (Trad)", width="stretch", type="primary", key=f"splash_{ch}_{idx}"):
                         st.session_state.onboarding_done = True
                         enter_component(ch, script_override="Traditional")
                         st.rerun()
                 else:
-                    if st.button(f"Explore {ch}", use_container_width=True, type="primary", key=f"splash_{ch}_{idx}"):
+                    if st.button(f"Explore {ch}", width="stretch", type="primary", key=f"splash_{ch}_{idx}"):
                         st.session_state.onboarding_done = True
                         enter_component(ch)
                         st.rerun()
@@ -849,7 +849,7 @@ def render_splash():
     st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([2, 1, 2])
     with c2:
-        if st.button("Enter Radix", use_container_width=True):
+        if st.button("Enter Radix", width="stretch"):
             st.session_state.onboarding_done = True
             st.rerun()
 
@@ -871,7 +871,7 @@ def main():
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
         
-        if st.button("Show Favourites", use_container_width=True):
+        if st.button("Show Favourites", width="stretch"):
             go_to_root()
             st.session_state.onboarding_done = False
             st.rerun()
@@ -885,9 +885,9 @@ def main():
             current_char_for_sidebar = st.session_state.stroke_view_char
             c1, c2 = st.columns(2)
             with c1:
-                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+                st.button("← Back", on_click=end_stroke_view, width="stretch")
             with c2:
-                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+                st.button("🏠 Root", on_click=go_to_root, width="stretch")
             st.markdown("---")
             st.markdown("### Character Info")
             
@@ -982,7 +982,7 @@ def main():
                 is_fav = current_char_for_sidebar in st.session_state.favourites_list
                 st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
                 
-                if st.button(f"Explore {current_char_for_sidebar}", key="sb_select_btn", use_container_width=True, type="primary"):
+                if st.button(f"Explore {current_char_for_sidebar}", key="sb_select_btn", width="stretch", type="primary"):
                     st.session_state.history = []
                     st.session_state.selected_comp = current_char_for_sidebar
                     st.session_state.last_valid_selected_comp = current_char_for_sidebar
@@ -998,9 +998,9 @@ def main():
             # DETAIL VIEW Sidebar
             c1, c2 = st.columns(2)
             with c1:
-                st.button("← Back", on_click=go_back, use_container_width=True)
+                st.button("← Back", on_click=go_back, width="stretch")
             with c2:
-                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+                st.button("🏠 Root", on_click=go_to_root, width="stretch")
             
             current_char_for_sidebar = st.session_state.preview_comp if st.session_state.preview_comp else st.session_state.selected_comp
             
@@ -1076,7 +1076,7 @@ def main():
             for i, ch in enumerate(page):
                 with cols[i % GRID_COLS]:
                     is_preview = st.session_state.preview_comp == ch
-                    st.button(ch, key=f"b_{ch}_{st.session_state.page}", use_container_width=True, type="primary" if is_preview else "secondary", on_click=tile_click, args=(ch,))
+                    st.button(ch, key=f"b_{ch}_{st.session_state.page}", width="stretch", type="primary" if is_preview else "secondary", on_click=tile_click, args=(ch,))
             st.markdown("</div>", unsafe_allow_html=True)
             st.markdown("<div class='jump-footer'>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
@@ -1135,7 +1135,7 @@ def main():
                 st.button(
                     c, 
                     key=f"explore_char_{c}", 
-                    use_container_width=True, # Full width
+                    width="stretch", # Full width
                     type="primary" if is_preview else "secondary",
                     on_click=list_tile_click,
                     args=(c,)
@@ -1143,7 +1143,7 @@ def main():
                 st.markdown("</div>", unsafe_allow_html=True)
                 
                 st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-                if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order", use_container_width=True):
+                if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order", width="stretch"):
                     st.session_state.stroke_view_char = c
                     st.session_state.stroke_view_active = True
                     st.rerun()
