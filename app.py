@@ -1085,7 +1085,7 @@ def main():
                 st.text_input("Go to component/character", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
                 st.caption("Enter one Chinese character to jump directly to its details")
             st.markdown("</div>", unsafe_allow_html=True)
-    else:
+else:
         # STATIC MAP (Optimized)
         path_items = ["🏠 Root"] + st.session_state.history + [f"<b>{st.session_state.selected_comp}</b>"]
         path_str = " &nbsp;→&nbsp; ".join(path_items)
@@ -1104,14 +1104,49 @@ def main():
         )
 
         selected = st.session_state.selected_comp
-        related = component_map[selected].get("related_characters", [])
-        chars = list(set([c for c in related if isinstance(c, str) and len(c) == 1]))
+
+        # --- LOGIC UPDATE START: Components First, Then Children ---
+
+        # 1. Identify Components (The Structure)
+        # Get decomposition (e.g., "⿰口乞") and strip IDC markers to get ["口", "乞"]
+        decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
+        components_list = [c for c in decomp_raw if c not in IDC_CHARS and c != "?" and c != "–"]
+
+        # 2. Identify Related Characters (The "Children" / Usage)
+        related_raw = component_map.get(selected, {}).get("related_characters", [])
+        children_list = [c for c in related_raw if isinstance(c, str) and len(c) == 1]
+
+        # 3. Sort the Children list (Frequency -> Strokes)
+        children_sorted = sorted(children_list, key=lambda x: (-component_usage_count(x), get_stroke_count(x) or 999, x))
+
+        # 4. Merge: Components TOP, then Children (Deduplicate)
+        final_chars_list = []
+        seen_chars = set()
+
+        # Add Components First
+        for c in components_list:
+            if c not in seen_chars and c in component_map: # Only add if in database
+                final_chars_list.append(c)
+                seen_chars.add(c)
+
+        # Add Children Next
+        for c in children_sorted:
+            if c not in seen_chars and c in component_map:
+                final_chars_list.append(c)
+                seen_chars.add(c)
+
+        chars = final_chars_list
+        # --- LOGIC UPDATE END ---
+
         n = int(st.session_state.display_mode[0]) if st.session_state.display_mode != "Single Character" else 0
         compounds = {c: [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if isinstance(w, str) and len(w) == n] for c in chars} if n else {c: [] for c in chars}
-        chars = sorted(chars, key=lambda x: (-component_usage_count(x), get_stroke_count(x) or 999, x))
+        
+        # Note: We removed the previous `sorted(chars...)` line here because we 
+        # specifically constructed the order manually above (Components + Sorted Children).
         
         # --- HYBRID RENDER: 60 Clickable + Rest Static ---
         LIMIT = 60
+        # ... (Rest of the code remains the same)
         total_available = len(chars)
         
         clickable_chars = chars[:LIMIT]
