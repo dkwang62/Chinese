@@ -1085,7 +1085,7 @@ def main():
                 st.text_input("Go to component/character", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
                 st.caption("Enter one Chinese character to jump directly to its details")
             st.markdown("</div>", unsafe_allow_html=True)
-else:
+    else:
         # STATIC MAP (Optimized)
         path_items = ["🏠 Root"] + st.session_state.history + [f"<b>{st.session_state.selected_comp}</b>"]
         path_str = " &nbsp;→&nbsp; ".join(path_items)
