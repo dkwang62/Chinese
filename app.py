@@ -511,13 +511,15 @@ Output ONLY valid JSON (no markdown, no extra text) with this schema:
   "examples": [
     {{
       "word": "<target word/phrase containing the character>",
+      "pinyin": "<tone-mark pinyin>",
       "sent_zh": "<Traditional Chinese sentence>",
       "sent_zh_sim": "<Simplified Chinese sentence>",
       "sent_en": "<English translation>",
-      "note_zh_en": "<optional short note on meaning in this context or ''>"
+      "note_en": "<optional short note on meaning in this context or ''>"
     }},
     {{
       "word": "<target word/phrase containing the character>",
+      "pinyin": "<tone-mark pinyin>",
       "sent_zh": "<Traditional Chinese sentence>",
       "sent_zh_sim": "<Simplified Chinese sentence>",
       "sent_en": "<English translation>",
