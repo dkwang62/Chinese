@@ -1,5 +1,6 @@
 # app.py
 # Radix – Component-first Chinese character explorer (Batch SQL Optimization)
+
 import json
 import math
 import html
@@ -20,6 +21,7 @@ except ImportError:
 st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 
 IDC_CHARS = {"⿰", "⿱", "⿲", "⿳", "⿴", "⿵", "⿶", "⿷", "⿸", "⿹", "⿺", "⿻"}
+SCRIPT_FILTERS = ["Any", "Simplified", "Traditional"]
 
 
 def apply_dynamic_css():
@@ -262,8 +264,8 @@ def component_usage_count(comp: str) -> int:
 
 def normalize_single_hanzi(raw: str) -> str:
     """
-    Normalizes pasted/typed input to a single Hanzi. Removes format characters (Cf),
-    which commonly appear in clipboard pastes (zero-width, variation selectors, etc.).
+    Normalizes pasted/typed input to a single Hanzi.
+    Removes Unicode format characters (Cf) that commonly appear in clipboard pastes.
     Returns "" if not exactly one visible char after cleanup.
     """
     if not raw:
@@ -275,28 +277,27 @@ def normalize_single_hanzi(raw: str) -> str:
     return chars[0]
 
 
-def resolve_to_traditional_in_dataset(ch: str) -> str:
+def reset_script_filter_to_any():
     """
-    Enforces Traditional mode on typed/pasted entry:
-    - Prefer Traditional form if OpenCC can produce it and it exists in component_map.
-    - Otherwise fall back to the original char.
+    Requirement: when a character is selected (typed/pasted/clicked), default to NO filter.
+    Also clears the widget key so Streamlit can re-init without key/value conflicts.
     """
-    if not ch:
-        return ch
-    if cc_s2t:
-        t = cc_s2t.convert(ch)
-        if t in component_map:
-            return t
-    return ch
+    st.session_state.script_filter = "Any"
+    st.session_state.pop("w_script_filter", None)
 
 
-def force_traditional_filter():
+def apply_script_filter(chars: list[str]) -> list[str]:
     """
-    Requirement: whenever user types/pastes a char to jump, set the filter to Traditional.
-    Keep widget state and underlying state consistent.
+    Applies script filtering ONLY if user has explicitly set it to Simplified or Traditional.
+    If 'Any', returns chars unchanged.
     """
-    st.session_state.script_variant = "Traditional"
-    st.session_state.w_script = "Traditional"
+    f = st.session_state.get("script_filter", "Any")
+    if f == "Any":
+        return chars
+    if f == "Simplified":
+        return [c for c in chars if (not cc_t2s) or (cc_t2s.convert(c) == c)]
+    # Traditional
+    return [c for c in chars if (not cc_s2t) or (cc_s2t.convert(c) == c)]
 
 
 # --- State init ---
@@ -306,7 +307,7 @@ defaults = {
     "stroke_range": (3, 8),
     "radical": "none",
     "component_idc": "none",
-    "display_mode": "Single Character",
+    "display_mode": "Single Character",  # normal list always single; pen view can change
     "text_input_comp": "",
     "page": 1,
     "text_input_warning": None,
@@ -315,7 +316,7 @@ defaults = {
     "preview_comp": None,
     "stroke_view_active": False,
     "stroke_view_char": "",
-    "script_variant": "Simplified",
+    "script_filter": "Any",  # Any | Simplified | Traditional
     "component_only": True,
     "used_components": set(),
     "favourites_list": [],
@@ -326,6 +327,10 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+# Clean up legacy keys to avoid confusion across reruns (safe no-ops if absent)
+st.session_state.pop("w_script", None)
+st.session_state.pop("script_variant", None)
 
 
 # --- Initial Population of Favourites from JSON ---
@@ -351,34 +356,26 @@ def sync_idc():
     st.session_state.page = 1
 
 
-def sync_script():
-    st.session_state.script_variant = st.session_state.w_script
-
-
-def sync_display():
-    st.session_state.display_mode = st.session_state.w_display
-
-
 def sync_component_only():
     st.session_state.component_only = st.session_state.w_component_only
     st.session_state.page = 1
 
 
+def sync_script_filter():
+    # User explicitly sets filter later
+    st.session_state.script_filter = st.session_state.w_script_filter
+
+
 def sync_text():
     # Footer input callback (typed/pasted)
-    raw = st.session_state.w_text
-    v = normalize_single_hanzi(raw)
+    v = normalize_single_hanzi(st.session_state.get("w_text", ""))
     if not v:
         st.session_state.text_input_warning = "One character only"
         return
 
-    # Requirement: force Traditional filter on typed/pasted jump
-    force_traditional_filter()
-
-    # Prefer Traditional char if available
-    v = resolve_to_traditional_in_dataset(v)
-
     if v in component_map:
+        reset_script_filter_to_any()
+
         st.session_state.history = []
         st.session_state.selected_comp = v
         st.session_state.last_valid_selected_comp = v
@@ -386,7 +383,7 @@ def sync_text():
         st.session_state.text_input_warning = None
         st.session_state.show_inputs = False
         st.session_state.preview_comp = None
-        # Requirement: list view always single-character
+        st.session_state.stroke_view_active = False
         st.session_state.display_mode = "Single Character"
     else:
         st.session_state.text_input_warning = "Not found"
@@ -394,23 +391,16 @@ def sync_text():
 
 def sync_sidebar_text():
     # Sidebar input callback (typed/pasted)
-    raw = st.session_state.sb_search
-    v = normalize_single_hanzi(raw)
+    v = normalize_single_hanzi(st.session_state.get("sb_search", ""))
     if not v:
         st.toast("Please enter exactly one character.")
         return
-
-    # Requirement: force Traditional filter on typed/pasted jump
-    force_traditional_filter()
-
-    # Prefer Traditional char if available
-    v = resolve_to_traditional_in_dataset(v)
-
     if v not in component_map:
         st.toast("Character not found.")
         return
 
-    # Global jump logic
+    reset_script_filter_to_any()
+
     st.session_state.history = []
     st.session_state.selected_comp = v
     st.session_state.last_valid_selected_comp = v
@@ -418,20 +408,22 @@ def sync_sidebar_text():
     st.session_state.show_inputs = False
     st.session_state.preview_comp = None
     st.session_state.stroke_view_active = False
-    # Requirement: list view always single-character
+    st.session_state.stroke_view_char = ""
     st.session_state.display_mode = "Single Character"
 
 
 def tile_click(c):
     if st.session_state.show_inputs:
         if st.session_state.preview_comp == c:
+            reset_script_filter_to_any()
+
             st.session_state.history = []
             st.session_state.selected_comp = c
             st.session_state.last_valid_selected_comp = c
             st.session_state.show_inputs = False
             st.session_state.preview_comp = None
             st.session_state.text_input_comp = c
-            # Requirement: list view always single-character
+            st.session_state.stroke_view_active = False
             st.session_state.display_mode = "Single Character"
         else:
             st.session_state.preview_comp = c
@@ -439,6 +431,8 @@ def tile_click(c):
 
 def list_tile_click(c):
     if st.session_state.preview_comp == c:
+        reset_script_filter_to_any()
+
         if st.session_state.selected_comp:
             st.session_state.history.append(st.session_state.selected_comp)
         st.session_state.selected_comp = c
@@ -446,7 +440,7 @@ def list_tile_click(c):
         st.session_state.show_inputs = False
         st.session_state.preview_comp = None
         st.session_state.text_input_comp = c
-        # Requirement: list view always single-character
+        st.session_state.stroke_view_active = False
         st.session_state.display_mode = "Single Character"
     else:
         st.session_state.preview_comp = c
@@ -461,10 +455,11 @@ def go_back():
 
     if st.session_state.history:
         prev = st.session_state.history.pop()
+        reset_script_filter_to_any()
+
         st.session_state.selected_comp = prev
         st.session_state.last_valid_selected_comp = prev
         st.session_state.show_inputs = False
-        # Requirement: list view always single-character
         st.session_state.display_mode = "Single Character"
     else:
         st.session_state.show_inputs = True
@@ -479,7 +474,7 @@ def go_to_root():
     st.session_state.text_input_warning = None
     st.session_state.selected_comp = ""
     st.session_state.show_inputs = True
-    # Requirement: list view always single-character
+    reset_script_filter_to_any()
     st.session_state.display_mode = "Single Character"
 
 
@@ -565,11 +560,10 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
     if not char:
         return
 
-    # --- FETCH PINYIN ---
     meta = component_map.get(char, {}).get("meta", {})
     pinyin = clean_field(meta.get("pinyin", ""))
 
-    h = size + 80  # increased height for pinyin
+    h = size + 80
     st_html(
         f"""
         <div style="display:flex; flex-direction:column; align-items:center; margin:20px 0;">
@@ -593,19 +587,15 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
                                  'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'];
                 for (const src of sources) {{ try {{ await loadScript(src); if (window.HanziWriter) return; }} catch(e) {{}} }}
             }}
-
-            // --- AUDIO FUNCTION (iPad/iOS Optimized) ---
+            
             function speak(text) {{
                 if ('speechSynthesis' in window) {{
                     window.speechSynthesis.cancel();
                     const u = new SpeechSynthesisUtterance(text);
                     u.lang = 'zh-CN';
-
-                    // iOS SPECIFIC: Explicitly find a Chinese voice or it might fail/use English
                     const voices = window.speechSynthesis.getVoices();
                     const zhVoice = voices.find(v => v.lang.replace('_', '-').toLowerCase().startsWith('zh'));
                     if (zhVoice) u.voice = zhVoice;
-
                     window.speechSynthesis.speak(u);
                 }}
             }}
@@ -618,27 +608,22 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
             async function init() {{
                 try {{
                     await ensureLib();
-                    const charData = await loadData();
+                    await loadData();
                     const writer = window.HanziWriter.create(target, char, {{
                         width: {size}, height: {size}, padding: 8, showOutline: true, showCharacter: false,
                         strokeAnimationSpeed: 1.3, delayBetweenStrokes: 100
                     }});
-                    // STATIC START: Only animate on click
                     writer.showCharacter();
                     const el = document.getElementById(target);
                     el.style.cursor = 'pointer';
-
-                    // Handler for click/touch
                     const trigger = (e) => {{
-                        e.preventDefault();
-                        speak(char); // Trigger audio on click
+                        e.preventDefault(); 
+                        speak(char);
                         writer.hideCharacter();
                         writer.animateCharacter();
                     }};
-
                     el.addEventListener('click', trigger);
                     el.addEventListener('touchend', trigger);
-
                 }} catch(e) {{
                     document.getElementById(target).innerHTML = `<div style="font-size:${size*0.7}px; line-height:${size}px; text-align:center;">${{char}}</div>`;
                 }}
@@ -657,14 +642,12 @@ def render_stroke_order_view(char_input: str):
         st.info("No character selected for stroke order.")
         return
 
-    # --- AUTO-SWITCH TO 2-CHAR PHRASES IF IN SINGLE MODE ---
-    # (This is fine: phrases are only accessible in pen/stroke view per requirement.)
+    # In pen view, phrases are allowed; if currently single, jump to 2-char mode.
     if st.session_state.display_mode == "Single Character":
         st.session_state.display_mode = "2-Character Phrases"
         st.rerun()
 
     st.markdown("### Stroke Order & Phrases")
-    # REMOVED "Single Character" from available modes in this view
     modes = ["2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
 
     current_index = 0
@@ -710,7 +693,6 @@ def render_stroke_order_view(char_input: str):
             else ""
         )
 
-        # --- FETCH PINYIN FOR THIS VARIANT ---
         meta = component_map.get(c, {}).get("meta", {})
         pinyin = clean_field(meta.get("pinyin", ""))
 
@@ -737,22 +719,18 @@ def render_stroke_order_view(char_input: str):
             const boxSize = {BOX_SIZE};
             const errEl = document.getElementById('hw-error');
 
-            // --- AUDIO FUNCTION (iPad/iOS Optimized) ---
             function speak(text) {{
                 if ('speechSynthesis' in window) {{
                     window.speechSynthesis.cancel();
                     const u = new SpeechSynthesisUtterance(text);
                     u.lang = 'zh-CN';
-
-                    // iOS SPECIFIC: Explicitly find a Chinese voice or it might fail/use English
                     const voices = window.speechSynthesis.getVoices();
                     const zhVoice = voices.find(v => v.lang.replace('_', '-').toLowerCase().startsWith('zh'));
                     if (zhVoice) u.voice = zhVoice;
-
                     window.speechSynthesis.speak(u);
                 }}
             }}
-
+            
             function loadScript(src) {{ return new Promise((resolve, reject) => {{
                 const s = document.createElement('script'); s.src = src; s.async = true;
                 s.onload = () => resolve(src); s.onerror = () => reject();
@@ -764,8 +742,8 @@ def render_stroke_order_view(char_input: str):
                                  'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'];
                 for (const src of sources) {{ try {{ await loadScript(src); if (window.HanziWriter) return; }} catch (e) {{}} }}
             }}
-            const writers = []; // Array of objects {{w: writer, c: char}}
-
+            const writers = [];
+            
             async function init() {{
                 try {{
                     await ensureLibLoaded();
@@ -785,33 +763,31 @@ def render_stroke_order_view(char_input: str):
                             document.getElementById(targetId).innerHTML = `<div style="line-height:${{boxSize}}px; text-align:center; font-size:${{boxSize/2}}px; color:#ddd;">${{char}}</div>`;
                         }}
                     }}
-                    // SILENT START ON IPAD (Autoplay blocked anyway)
                     autoAnimateAll(true);
                 }} catch (e) {{ errEl.textContent = e.message || String(e); }}
             }}
-
+            
             async function playSequence(item, silent) {{
                 const writer = item.w;
                 const char = item.c;
                 for (let k = 0; k < 3; k++) {{
-                    if (!silent) speak(char); // Only speak if not silent
+                    if (!silent) speak(char);
                     writer.hideCharacter();
                     await writer.animateCharacter();
                     await new Promise(r => setTimeout(r, 800));
                 }}
                 writer.showCharacter();
             }}
-
+            
             function autoAnimateAll(silent = false) {{
                 writers.forEach(item => {{ playSequence(item, silent); }});
             }}
-
+            
             function resetAll() {{
                 writers.forEach(item => {{ item.w.hideCharacter(); }});
             }}
-
+            
             document.getElementById('hw-reset').addEventListener('click', resetAll);
-            // Replay button is a user interaction -> Audio allowed
             document.getElementById('hw-animate').addEventListener('click', () => autoAnimateAll(false));
             init();
         }})();
@@ -820,7 +796,7 @@ def render_stroke_order_view(char_input: str):
         height=400,
     )
 
-    # 3. Render Phrases List (Optimized SQL Fetch)
+    # Render phrases list (pen view only)
     st.markdown("---")
 
     n = 0
@@ -840,13 +816,10 @@ def render_stroke_order_view(char_input: str):
         sorted_compounds = sorted(relevant_compounds)
         items_html = []
 
-        # BATCH FETCH OPTIMIZATION
         if not db_conn:
             st.warning("⚠️ 'phrases.db' not found. Please upload it to your repository to see phrases.")
         else:
-            # --- BATCH FETCH HERE ---
             phrases_map = batch_get_phrase_details(sorted_compounds, db_conn)
-
             for word in sorted_compounds:
                 entry = phrases_map.get(word)
                 pinyin = entry.get("pinyin", "") if entry else ""
@@ -882,8 +855,10 @@ def render_stroke_order_view(char_input: str):
         st.info(f"No {mode} found for {primary_char}.")
 
 
-def enter_component(comp: str, script_override: str | None = None):
-    # This is a helper for direct entry (e.g. from Splash)
+def enter_component(comp: str):
+    # helper for direct entry (e.g. from Splash)
+    reset_script_filter_to_any()
+
     st.session_state.history = []
     st.session_state.selected_comp = comp
     st.session_state.last_valid_selected_comp = comp
@@ -891,10 +866,8 @@ def enter_component(comp: str, script_override: str | None = None):
     st.session_state.preview_comp = None
     st.session_state.text_input_comp = comp
     st.session_state.text_input_warning = None
-    if script_override:
-        st.session_state.script_variant = script_override
-        st.session_state.w_script = script_override
-    # Requirement: list view always single-character
+    st.session_state.stroke_view_active = False
+    st.session_state.stroke_view_char = ""
     st.session_state.display_mode = "Single Character"
 
 
@@ -918,7 +891,6 @@ def render_splash():
         unsafe_allow_html=True,
     )
 
-    # Save/Load Controls
     lc1, lc2, lc3 = st.columns([1, 2, 1])
     with lc2:
         with st.expander("Manage Favourites (Save/Load)"):
@@ -941,7 +913,6 @@ def render_splash():
                     label_visibility="collapsed",
                 )
 
-    # Render Favourites Grid
     demos = st.session_state.favourites_list
     COLS = 5
     rows = (len(demos) + COLS - 1) // COLS
@@ -955,16 +926,10 @@ def render_splash():
             ch = demos[idx]
             count = component_usage_count(ch)
             with cols[j]:
-                if ch == "貝":
-                    if st.button(f"Explore {ch} (Trad)", width="stretch", type="primary", key=f"splash_{ch}_{idx}"):
-                        st.session_state.onboarding_done = True
-                        enter_component(ch, script_override="Traditional")
-                        st.rerun()
-                else:
-                    if st.button(f"Explore {ch}", width="stretch", type="primary", key=f"splash_{ch}_{idx}"):
-                        st.session_state.onboarding_done = True
-                        enter_component(ch)
-                        st.rerun()
+                if st.button(f"Explore {ch}", width="stretch", type="primary", key=f"splash_{ch}_{idx}"):
+                    st.session_state.onboarding_done = True
+                    enter_component(ch)
+                    st.rerun()
                 st.caption(f"{count} characters")
 
     st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
@@ -998,7 +963,6 @@ def main():
             st.session_state.onboarding_done = False
             st.rerun()
 
-        # Global Sidebar Input
         st.text_input("Shortcut: Paste/Type characters", key="sb_search", on_change=sync_sidebar_text)
 
         current_char_for_sidebar = None
@@ -1010,6 +974,7 @@ def main():
                 st.button("← Back", on_click=end_stroke_view, width="stretch")
             with c2:
                 st.button("🏠 Root", on_click=go_to_root, width="stretch")
+
             st.markdown("---")
             st.markdown("### Character Info")
 
@@ -1120,6 +1085,7 @@ def main():
                             st.session_state.component_idc = idc
                             st.session_state.page = 1
                             st.rerun()
+
             st.markdown("---")
 
             if st.session_state.preview_comp:
@@ -1141,15 +1107,16 @@ def main():
                     width="stretch",
                     type="primary",
                 ):
+                    reset_script_filter_to_any()
                     st.session_state.history = []
                     st.session_state.selected_comp = current_char_for_sidebar
                     st.session_state.last_valid_selected_comp = current_char_for_sidebar
                     st.session_state.show_inputs = False
                     st.session_state.preview_comp = None
                     st.session_state.text_input_comp = current_char_for_sidebar
-                    # Requirement: list view always single-character
                     st.session_state.display_mode = "Single Character"
                     st.rerun()
+
                 related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
                 count = len(set([c for c in related if isinstance(c, str) and len(c) == 1]))
                 st.markdown(
@@ -1183,28 +1150,22 @@ def main():
 
                 st.radio(
                     "Filter Results",
-                    ["Simplified", "Traditional"],
-                    key="w_script",
-                    index=0 if st.session_state.script_variant == "Simplified" else 1,
-                    on_change=sync_script,
+                    options=SCRIPT_FILTERS,
+                    index=SCRIPT_FILTERS.index(st.session_state.script_filter),
+                    key="w_script_filter",
+                    on_change=sync_script_filter,
                 )
 
                 related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
                 chars_all = list(set([c for c in related if isinstance(c, str) and len(c) == 1]))
                 chars_all = [c for c in chars_all if c in component_map]
-                if st.session_state.script_variant == "Simplified":
-                    chars_filtered = [c for c in chars_all if not cc_t2s or cc_t2s.convert(c) == c]
-                else:
-                    chars_filtered = [c for c in chars_all if not cc_s2t or cc_s2t.convert(c) == c]
+                chars_filtered = apply_script_filter(chars_all)
                 count_filtered = len(chars_filtered)
+
                 st.markdown(
                     f"<div class='preview-count-line'>{count_filtered} characters contain <span class='char'>{current_char_for_sidebar}</span></div>",
                     unsafe_allow_html=True,
                 )
-
-                # Requirement: remove display mode selector here.
-                # The normal list view always shows Single Characters only.
-                # Phrase modes are only available inside the pen/stroke view.
 
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
@@ -1284,6 +1245,7 @@ def main():
                         args=(ch,),
                     )
             st.markdown("</div>", unsafe_allow_html=True)
+
             st.markdown("<div class='jump-footer'>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
@@ -1301,7 +1263,9 @@ def main():
             st.markdown("</div>", unsafe_allow_html=True)
 
     else:
-        # STATIC MAP (Optimized)
+        # DETAIL LIST (single characters only; phrases appear ONLY in pen view)
+        st.session_state.display_mode = "Single Character"
+
         path_items = ["🏠 Root"] + st.session_state.history + [f"<b>{st.session_state.selected_comp}</b>"]
         path_str = " &nbsp;→&nbsp; ".join(path_items)
 
@@ -1320,28 +1284,22 @@ def main():
 
         selected = st.session_state.selected_comp
 
-        # --- LOGIC UPDATE START: Components First, Then Children ---
-
-        # 1. Identify Components (The Structure)
+        # Components first
         decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
         components_list = [c for c in decomp_raw if c not in IDC_CHARS and c != "?" and c != "–"]
 
-        # 2. Identify Related Characters (The "Children" / Usage)
+        # Children next
         related_raw = component_map.get(selected, {}).get("related_characters", [])
         children_list = [c for c in related_raw if isinstance(c, str) and len(c) == 1]
-
-        # 3. Sort the Children list (Frequency -> Strokes)
         children_sorted = sorted(children_list, key=lambda x: (-component_usage_count(x), get_stroke_count(x) or 999, x))
 
-        # 4. Merge: Components TOP, then Children (Deduplicate)
+        # Merge (dedupe)
         final_chars_list = []
         seen_chars = set()
-
         for c in components_list:
             if c not in seen_chars and c in component_map:
                 final_chars_list.append(c)
                 seen_chars.add(c)
-
         for c in children_sorted:
             if c not in seen_chars and c in component_map:
                 final_chars_list.append(c)
@@ -1349,26 +1307,15 @@ def main():
 
         chars = final_chars_list
 
-        # --- LOGIC UPDATE END ---
-
-        # Requirement: list produced always shows ONLY single characters (no 2/3/4 phrase mode here)
-        st.session_state.display_mode = "Single Character"
-
-        # --- HYBRID RENDER: 60 Clickable + Rest Static ---
+        # Hybrid render
         LIMIT = 60
-        total_available = len(chars)
-
         clickable_chars = chars[:LIMIT]
         static_chars = chars[LIMIT:]
 
-        if st.session_state.script_variant == "Simplified":
-            clickable_chars = [c for c in clickable_chars if not cc_t2s or cc_t2s.convert(c) == c]
-            static_chars = [c for c in static_chars if not cc_t2s or cc_t2s.convert(c) == c]
-        else:
-            clickable_chars = [c for c in clickable_chars if not cc_s2t or cc_s2t.convert(c) == c]
-            static_chars = [c for c in static_chars if not cc_s2t or cc_s2t.convert(c) == c]
+        # Apply script filter ONLY if user set it to Simplified/Traditional (not Any)
+        clickable_chars = apply_script_filter(clickable_chars)
+        static_chars = apply_script_filter(static_chars)
 
-        # 1. RENDER INTERACTIVE SECTION
         for c in clickable_chars:
             col_char, col_details = st.columns([2, 10])
             with col_char:
@@ -1397,7 +1344,6 @@ def main():
 
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
-        # 2. RENDER STATIC SECTION (If more exist)
         if len(static_chars) > 0:
             st.markdown("---")
             st.markdown(
@@ -1409,11 +1355,9 @@ def main():
                 col_char, col_details = st.columns([2, 10])
                 with col_char:
                     st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
-
                 with col_details:
                     usage_count = component_usage_count(c)
                     st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
-
                 st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
 
