@@ -505,19 +505,19 @@ Output ONLY valid JSON (no markdown, no extra text) with this schema:
 {{
   "char": "<Hanzi>",
   "pinyin": "<tone-mark pinyin>",
-  "def_zh": "<one-line Chinese definition>",
+  "def_zh_sim": "<one-line Chinese definition>",
   "examples": [
     {{
       "word": "<target word/phrase containing the character>",
-      "sent_zh": "<Chinese sentence>",
+      "sent_zh_sim": "<Chinese sentence>",
       "sent_en": "<English translation>",
-      "note_zh": "<optional short note on meaning in this context or ''>"
+      "note_zh_sim": "<optional short note on meaning in this context or ''>"
     }},
     {{
       "word": "<target word/phrase containing the character>",
-      "sent_zh": "<Chinese sentence>",
+      "sent_zh_sim": "<Chinese sentence>",
       "sent_en": "<English translation>",
-      "note_zh": "<optional short note or ''>"
+      "note_zh_sim": "<optional short note or ''>"
     }}
   ]
 }}
