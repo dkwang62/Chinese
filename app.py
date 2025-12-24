@@ -899,7 +899,7 @@ def render_splash():
         unsafe_allow_html=True,
     )
 
-    # Manage Favourites controls — now inside the same card
+    # Save and Load buttons side by side
     col_save, col_load = st.columns([1, 1])
     with col_save:
         json_data = json.dumps(st.session_state.favourites_list, ensure_ascii=False, indent=2)
@@ -908,16 +908,16 @@ def render_splash():
             data=json_data,
             file_name="radix_favourites.json",
             mime="application/json",
-            use_container_width=True,
+            use_container_width=True,  # This IS supported on download_button
         )
     with col_load:
+        # REMOVED use_container_width — not supported on file_uploader
         st.file_uploader(
             "📂 Load Favourites from File",
             type=["json"],
             key="fav_uploader",
             on_change=handle_file_upload,
             label_visibility="collapsed",
-            use_container_width=True,
         )
 
     st.markdown("---")
