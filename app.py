@@ -12,6 +12,7 @@ from streamlit.components.v1 import html as st_html
 # --- Optional: OpenCC for Traditional/Simplified Conversion ---
 try:
     from opencc import OpenCC
+
     cc_t2s = OpenCC("t2s")
     cc_s2t = OpenCC("s2t")
 except ImportError:
@@ -31,48 +32,48 @@ def apply_dynamic_css():
     /* Char card styling */
     .char-card {background: white; padding: 20px; border-radius: 10px; margin-bottom: 0px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);}
     .meta-row {font-size: 0.95em; color: #555; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;}
-    
+
     /* --- UPDATED: DOUBLED PINYIN SIZE --- */
-    .meta-pinyin {font-weight: bold; font-size: 2.2em; color: #d35400;} 
-    
+    .meta-pinyin {font-weight: bold; font-size: 2.2em; color: #d35400;}
+
     /* Tags */
     .meta-tag {background: #f1f3f5; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; color: #495057;}
     .meta-tag-trad {background: #fff8e1; color: #856404; border: 1px solid #ffeeba;}
     .meta-tag-simp {background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;}
     .def-row {font-size: 1.1em; line-height: 1.4; color: #2c3e50; margin-bottom: 8px;}
     .ety-row {font-size: 0.9em; color: #666; font-style: italic; border-top: 1px solid #eee; padding-top: 8px; margin-top: 4px;}
-    
+
     /* Grid buttons */
     .comp-grid .stButton button {font-size: 2em; height: 80px; background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 0; line-height: 80px;}
     .comp-grid .stButton button:hover {background: #fff5f5; border-color: #f2c6c6; color: #c0392b;}
-    
+
     /* UNIFIED BUTTON STYLING FOR LIST VIEW */
     div[data-testid="column"] .stButton button {
         width: 100%;
         border-radius: 8px;
         transition: all 0.2s ease;
     }
-    
+
     /* Specifics for the big character button */
     .char-btn-wrap button {
-        font-size: 3.5em !important; 
-        font-weight: bold !important; 
-        background: white !important; 
-        border: 2px solid #e0e0e0 !important; 
-        padding: 5px !important; 
-        min-height: 80px !important; 
+        font-size: 3.5em !important;
+        font-weight: bold !important;
+        background: white !important;
+        border: 2px solid #e0e0e0 !important;
+        padding: 5px !important;
+        min-height: 80px !important;
     }
     .char-btn-wrap button:hover {
-        background: #f0f9ff !important; 
+        background: #f0f9ff !important;
         border-color: #3b82f6 !important;
     }
-    
+
     /* Specifics for the pen button */
     .pen-btn-wrap button {
         font-size: 1.5em !important;
         border: 1px solid #eee !important;
         background: #f8f9fa !important;
-        margin-top: 5px !important; 
+        margin-top: 5px !important;
         height: 40px !important;
         line-height: 1 !important;
         color: #555 !important;
@@ -102,54 +103,54 @@ def apply_dynamic_css():
 
     /* Status line / Navigation Map */
     .status-line {
-        font-size: 1.1em; 
-        font-weight: 600; 
-        color: #0f5132; 
-        background-color: #d1e7dd; 
-        border: 1px solid #badbcc; 
-        padding: 15px; 
-        border-radius: 8px; 
-        margin: 20px 0 30px 0; 
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #0f5132;
+        background-color: #d1e7dd;
+        border: 1px solid #badbcc;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0 30px 0;
     }
     .status-tag {
-        background-color: #f1f3f5; 
-        color: #2c3e50; 
-        padding: 4px 10px; 
-        border-radius: 6px; 
-        font-weight: 600; 
-        font-size: 0.9em; 
-        border: 1px solid #e9ecef; 
-        display: inline-flex; 
-        align-items: center; 
+        background-color: #f1f3f5;
+        color: #2c3e50;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.9em;
+        border: 1px solid #e9ecef;
+        display: inline-flex;
+        align-items: center;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
-    
+
     .map-path {
         font-family: monospace;
         color: #155724;
         margin-left: 10px;
     }
-    
+
     /* Sidebar Count Lines */
     .preview-count-line {font-size: 1.3em; text-align: center; color: #2c3e50; margin: 20px 0 25px 0;}
     .preview-count-line .char {font-size: 1.4em; font-weight: bold; color: #e74c3c;}
-    
+
     /* General UI */
     .jump-footer {margin-top: 40px; padding: 20px; background: #f8f9fa; border-top: 1px solid #e0e0e0; text-align: center;}
     div[data-testid="stExpander"] .stButton button {font-size: 1.2rem; height: 40px; padding: 0; line-height: 1.2; border-radius: 4px; border: 1px solid #eee; transition: all 0.1s ease-in-out;}
     div[data-testid="stExpander"] .stButton button:hover {border-color: #bbb; background-color: #f0f0f0;}
     .stroke-header {font-size: 0.85em; color: #888; border-bottom: 1px solid #eee; margin: 10px 0 5px 0; padding-bottom: 2px;}
-    
+
     /* Compound List Styling */
     .compound-item { display: flex; align-items: baseline; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e0e0e0; }
     .compound-item:last-child { border-bottom: none; margin-bottom: 0; }
     .cp-word { font-weight: bold; font-size: 1.1em; color: #2c3e50; min-width: 80px; margin-right: 10px; }
-    
+
     /* --- UPDATED: LARGER PINYIN IN LISTS --- */
     .cp-pinyin { color: #d35400; font-family: monospace; margin-right: 10px; font-weight: 500; font-size: 1.5em;}
-    
+
     .cp-mean { color: #333; font-size: 0.95em; flex: 1; }
-    
+
     /* Favourites / Splash */
     .splash-wrap {max-width: 1100px; margin: 0 auto; padding: 34px 10px 10px 10px;}
     .splash-card {background: white; border: 1px solid #eee; border-radius: 18px; padding: 34px; box-shadow: 0 6px 22px rgba(0,0,0,0.06);}
@@ -164,7 +165,6 @@ def apply_dynamic_css():
 
 
 # --- Data Loading ---
-
 @st.cache_data
 def load_component_map():
     try:
@@ -190,6 +190,19 @@ try:
     component_map = load_component_map()
 except Exception as e:
     st.error(f"Failed to load component data: {e}")
+
+
+# --- Optional: Wordfreq (Option A commonness fallback, no files needed) ---
+@st.cache_resource
+def get_zipf_frequency():
+    try:
+        from wordfreq import zipf_frequency
+        return zipf_frequency
+    except Exception:
+        return None
+
+
+ZIPF = get_zipf_frequency()
 
 
 # --- BATCH OPTIMIZATION: Get many phrases at once ---
@@ -277,6 +290,27 @@ def normalize_single_hanzi(raw: str) -> str:
     return chars[0]
 
 
+def resolve_to_known_variant(ch: str) -> str:
+    """
+    If user inputs a char not in component_map, attempt OpenCC conversion (S<->T)
+    and return the first variant that exists in component_map.
+    Returns "" if no variant found.
+    """
+    if not ch:
+        return ""
+    if ch in component_map:
+        return ch
+    if cc_s2t:
+        t = cc_s2t.convert(ch)
+        if t in component_map:
+            return t
+    if cc_t2s:
+        s = cc_t2s.convert(ch)
+        if s in component_map:
+            return s
+    return ""
+
+
 def reset_script_filter_to_any():
     """
     Requirement: when a character is selected (typed/pasted/clicked), default to NO filter.
@@ -298,6 +332,54 @@ def apply_script_filter(chars: list[str]) -> list[str]:
         return [c for c in chars if (not cc_t2s) or (cc_t2s.convert(c) == c)]
     # Traditional
     return [c for c in chars if (not cc_s2t) or (cc_s2t.convert(c) == c)]
+
+
+def zipf_commonness(ch: str) -> float:
+    """
+    Higher = more common (Zipf).
+    Uses wordfreq if available; otherwise returns -inf so it sorts last.
+    """
+    if not ch or ZIPF is None:
+        return float("-inf")
+    try:
+        z = float(ZIPF(ch, "zh"))
+    except Exception:
+        z = float("-inf")
+
+    # Improve hit-rate across scripts
+    if z <= 0:
+        if cc_s2t:
+            try:
+                z = max(z, float(ZIPF(cc_s2t.convert(ch), "zh")))
+            except Exception:
+                pass
+        if cc_t2s:
+            try:
+                z = max(z, float(ZIPF(cc_t2s.convert(ch), "zh")))
+            except Exception:
+                pass
+    return z
+
+
+def sort_key_usage_then_zipf(ch: str):
+    """
+    Ordering policy for result lists (grid and children lists):
+      - usage >= 3 first (sorted by usage desc)
+      - usage < 3 next (sorted by Zipf desc, i.e., more common first)
+
+    Tie-breakers:
+      - within usage group: Zipf desc
+      - then strokes asc
+      - then char
+    """
+    use = component_usage_count(ch)
+    z = zipf_commonness(ch)
+    strokes = get_stroke_count(ch) or 999
+
+    group = 0 if use >= 3 else 1
+    if group == 0:
+        return (group, -use, -z, strokes, ch)
+    return (group, -z, strokes, ch)
 
 
 # --- State init ---
@@ -328,7 +410,7 @@ for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# Clean up legacy keys to avoid confusion across reruns (safe no-ops if absent)
+# Clean up legacy keys (safe no-ops if absent)
 st.session_state.pop("w_script", None)
 st.session_state.pop("script_variant", None)
 
@@ -368,43 +450,49 @@ def sync_script_filter():
 
 def sync_text():
     # Footer input callback (typed/pasted)
-    v = normalize_single_hanzi(st.session_state.get("w_text", ""))
+    raw = st.session_state.get("w_text", "")
+    v = normalize_single_hanzi(raw)
     if not v:
         st.session_state.text_input_warning = "One character only"
         return
 
-    if v in component_map:
-        reset_script_filter_to_any()
-
-        st.session_state.history = []
-        st.session_state.selected_comp = v
-        st.session_state.last_valid_selected_comp = v
-        st.session_state.text_input_comp = v
-        st.session_state.text_input_warning = None
-        st.session_state.show_inputs = False
-        st.session_state.preview_comp = None
-        st.session_state.stroke_view_active = False
-        st.session_state.display_mode = "Single Character"
-    else:
+    resolved = resolve_to_known_variant(v)
+    if not resolved:
         st.session_state.text_input_warning = "Not found"
+        return
+
+    reset_script_filter_to_any()
+
+    st.session_state.history = []
+    st.session_state.selected_comp = resolved
+    st.session_state.last_valid_selected_comp = resolved
+    st.session_state.text_input_comp = resolved
+    st.session_state.text_input_warning = None
+    st.session_state.show_inputs = False
+    st.session_state.preview_comp = None
+    st.session_state.stroke_view_active = False
+    st.session_state.display_mode = "Single Character"
 
 
 def sync_sidebar_text():
     # Sidebar input callback (typed/pasted)
-    v = normalize_single_hanzi(st.session_state.get("sb_search", ""))
+    raw = st.session_state.get("sb_search", "")
+    v = normalize_single_hanzi(raw)
     if not v:
         st.toast("Please enter exactly one character.")
         return
-    if v not in component_map:
+
+    resolved = resolve_to_known_variant(v)
+    if not resolved:
         st.toast("Character not found.")
         return
 
     reset_script_filter_to_any()
 
     st.session_state.history = []
-    st.session_state.selected_comp = v
-    st.session_state.last_valid_selected_comp = v
-    st.session_state.text_input_comp = v
+    st.session_state.selected_comp = resolved
+    st.session_state.last_valid_selected_comp = resolved
+    st.session_state.text_input_comp = resolved
     st.session_state.show_inputs = False
     st.session_state.preview_comp = None
     st.session_state.stroke_view_active = False
@@ -482,6 +570,7 @@ def end_stroke_view():
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
 
+
 def build_chatgpt_prompt(char: str) -> str:
     char = (char or "").strip()[:1]
     meta = component_map.get(char, {}).get("meta", {})
@@ -523,7 +612,7 @@ Output ONLY valid JSON (no markdown, no extra text) with this schema:
       "sent_zh": "<Traditional Chinese sentence>",
       "sent_zh_sim": "<Simplified Chinese sentence>",
       "sent_en": "<English translation>",
-      "note_en": "<optional short note or ''>"
+      "note_en": "<optional short note on meaning in this context or ''>"
     }}
   ]
 }}
@@ -562,7 +651,6 @@ def render_copy_to_clipboard(prompt_text: str, widget_id: str):
                 await navigator.clipboard.writeText(text);
                 msg.textContent = "Copied. Paste into ChatGPT.";
               }} catch (e) {{
-                // Fallback for browsers that block clipboard
                 msg.textContent = "Copy failed. Please manually select and copy from the textbox above.";
               }}
               setTimeout(() => {{ msg.textContent = ""; }}, 2500);
@@ -574,6 +662,7 @@ def render_copy_to_clipboard(prompt_text: str, widget_id: str):
         """,
         height=90,
     )
+
 
 # --- Favourites Logic ---
 def toggle_favourite(char):
@@ -679,7 +768,7 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
                                  'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'];
                 for (const src of sources) {{ try {{ await loadScript(src); if (window.HanziWriter) return; }} catch(e) {{}} }}
             }}
-            
+
             function speak(text) {{
                 if ('speechSynthesis' in window) {{
                     window.speechSynthesis.cancel();
@@ -709,7 +798,7 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
                     const el = document.getElementById(target);
                     el.style.cursor = 'pointer';
                     const trigger = (e) => {{
-                        e.preventDefault(); 
+                        e.preventDefault();
                         speak(char);
                         writer.hideCharacter();
                         writer.animateCharacter();
@@ -822,7 +911,7 @@ def render_stroke_order_view(char_input: str):
                     window.speechSynthesis.speak(u);
                 }}
             }}
-            
+
             function loadScript(src) {{ return new Promise((resolve, reject) => {{
                 const s = document.createElement('script'); s.src = src; s.async = true;
                 s.onload = () => resolve(src); s.onerror = () => reject();
@@ -835,7 +924,7 @@ def render_stroke_order_view(char_input: str):
                 for (const src of sources) {{ try {{ await loadScript(src); if (window.HanziWriter) return; }} catch (e) {{}} }}
             }}
             const writers = [];
-            
+
             async function init() {{
                 try {{
                     await ensureLibLoaded();
@@ -858,7 +947,7 @@ def render_stroke_order_view(char_input: str):
                     autoAnimateAll(true);
                 }} catch (e) {{ errEl.textContent = e.message || String(e); }}
             }}
-            
+
             async function playSequence(item, silent) {{
                 const writer = item.w;
                 const char = item.c;
@@ -870,15 +959,15 @@ def render_stroke_order_view(char_input: str):
                 }}
                 writer.showCharacter();
             }}
-            
+
             function autoAnimateAll(silent = false) {{
                 writers.forEach(item => {{ playSequence(item, silent); }});
             }}
-            
+
             function resetAll() {{
                 writers.forEach(item => {{ item.w.hideCharacter(); }});
             }}
-            
+
             document.getElementById('hw-reset').addEventListener('click', resetAll);
             document.getElementById('hw-animate').addEventListener('click', () => autoAnimateAll(false));
             init();
@@ -932,9 +1021,9 @@ def render_stroke_order_view(char_input: str):
             full_list_html = "".join(items_html)
             st.markdown(
                 f"""
-                <div style='padding:15px; background:#f1f8e9; border-radius:8px; 
+                <div style='padding:15px; background:#f1f8e9; border-radius:8px;
                      margin:10px auto; border:1px solid #dcedc8; max-width:800px; max-height:400px; overflow-y:auto;'>
-                  <div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; 
+                  <div style='font-weight:bold; margin-bottom:10px; color:#2e7d32;
                        border-bottom:2px solid #a5d6a7; padding-bottom:5px; text-align:center;'>
                     {mode} containing {primary_char}
                   </div>
@@ -962,7 +1051,6 @@ def render_stroke_order_view(char_input: str):
 
 
 def enter_component(comp: str):
-    # helper for direct entry (e.g. from Splash)
     reset_script_filter_to_any()
 
     st.session_state.history = []
@@ -1173,21 +1261,13 @@ def main():
                                 st.session_state.page = 1
                                 st.rerun()
 
-            idc_label = (
-                f"Structure: {st.session_state.component_idc}"
-                if st.session_state.component_idc != "none"
-                else "Structure (Any)"
-            )
+            idc_label = f"Structure: {st.session_state.component_idc}" if st.session_state.component_idc != "none" else "Structure (Any)"
             with st.expander(idc_label, expanded=False):
                 idc_keys = sorted(st.session_state.idc_counts.keys())
                 idc_cols = st.columns(5)
                 for i, idc in enumerate(idc_keys):
                     with idc_cols[i % 5]:
-                        if st.button(
-                            idc,
-                            key=f"idc_{idc}",
-                            type="primary" if st.session_state.component_idc == idc else "secondary",
-                        ):
+                        if st.button(idc, key=f"idc_{idc}", type="primary" if st.session_state.component_idc == idc else "secondary"):
                             st.session_state.component_idc = idc
                             st.session_state.page = 1
                             st.rerun()
@@ -1207,12 +1287,7 @@ def main():
                     args=(current_char_for_sidebar,),
                 )
 
-                if st.button(
-                    f"Explore {current_char_for_sidebar}",
-                    key="sb_select_btn",
-                    width="stretch",
-                    type="primary",
-                ):
+                if st.button(f"Explore {current_char_for_sidebar}", key="sb_select_btn", width="stretch", type="primary"):
                     reset_script_filter_to_any()
                     st.session_state.history = []
                     st.session_state.selected_comp = current_char_for_sidebar
@@ -1238,9 +1313,7 @@ def main():
             with c2:
                 st.button("🏠 Root", on_click=go_to_root, width="stretch")
 
-            current_char_for_sidebar = (
-                st.session_state.preview_comp if st.session_state.preview_comp else st.session_state.selected_comp
-            )
+            current_char_for_sidebar = st.session_state.preview_comp if st.session_state.preview_comp else st.session_state.selected_comp
 
             if current_char_for_sidebar:
                 render_stroke_order_sidebar(current_char_for_sidebar, size=140)
@@ -1309,7 +1382,9 @@ def main():
             and (st.session_state.component_idc == "none" or component_map.get(c, {}).get("meta", {}).get("decomposition", "").startswith(st.session_state.component_idc))
             and (not st.session_state.component_only or c in st.session_state.used_components)
         ]
-        sorted_comps = sorted(filtered, key=lambda c: (-component_usage_count(c), get_stroke_count(c) or 999, c))
+
+        # ROOT GRID SORT: usage >=3 first by usage, then low-usage by Zipf commonness (Option A)
+        sorted_comps = sorted(filtered, key=sort_key_usage_then_zipf)
 
         if not sorted_comps:
             st.info("No components match current filters.")
@@ -1319,6 +1394,7 @@ def main():
             total = len(sorted_comps)
             max_page = max(1, math.ceil(total / PAGE_SIZE))
             st.session_state.page = max(1, min(st.session_state.page, max_page))
+
             p1, p2, p3 = st.columns([1, 3, 1])
             with p1:
                 if st.button("◀ Prev", disabled=st.session_state.page <= 1):
@@ -1328,7 +1404,7 @@ def main():
                 start = (st.session_state.page - 1) * PAGE_SIZE + 1
                 end = min(st.session_state.page * PAGE_SIZE, total)
                 st.markdown(
-                    f"""<div style='text-align:center; padding:10px 0; color:#555;'><div style='font-size:1.1em; font-weight:bold;'>{start}–{end} of {total}</div><div style='font-size:0.85em; color:#e74c3c;'>Sorted by frequency of use as component</div></div>""",
+                    f"""<div style='text-align:center; padding:10px 0; color:#555;'><div style='font-size:1.1em; font-weight:bold;'>{start}–{end} of {total}</div><div style='font-size:0.85em; color:#e74c3c;'>Sorted by component-usage; low-usage uses language commonness</div></div>""",
                     unsafe_allow_html=True,
                 )
             with p3:
@@ -1379,7 +1455,7 @@ def main():
             f"""
             <div class='status-line'>
                 <div style='margin-bottom:8px;'>
-                    <span class='status-tag'>Location</span> 
+                    <span class='status-tag'>Location</span>
                     <span class='map-path'>{path_str}</span>
                 </div>
                 <div class='status-text' style='font-size:0.85em; color:#666;'>Single-click previews. Double-click explores.</div>
@@ -1394,12 +1470,12 @@ def main():
         decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
         components_list = [c for c in decomp_raw if c not in IDC_CHARS and c != "?" and c != "–"]
 
-        # Children next
+        # Children next (usage>=3 first by usage; usage<3 sorted by Zipf commonness)
         related_raw = component_map.get(selected, {}).get("related_characters", [])
         children_list = [c for c in related_raw if isinstance(c, str) and len(c) == 1]
-        children_sorted = sorted(children_list, key=lambda x: (-component_usage_count(x), get_stroke_count(x) or 999, x))
+        children_sorted = sorted(children_list, key=sort_key_usage_then_zipf)
 
-        # Merge (dedupe)
+        # Merge (dedupe): components at top, then children in their sorted order
         final_chars_list = []
         seen_chars = set()
         for c in components_list:
@@ -1413,12 +1489,11 @@ def main():
 
         chars = final_chars_list
 
-        # Hybrid render
         LIMIT = 60
         clickable_chars = chars[:LIMIT]
         static_chars = chars[LIMIT:]
 
-        # Apply script filter ONLY if user set it to Simplified/Traditional (not Any)
+        # Apply script filter only if user set it (not Any)
         clickable_chars = apply_script_filter(clickable_chars)
         static_chars = apply_script_filter(static_chars)
 
