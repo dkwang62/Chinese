@@ -1263,7 +1263,7 @@ def main():
                 seen.add(c)
 
         chars = final_chars_list
-        LIMIT = 60
+        LIMIT = 120
         clickable_chars = apply_script_filter(chars[:LIMIT])
         static_chars = apply_script_filter(chars[LIMIT:])
 
