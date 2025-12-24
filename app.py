@@ -482,6 +482,92 @@ def end_stroke_view():
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
 
+def build_chatgpt_prompt(char: str) -> str:
+    char = (char or "").strip()[:1]
+    meta = component_map.get(char, {}).get("meta", {})
+    def_en = clean_field(meta.get("definition", ""))  # your existing English definition
+    decomp = format_decomposition(char)
+
+    return f"""You are a bilingual Chinese dictionary editor.
+
+Task:
+For the single Hanzi below, give:
+1) One-line Chinese definition (≤ 22 Chinese characters, no English).
+2) Pinyin with tone marks.
+3) Two example sentences that BEST illustrate the meaning (prefer everyday usage unless the character is primarily literary).
+   - Each example must include the target character in a common word/phrase.
+   - For each example provide:
+     a) Chinese sentence
+     b) English translation (natural, not literal)
+     c) Highlight the target word/phrase used in that sentence.
+
+Output ONLY valid JSON (no markdown, no extra text) with this schema:
+{{
+  "char": "<Hanzi>",
+  "pinyin": "<tone-mark pinyin>",
+  "def_zh": "<one-line Chinese definition>",
+  "examples": [
+    {{
+      "word": "<target word/phrase containing the character>",
+      "sent_zh": "<Chinese sentence>",
+      "sent_en": "<English translation>",
+      "note_zh": "<optional short note on meaning in this context or ''>"
+    }},
+    {{
+      "word": "<target word/phrase containing the character>",
+      "sent_zh": "<Chinese sentence>",
+      "sent_en": "<English translation>",
+      "note_zh": "<optional short note or ''>"
+    }}
+  ]
+}}
+
+Hanzi: {char}
+Context (may be empty):
+- English definition: {def_en}
+- Decomposition: {decomp}
+"""
+
+
+def render_copy_to_clipboard(prompt_text: str, widget_id: str):
+    """
+    Renders a copy button using HTML/JS (works in most modern browsers).
+    """
+    safe_text = json.dumps(prompt_text, ensure_ascii=False)
+    st_html(
+        f"""
+        <div style="display:flex; justify-content:center; margin:10px 0 0 0;">
+          <button id="copy-btn-{widget_id}" style="
+              padding:10px 14px; border-radius:10px; border:1px solid #ddd;
+              background:#fff; cursor:pointer; font-weight:700;">
+            Copy Prompt to Clipboard
+          </button>
+        </div>
+        <div id="copy-msg-{widget_id}" style="text-align:center; margin-top:8px; color:#2e7d32; font-weight:600;"></div>
+        <script>
+          (function() {{
+            const text = {safe_text};
+            const btn = document.getElementById("copy-btn-{widget_id}");
+            const msg = document.getElementById("copy-msg-{widget_id}");
+            if (!btn) return;
+
+            async function copy() {{
+              try {{
+                await navigator.clipboard.writeText(text);
+                msg.textContent = "Copied. Paste into ChatGPT.";
+              }} catch (e) {{
+                // Fallback for browsers that block clipboard
+                msg.textContent = "Copy failed. Please manually select and copy from the textbox above.";
+              }}
+              setTimeout(() => {{ msg.textContent = ""; }}, 2500);
+            }}
+
+            btn.addEventListener("click", copy);
+          }})();
+        </script>
+        """,
+        height=90,
+    )
 
 # --- Favourites Logic ---
 def toggle_favourite(char):
@@ -853,6 +939,20 @@ def render_stroke_order_view(char_input: str):
             )
     elif n > 0:
         st.info(f"No {mode} found for {primary_char}.")
+
+    # --- ChatGPT Prompt Builder (Pen View Only) ---
+    st.markdown("---")
+    st.markdown("### ChatGPT Prompt (Chinese definition + bilingual examples)")
+
+    prompt_text = build_chatgpt_prompt(primary_char)
+    st.text_area(
+        "Copy this prompt into ChatGPT",
+        value=prompt_text,
+        height=320,
+        key=f"prompt_area_{primary_char}",
+    )
+
+    render_copy_to_clipboard(prompt_text, widget_id=str(hash(primary_char))[-6:])
 
 
 def enter_component(comp: str):
