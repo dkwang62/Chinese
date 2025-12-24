@@ -878,12 +878,8 @@ def render_splash():
           <div class="splash-card">
             <div class="splash-title">Radix 🈑 Explore Characters by Components</div>
             <div class="splash-sub">
-              Learn to read and write Chinese characters by identifying <b>components</b>.
-              <b>Components</b> are recurring parts that hint at meaning or pronunciation.
-            </div>
-            <div class="splash-demo">
-              <div class="splash-demo-h">Favourites Collection</div>
-              <div>This list revolves as you add new characters. Load/Save your collection below.</div>
+              Learn to read and write Chinese characters by identifying <b>components</b> — 
+              the recurring building blocks that often hint at meaning or sound.
             </div>
           </div>
         </div>
@@ -891,40 +887,70 @@ def render_splash():
         unsafe_allow_html=True,
     )
 
-    lc1, lc2, lc3 = st.columns([1, 2, 1])
-    with lc2:
-        with st.expander("Manage Favourites (Save/Load)"):
-            c_dl, c_ul = st.columns(2)
-            with c_dl:
-                json_data = json.dumps(st.session_state.favourites_list, ensure_ascii=False, indent=2)
-                st.download_button("💾 Save Favourites", data=json_data, file_name="favourites.json", mime="application/json")
-            with c_ul:
-                st.file_uploader("Load Favourites", type=["json"], key="fav_uploader", on_change=handle_file_upload, label_visibility="collapsed")
+    st.markdown("### Your Favourites Collection")
+    st.markdown(
+        """
+        <div style="background:#f8fdf8; border:2px solid #a7d6a7; border-radius:16px; padding:20px; margin:20px 0;">
+          <div style="font-size:1.1em; color:#2e7d32; margin-bottom:16px; font-weight:600;">
+            These are your saved favourite components. The list rotates as you add more — 
+            always showing your 20 most recent favourites.
+          </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
+    # Manage Favourites controls — now inside the same card
+    col_save, col_load = st.columns([1, 1])
+    with col_save:
+        json_data = json.dumps(st.session_state.favourites_list, ensure_ascii=False, indent=2)
+        st.download_button(
+            label="💾 Save Favourites to File",
+            data=json_data,
+            file_name="radix_favourites.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+    with col_load:
+        st.file_uploader(
+            "📂 Load Favourites from File",
+            type=["json"],
+            key="fav_uploader",
+            on_change=handle_file_upload,
+            label_visibility="collapsed",
+            use_container_width=True,
+        )
+
+    st.markdown("---")
+
+    # Favourite character grid
     demos = st.session_state.favourites_list
-    COLS = 5
-    for r in range((len(demos) + COLS - 1) // COLS):
-        cols = st.columns(COLS)
-        for j in range(COLS):
-            idx = r * COLS + j
-            if idx >= len(demos):
-                continue
-            ch = demos[idx]
-            count = component_usage_count(ch)
-            with cols[j]:
-                if st.button(f"Explore {ch}", type="primary", key=f"splash_{ch}_{idx}"):
-                    st.session_state.onboarding_done = True
-                    enter_component(ch)
-                    st.rerun()
-                st.caption(f"{count} characters")
+    if demos:
+        COLS = 5
+        for r in range((len(demos) + COLS - 1) // COLS):
+            cols = st.columns(COLS)
+            for j in range(COLS):
+                idx = r * COLS + j
+                if idx >= len(demos):
+                    continue
+                ch = demos[idx]
+                count = component_usage_count(ch)
+                with cols[j]:
+                    if st.button(f"Explore {ch}", type="primary", key=f"splash_{ch}_{idx}", use_container_width=True):
+                        st.session_state.onboarding_done = True
+                        enter_component(ch)
+                        st.rerun()
+                    st.caption(f"{count} characters contain it", help="How many characters use this as a component")
+    else:
+        st.info("Your favourites list is empty. Start exploring and check 'Show in Favourites' to add characters here!")
 
-    c1, c2, c3 = st.columns([2, 1, 2])
-    with c2:
-        if st.button("Enter Radix"):
+    st.markdown("</div>", unsafe_allow_html=True)  # Close the green card
+
+    # Final call to action
+    col1, col2, col3 = st.columns([2, 1, 2])
+    with col2:
+        if st.button("Enter Radix →", type="primary", use_container_width=True):
             st.session_state.onboarding_done = True
             st.rerun()
-
-
 def main():
     if not component_map:
         st.error("Component dataset not loaded. Ensure enhanced_component_map_with_etymology.json exists.")
