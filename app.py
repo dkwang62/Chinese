@@ -1,11 +1,12 @@
 # app.py
-# Radix – Component-first Chinese character explorer (Optimized Version)
+# Radix – Component-first Chinese character explorer (Memory-Optimized for Streamlit Cloud)
 
 import json
 import math
 import html
 import sqlite3
 import unicodedata
+import gc  # Explicit garbage collection for memory efficiency
 import streamlit as st
 from streamlit.components.v1 import html as st_html
 
@@ -24,19 +25,7 @@ IDC_CHARS = {"⿰", "⿱", "⿲", "⿳", "⿴", "⿵", "⿶", "⿷", "⿸", "⿹
 SCRIPT_FILTERS = ["Any", "Simplified", "Traditional"]
 
 
-# --- DATA PIPELINE OPTIMIZATIONS ---
-@st.cache_resource
-def get_zipf_frequency():
-    try:
-        from wordfreq import zipf_frequency
-        return zipf_frequency
-    except Exception:
-        return None
-
-
-ZIPF = get_zipf_frequency()
-
-
+# --- MEMORY-OPTIMIZED DATA PIPELINE ---
 def zipf_commonness_raw(ch: str) -> float:
     if not ch or ZIPF is None:
         return float("-inf")
@@ -54,7 +43,19 @@ def zipf_commonness_raw(ch: str) -> float:
     return z
 
 
-@st.cache_data
+@st.cache_resource
+def get_zipf_frequency():
+    try:
+        from wordfreq import zipf_frequency
+        return zipf_frequency
+    except Exception:
+        return None
+
+
+ZIPF = get_zipf_frequency()
+
+
+@st.cache_resource  # Single shared instance – avoids pickling duplication
 def load_and_augment_map():
     try:
         with open("enhanced_component_map_with_etymology.json", "r", encoding="utf-8") as f:
@@ -62,14 +63,18 @@ def load_and_augment_map():
     except FileNotFoundError:
         return {}
 
+    # Augment in-place to minimize memory footprint
     for char, info in data.items():
         meta = info.get("meta", {})
+        
         # Pre-calculate usage count
         rel = info.get("related_characters", [])
         info['usage_count'] = len({c for c in rel if isinstance(c, str) and len(c) == 1})
+        
         # Pre-calculate Zipf value
         info['zipf_val'] = zipf_commonness_raw(char)
-        # Clean and store stroke count
+        
+        # Clean stroke count
         s = meta.get("strokes")
         try:
             if isinstance(s, (int, float)) and s > 0:
@@ -80,39 +85,42 @@ def load_and_augment_map():
                 info['stroke_count'] = None
         except:
             info['stroke_count'] = None
+    
+    gc.collect()  # Free temporary objects
     return data
 
 
-@st.cache_data
+@st.cache_resource  # Single shared stats object
 def get_component_stats(_component_map):
-    r_counts = {}
+    r_groups = {}
     idc_counts = {}
     used_comps = set()
 
     for c, data in _component_map.items():
+        # Radical grouping by its own stroke count
         r = data.get("meta", {}).get("radical")
         if r:
-            r_counts[r] = r_counts.get(r, 0) + 1
+            gs = _component_map.get(r, {}).get('stroke_count') or 999
+            r_groups.setdefault(gs, []).append(r)
 
+        # IDC structure count
         d = data.get("meta", {}).get("decomposition", "")
         if d and d[0] in IDC_CHARS:
             idc = d[0]
             idc_counts[idc] = idc_counts.get(idc, 0) + 1
-        clean_d = "".join(ch for ch in d if ch not in IDC_CHARS)
-        for ch in clean_d:
-            used_comps.add(ch)
+        
+        # Efficient used components collection
+        for ch in d:
+            if ch not in IDC_CHARS:
+                used_comps.add(ch)
 
-    # Group radicals by their own stroke count
-    r_groups = {}
-    for r in r_counts:
-        gs = _component_map.get(r, {}).get('stroke_count') or 999
-        r_groups.setdefault(gs, []).append(r)
+    # Dedupe and sort radical groups
     for gs in r_groups:
-        r_groups[gs].sort()
+        r_groups[gs] = sorted(list(set(r_groups[gs])))
 
+    gc.collect()
     return {
         "rad_groups": r_groups,
-        "rad_counts": r_counts,
         "idc_counts": idc_counts,
         "used_components": used_comps
     }
@@ -127,136 +135,40 @@ def apply_dynamic_css():
     css = """
     <style>
     .results-header-sidebar {font-size: 1.4em; font-weight: bold; color: #2c3e50; margin: 20px 0 10px 0; text-align: center;}
-    /* Char card styling */
     .char-card {background: white; padding: 20px; border-radius: 10px; margin-bottom: 0px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);}
     .meta-row {font-size: 0.95em; color: #555; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;}
-
-    /* --- DOUBLED PINYIN SIZE --- */
     .meta-pinyin {font-weight: bold; font-size: 2.2em; color: #d35400;}
-
-    /* Tags */
     .meta-tag {background: #f1f3f5; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; color: #495057;}
     .meta-tag-trad {background: #fff8e1; color: #856404; border: 1px solid #ffeeba;}
     .meta-tag-simp {background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;}
     .def-row {font-size: 1.1em; line-height: 1.4; color: #2c3e50; margin-bottom: 8px;}
     .ety-row {font-size: 0.9em; color: #666; font-style: italic; border-top: 1px solid #eee; padding-top: 8px; margin-top: 4px;}
-
-    /* Grid buttons */
     .comp-grid .stButton button {font-size: 2em; height: 80px; background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 0; line-height: 80px;}
     .comp-grid .stButton button:hover {background: #fff5f5; border-color: #f2c6c6; color: #c0392b;}
-
-    /* UNIFIED BUTTON STYLING FOR LIST VIEW */
-    div[data-testid="column"] .stButton button {
-        width: 100%;
-        border-radius: 8px;
-        transition: all 0.2s ease;
-    }
-
-    /* Specifics for the big character button */
-    .char-btn-wrap button {
-        font-size: 3.5em !important;
-        font-weight: bold !important;
-        background: white !important;
-        border: 2px solid #e0e0e0 !important;
-        padding: 5px !important;
-        min-height: 80px !important;
-    }
-    .char-btn-wrap button:hover {
-        background: #f0f9ff !important;
-        border-color: #3b82f6 !important;
-    }
-
-    /* Specifics for the pen button */
-    .pen-btn-wrap button {
-        font-size: 1.5em !important;
-        border: 1px solid #eee !important;
-        background: #f8f9fa !important;
-        margin-top: 5px !important;
-        height: 40px !important;
-        line-height: 1 !important;
-        color: #555 !important;
-    }
-    .pen-btn-wrap button:hover {
-        background: #e3f2fd !important;
-        border-color: #90caf9 !important;
-        color: #1565c0 !important;
-    }
-
-    /* STATIC CARD STYLING */
-    .char-static-box {
-        font-size: 3.5em;
-        font-weight: bold;
-        background: #fdfdfd;
-        color: #999;
-        border: 2px solid #eee;
-        border-radius: 12px;
-        padding: 5px;
-        min-height: 80px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        cursor: default;
-    }
-
-    /* Status line / Navigation Map */
-    .status-line {
-        font-size: 1.1em;
-        font-weight: 600;
-        color: #0f5132;
-        background-color: #d1e7dd;
-        border: 1px solid #badbcc;
-        padding: 15px;
-        border-radius: 8px;
-        margin: 20px 0 30px 0;
-    }
-    .status-tag {
-        background-color: #f1f3f5;
-        color: #2c3e50;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-weight: 600;
-        font-size: 0.9em;
-        border: 1px solid #e9ecef;
-        display: inline-flex;
-        align-items: center;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-
-    .map-path {
-        font-family: monospace;
-        color: #155724;
-        margin-left: 10px;
-    }
-
-    /* Sidebar Count Lines */
+    div[data-testid="column"] .stButton button { width: 100%; border-radius: 8px; transition: all 0.2s ease; }
+    .char-btn-wrap button { font-size: 3.5em !important; font-weight: bold !important; background: white !important; border: 2px solid #e0e0e0 !important; padding: 5px !important; min-height: 80px !important; }
+    .char-btn-wrap button:hover { background: #f0f9ff !important; border-color: #3b82f6 !important; }
+    .pen-btn-wrap button { font-size: 1.5em !important; border: 1px solid #eee !important; background: #f8f9fa !important; margin-top: 5px !important; height: 40px !important; line-height: 1 !important; color: #555 !important; }
+    .pen-btn-wrap button:hover { background: #e3f2fd !important; border-color: #90caf9 !important; color: #1565c0 !important; }
+    .char-static-box { font-size: 3.5em; font-weight: bold; background: #fdfdfd; color: #999; border: 2px solid #eee; border-radius: 12px; padding: 5px; min-height: 80px; display: flex; align-items: center; justify-content: center; width: 100%; cursor: default; }
+    .status-line { font-size: 1.1em; font-weight: 600; color: #0f5132; background-color: #d1e7dd; border: 1px solid #badbcc; padding: 15px; border-radius: 8px; margin: 20px 0 30px 0; }
+    .status-tag { background-color: #f1f3f5; color: #2c3e50; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.9em; border: 1px solid #e9ecef; display: inline-flex; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .map-path { font-family: monospace; color: #155724; margin-left: 10px; }
     .preview-count-line {font-size: 1.3em; text-align: center; color: #2c3e50; margin: 20px 0 25px 0;}
     .preview-count-line .char {font-size: 1.4em; font-weight: bold; color: #e74c3c;}
-
-    /* General UI */
     .jump-footer {margin-top: 40px; padding: 20px; background: #f8f9fa; border-top: 1px solid #e0e0e0; text-align: center;}
     div[data-testid="stExpander"] .stButton button {font-size: 1.2rem; height: 40px; padding: 0; line-height: 1.2; border-radius: 4px; border: 1px solid #eee; transition: all 0.1s ease-in-out;}
     div[data-testid="stExpander"] .stButton button:hover {border-color: #bbb; background-color: #f0f0f0;}
     .stroke-header {font-size: 0.85em; color: #888; border-bottom: 1px solid #eee; margin: 10px 0 5px 0; padding-bottom: 2px;}
-
-    /* Compound List Styling */
     .compound-item { display: flex; align-items: baseline; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e0e0e0; }
     .compound-item:last-child { border-bottom: none; margin-bottom: 0; }
     .cp-word { font-weight: bold; font-size: 1.1em; color: #2c3e50; min-width: 80px; margin-right: 10px; }
-
-    /* LARGER PINYIN IN LISTS */
     .cp-pinyin { color: #d35400; font-family: monospace; margin-right: 10px; font-weight: 500; font-size: 1.5em;}
-
     .cp-mean { color: #333; font-size: 0.95em; flex: 1; }
-
-    /* Favourites / Splash */
     .splash-wrap {max-width: 1100px; margin: 0 auto; padding: 34px 10px 10px 10px;}
     .splash-card {background: white; border: 1px solid #eee; border-radius: 18px; padding: 34px; box-shadow: 0 6px 22px rgba(0,0,0,0.06);}
     .splash-title {font-size: 2.3em; font-weight: 850; line-height: 1.12; color:#111;}
     .splash-sub {margin-top: 10px; font-size: 1.15em; color:#444; line-height: 1.5;}
-    .splash-demo {margin-top: 18px; padding: 14px 16px; background:#fff8e1; border:1px solid #ffeeba; border-radius: 14px;}
-    .splash-demo-h {font-weight: 750; color:#856404; margin-bottom: 8px;}
-    .splash-tip {text-align:center; color:#777; margin-top: 10px;}
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -383,7 +295,6 @@ defaults = {
     "stroke_view_char": "",
     "script_filter": "Any",
     "component_only": True,
-    "used_components": set(),
     "favourites_list": [],
     "fav_cursor": 0,
     "history": [],
@@ -699,8 +610,7 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
     if not char:
         return
 
-    meta = component_map.get(char, {}).get("meta", {})
-    pinyin = clean_field(meta.get("pinyin", ""))
+    pinyin = clean_field(component_map.get(char, {}).get("meta", {}).get("pinyin", ""))
 
     h = size + 80
     st_html(
@@ -747,24 +657,19 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
             async function init() {{
                 try {{
                     await ensureLib();
-                    await loadData();
-                    const writer = window.HanziWriter.create(target, char, {{
-                        width: {size}, height: {size}, padding: 8, showOutline: true, showCharacter: false,
-                        strokeAnimationSpeed: 1.3, delayBetweenStrokes: 100
+                    const writer = HanziWriter.create(target, char, {{
+                        width: {size}, height: {size}, padding: 8, showOutline: true, strokeAnimationSpeed: 1.3
                     }});
-                    writer.showCharacter();
+                    writer.animateCharacter();
                     const el = document.getElementById(target);
                     el.style.cursor = 'pointer';
-                    const trigger = (e) => {{
-                        e.preventDefault();
+                    el.addEventListener('click', () => {{
                         speak(char);
                         writer.hideCharacter();
                         writer.animateCharacter();
-                    }};
-                    el.addEventListener('click', trigger);
-                    el.addEventListener('touchend', trigger);
+                    }});
                 }} catch(e) {{
-                    document.getElementById(target).innerHTML = `<div style="font-size:${size*0.7}px; line-height:${size}px; text-align:center;">${{char}}</div>`;
+                    document.getElementById(target).innerHTML = `<div style="font-size:${size*0.7}px;line-height:${size}px;text-align:center;">${{char}}</div>`;
                 }}
             }}
             init();
@@ -778,12 +683,10 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
 def render_stroke_order_view(char_input: str):
     primary_char = (char_input or "").strip()[:1]
     if not primary_char:
-        st.info("No character selected for stroke order.")
         return
 
     if st.session_state.display_mode == "Single Character":
         st.session_state.display_mode = "2-Character Phrases"
-        st.rerun()
 
     st.markdown("### Stroke Order & Phrases")
     modes = ["2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
@@ -800,14 +703,14 @@ def render_stroke_order_view(char_input: str):
     BOX_SIZE = 280
     container_html = ""
     for i, c in enumerate(chars_to_show):
-        label_text = "Simplified" if c == s_char and s_char != t_char else "Traditional" if c == t_char and s_char != t_char else ""
+        label_text = "Simplified" if c == s_char and c != primary_char else "Traditional" if c == t_char and c != primary_char else ""
         label_html = f"<div style='text-align:center; font-weight:bold; color:#555; margin-bottom:5px;'>{label_text}</div>" if label_text else ""
         pinyin = clean_field(component_map.get(c, {}).get("meta", {}).get("pinyin", ""))
         container_html += f"""
         <div style="display:flex; flex-direction:column; align-items:center;">
-             {label_html}
+            {label_html}
             <div style="font-size:2.5rem; color:#e67e22; font-weight:bold; margin-bottom:10px;">{pinyin}</div>
-            <div id="hw-target-{i}" style="width:{BOX_SIZE}px;height:{BOX_SIZE}px;border:1px solid #e0e0e0;border-radius:12px; background:white;"></div>
+            <div id="hw-target-{i}" style="width:{BOX_SIZE}px;height:{BOX_SIZE}px;border:1px solid #e0e0e0;border-radius:12px;background:white;"></div>
         </div>
         """
 
@@ -840,38 +743,43 @@ def render_stroke_order_view(char_input: str):
 
             function loadScript(src) {{ return new Promise((resolve, reject) => {{
                 const s = document.createElement('script'); s.src = src; s.async = true;
-                s.onload = () => resolve(src); s.onerror = () => reject();
+                s.onload = () => resolve(); s.onerror = () => reject();
                 document.head.appendChild(s);
             }}); }}
+
             async function ensureLibLoaded() {{
                 if (window.HanziWriter) return;
                 const sources = ['https://cdn.jsdelivr.net/npm/hanzi-writer@3/dist/hanzi-writer.min.js',
                                  'https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js'];
-                for (const src of sources) {{ try {{ await loadScript(src); if (window.HanziWriter) return; }} catch (e) {{}} }}
+                for (const src of sources) {{ try {{ await loadScript(src); if (window.HanziWriter) return; }} catch {{}} }}
             }}
+
             const writers = [];
 
             async function init() {{
                 try {{
                     await ensureLibLoaded();
-                    for (let idx = 0; idx < chars.length; idx++) {{
-                        const char = chars[idx];
-                        const targetId = 'hw-target-' + idx;
-                        const dataUrls = [`https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/${{char}}.json`,`https://unpkg.com/hanzi-writer-data@2.0.1/${{char}}.json`];
-                        let hasData = false;
-                        for (const url of dataUrls) {{ try {{ const res = await fetch(url); if (res.ok) {{ hasData = true; break; }} }} catch (e) {{}} }}
-                        if(hasData) {{
-                            const writer = window.HanziWriter.create(targetId, char, {{
+                    for (let i = 0; i < chars.length; i++) {{
+                        const char = chars[i];
+                        const target = 'hw-target-' + i;
+                        const dataUrls = [`https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/${{char}}.json`,
+                                          `https://unpkg.com/hanzi-writer-data@2.0.1/${{char}}.json`];
+                        let loaded = false;
+                        for (const url of dataUrls) {{
+                            try {{ const res = await fetch(url); if (res.ok) {{ loaded = true; break; }} }} catch {{}}
+                        }}
+                        if (loaded) {{
+                            const writer = HanziWriter.create(target, char, {{
                                 width: boxSize, height: boxSize, padding: 10, showOutline: true, showCharacter: false,
                                 strokeAnimationSpeed: 1, delayBetweenStrokes: 60
                             }});
                             writers.push({{w: writer, c: char}});
                         }} else {{
-                            document.getElementById(targetId).innerHTML = `<div style="line-height:${{boxSize}}px; text-align:center; font-size:${{boxSize/2}}px; color:#ddd;">${{char}}</div>`;
+                            document.getElementById(target).innerHTML = `<div style="line-height:${{boxSize}}px;text-align:center;font-size:${{boxSize/2}}px;color:#ddd;">${{char}}</div>`;
                         }}
                     }}
                     autoAnimateAll(true);
-                }} catch (e) {{ errEl.textContent = e.message || String(e); }}
+                }} catch (e) {{ errEl.textContent = 'Failed to load stroke data.'; }}
             }}
 
             async function playSequence(item, silent) {{
@@ -887,11 +795,11 @@ def render_stroke_order_view(char_input: str):
             }}
 
             function autoAnimateAll(silent = false) {{
-                writers.forEach(item => {{ playSequence(item, silent); }});
+                writers.forEach(item => playSequence(item, silent));
             }}
 
             function resetAll() {{
-                writers.forEach(item => {{ item.w.hideCharacter(); }});
+                writers.forEach(item => item.w.hideCharacter());
             }}
 
             document.getElementById('hw-reset').addEventListener('click', resetAll);
@@ -989,12 +897,7 @@ def render_splash():
             c_dl, c_ul = st.columns(2)
             with c_dl:
                 json_data = json.dumps(st.session_state.favourites_list, ensure_ascii=False, indent=2)
-                st.download_button(
-                    label="💾 Save Favourites",
-                    data=json_data,
-                    file_name="favourites.json",
-                    mime="application/json",
-                )
+                st.download_button("💾 Save Favourites", data=json_data, file_name="favourites.json", mime="application/json")
             with c_ul:
                 st.file_uploader("Load Favourites", type=["json"], key="fav_uploader", on_change=handle_file_upload, label_visibility="collapsed")
 
@@ -1057,13 +960,9 @@ def main():
             st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char}</div>", unsafe_allow_html=True)
             st.markdown(generate_clean_card_html(current_char), unsafe_allow_html=True)
 
-            counterpart = None
             s_char = cc_t2s.convert(current_char) if cc_t2s else current_char
             t_char = cc_s2t.convert(current_char) if cc_s2t else current_char
-            if current_char == s_char and t_char != current_char:
-                counterpart = t_char
-            elif current_char == t_char and s_char != current_char:
-                counterpart = s_char
+            counterpart = t_char if current_char == s_char and t_char != current_char else s_char if current_char == t_char and s_char != current_char else None
             if counterpart:
                 st.markdown("---")
                 st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px; color:#666;'>{counterpart}</div>", unsafe_allow_html=True)
@@ -1105,7 +1004,8 @@ def main():
             if st.session_state.preview_comp:
                 render_stroke_order_sidebar(st.session_state.preview_comp, size=110)
                 is_fav = st.session_state.preview_comp in st.session_state.favourites_list
-                st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{st.session_state.preview_comp}", on_change=toggle_favourite, args=(st.session_state.preview_comp,))
+                st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{st.session_state.preview_comp}",
+                            on_change=toggle_favourite, args=(st.session_state.preview_comp,))
                 if st.button(f"Explore {st.session_state.preview_comp}", type="primary", key="sb_select_btn"):
                     reset_script_filter_to_any()
                     st.session_state.history = []
@@ -1132,7 +1032,8 @@ def main():
             if current_char:
                 render_stroke_order_sidebar(current_char, size=140)
                 is_fav = current_char in st.session_state.favourites_list
-                st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{current_char}", on_change=toggle_favourite, args=(current_char,))
+                st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{current_char}",
+                            on_change=toggle_favourite, args=(current_char,))
                 st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(st.session_state.script_filter),
                          key="w_script_filter", on_change=sync_script_filter)
 
@@ -1263,7 +1164,7 @@ def main():
                 seen.add(c)
 
         chars = final_chars_list
-        LIMIT = 120
+        LIMIT = 120  # Consistent with grid page size
         clickable_chars = apply_script_filter(chars[:LIMIT])
         static_chars = apply_script_filter(chars[LIMIT:])
 
