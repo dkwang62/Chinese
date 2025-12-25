@@ -967,7 +967,7 @@ def main():
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
-        # 1. Quick Access: Favourites button
+        # 1. Show Favourites button
         if st.button("Show Favourites", use_container_width=True):
             go_to_root()
             st.session_state.onboarding_done = False
@@ -981,19 +981,9 @@ def main():
             placeholder="e.g. 水",
         )
 
-        # 3. Main Explore button (prominent)
-        if st.button("Explore □", type="primary", use_container_width=True):
-            # If currently in preview/detail mode, go back to grid
-            if not st.session_state.show_inputs:
-                st.session_state.show_inputs = True
-                st.session_state.preview_comp = None
-                st.session_state.selected_comp = ""
-                st.session_state.history = []
-                st.rerun()
-
         st.markdown("---")
 
-        # 4. Filters (only show in grid mode)
+        # 4. Filters — only in grid mode
         if st.session_state.show_inputs:
             st.markdown("#### Filters")
 
@@ -1038,14 +1028,46 @@ def main():
                             st.session_state.page = 1
                             st.rerun()
 
-
-        # Optional: Add preview info in sidebar when previewing
+        # ==================== PREVIEW SECTION (only when previewing) ====================
         if st.session_state.preview_comp and st.session_state.show_inputs:
             st.markdown("---")
             st.markdown("#### Preview")
-            render_stroke_order_sidebar(st.session_state.preview_comp, size=110)
-            count = component_usage_count(st.session_state.preview_comp)
+
+            preview_char = st.session_state.preview_comp
+            render_stroke_order_sidebar(preview_char, size=140)
+
+            # Character info below animation
+            count = component_usage_count(preview_char)
+            st.markdown(f"**{preview_char}**")
             st.caption(f"Used in {count} characters")
+
+            # Favourites checkbox
+            is_fav = preview_char in st.session_state.favourites_list
+            st.checkbox(
+                "❤️ Add to Favourites",
+                value=is_fav,
+                key=f"fav_chk_{preview_char}",
+                on_change=toggle_favourite,
+                args=(preview_char,),
+            )
+
+            st.markdown("---")
+
+            # THE NEW EXPLORE BUTTON — now active and contextual!
+            if st.button(f"Explore {preview_char} □", type="primary", use_container_width=True, key="explore_preview_btn"):
+                # Same behavior as double-clicking the tile
+                reset_script_filter_to_any()
+                if st.session_state.selected_comp:
+                    st.session_state.history.append(st.session_state.selected_comp)
+                st.session_state.selected_comp = preview_char
+                st.session_state.last_valid_selected_comp = preview_char
+                st.session_state.show_inputs = False
+                st.session_state.preview_comp = None
+                st.session_state.text_input_comp = preview_char
+                st.session_state.stroke_view_active = False
+                st.session_state.display_mode = "Single Character"
+                st.rerun()
+
 
 
     # ==================== MAIN CONTENT (OUTSIDE SIDEBAR) ====================
