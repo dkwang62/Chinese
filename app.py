@@ -769,10 +769,7 @@ def build_chatgpt_prompt(char: str) -> str:
     return f"""You are a bilingual Chinese dictionary editor.
 
 Task:
-For the single Hanzi below, give:
-	1.	One-line Chinese definition (≤ 22 Chinese characters, no English).
-	2.	Pinyin with tone marks.
-	3.	Two example sentences that BEST illustrate the meaning (prefer everyday usage unless the character is primarily literary).
+For the single Hanzi below, give two example sentences that BEST illustrate the meaning (prefer everyday usage unless the character is primarily literary).
 
 For each example, provide:
 a) Traditional Chinese sentence
@@ -781,39 +778,8 @@ c) Natural English translation
 d) Target word/phrase (must include the character)
 e) Read-aloud pinyin of the full Chinese sentence (with tone marks, natural word grouping)
 
-Output ONLY valid JSON (no markdown, no extra text) with this schema:
-{{
-  "char": "<Hanzi>",
-  "pinyin": "<tone-mark pinyin>",
-  "def_zh": "<one-line Traditional Chinese definition>",
-  "def_zh_sim": "<one-line Simplified Chinese definition>",
-  "def_en": "<one-line English definition>",
-  "examples": [
-    {{
-      "word": "<target word/phrase containing the character>",
-      "pinyin": "<tone-mark pinyin>",
-      "sent_zh": "<Traditional Chinese sentence>",
-      "sent_zh_sim": "<Simplified Chinese sentence>",
-      "sent_pinyin": "<full sentence pinyin with tone marks>",
-      "sent_en": "<English translation>",
-      "note_en": "<optional short note on meaning in this context or ''>"
-    }},
-    {{
-      "word": "<target word/phrase containing the character>",
-      "pinyin": "<tone-mark pinyin>",
-      "sent_zh": "<Traditional Chinese sentence>",
-      "sent_zh_sim": "<Simplified Chinese sentence>",
-      "sent_pinyin": "<full sentence pinyin with tone marks>",
-      "sent_en": "<English translation>",
-      "note_en": "<optional short note or ''>"
-    }}
-  ]
-}}
-
 Hanzi: {char}
-Context (may be empty):
 - English definition: {def_en}
-- Decomposition: {decomp}
 """
 
 
