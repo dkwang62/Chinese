@@ -136,8 +136,6 @@ def apply_dynamic_css():
     .status-line { font-size: 1.1em; font-weight: 600; color: #0f5132; background-color: #d1e7dd; border: 1px solid #badbcc; padding: 15px; border-radius: 8px; margin: 20px 0 30px 0; }
     .status-tag { background-color: #f1f3f5; color: #2c3e50; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.9em; border: 1px solid #e9ecef; display: inline-flex; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     .map-path { font-family: monospace; color: #155724; margin-left: 10px; }
-    .preview-count-line {font-size: 1.3em; text-align: center; color: #2c3e50; margin: 20px 0 25px 0;}
-    .preview-count-line .char {font-size: 1.4em; font-weight: bold; color: #e74c3c;}
     .jump-footer {margin-top: 40px; padding: 20px; background: #f8f9fa; border-top: 1px solid #e0e0e0; text-align: center;}
     div[data-testid="stExpander"] .stButton button {font-size: 1.2rem; height: 40px; padding: 0; line-height: 1.2; border-radius: 4px; border: 1px solid #eee; transition: all 0.1s ease-in-out;}
     div[data-testid="stExpander"] .stButton button:hover {border-color: #bbb; background-color: #f0f0f0;}
@@ -367,10 +365,6 @@ def go_to_root():
     st.session_state.show_inputs = True
     reset_script_filter_to_any()
 
-def end_stroke_view():
-    st.session_state.stroke_view_active = False
-    st.session_state.stroke_view_char = ""
-
 def toggle_favourite(char):
     is_now_checked = st.session_state.get(f"fav_chk_{char}", False)
     if is_now_checked:
@@ -397,91 +391,6 @@ def handle_file_upload():
                 st.toast("Favourites loaded successfully!", icon="✅")
         except Exception as e:
             st.error(f"Error loading file: {e}")
-
-def build_chatgpt_prompt(char: str) -> str:
-    char = (char or "").strip()[:1]
-    meta = component_map.get(char, {}).get("meta", {})
-    def_en = clean_field(meta.get("definition", ""))
-    decomp = format_decomposition(char)
-    return f"""You are a bilingual Chinese dictionary editor.
-
-Task:
-For the single Hanzi below, give:
-1) One-line Chinese definition (≤ 22 Chinese characters, no English).
-2) Pinyin with tone marks.
-3) Two example sentences that BEST illustrate the meaning (prefer everyday usage unless the character is primarily literary).
-   - Each example must include the target character in a common word/phrase.
-   - For each example provide:
-     a) Chinese sentence
-     b) English translation (natural, not literal)
-     c) Highlight the target word/phrase used in that sentence.
-
-Output ONLY valid JSON (no markdown, no extra text) with this schema:
-{{
-  "char": "<Hanzi>",
-  "pinyin": "<tone-mark pinyin>",
-  "def_zh": "<one-line Traditional Chinese definition>",
-  "def_zh_sim": "<one-line Simplified Chinese definition>",
-  "def_en": "<one-line English definition>",
-  "examples": [
-    {{
-      "word": "<target word/phrase containing the character>",
-      "pinyin": "<tone-mark pinyin>",
-      "sent_zh": "<Traditional Chinese sentence>",
-      "sent_zh_sim": "<Simplified Chinese sentence>",
-      "sent_en": "<English translation>",
-      "note_en": "<optional short note on meaning in this context or ''>"
-    }},
-    {{
-      "word": "<target word/phrase containing the character>",
-      "pinyin": "<tone-mark pinyin>",
-      "sent_zh": "<Traditional Chinese sentence>",
-      "sent_zh_sim": "<Simplified Chinese sentence>",
-      "sent_en": "<English translation>",
-      "note_en": "<optional short note on meaning in this context or ''>"
-    }}
-  ]
-}}
-
-Hanzi: {char}
-Context (may be empty):
-- English definition: {def_en}
-- Decomposition: {decomp}
-"""
-
-def render_copy_to_clipboard(prompt_text: str, widget_id: str):
-    safe_text = json.dumps(prompt_text, ensure_ascii=False)
-    st_html(
-        f"""
-        <div style="display:flex; justify-content:center; margin:10px 0 0 0;">
-          <button id="copy-btn-{widget_id}" style="
-              padding:10px 14px; border-radius:10px; border:1px solid #ddd;
-              background:#fff; cursor:pointer; font-weight:700;">
-            Copy Prompt to Clipboard
-          </button>
-        </div>
-        <div id="copy-msg-{widget_id}" style="text-align:center; margin-top:8px; color:#2e7d32; font-weight:600;"></div>
-        <script>
-          (function() {{
-            const text = {safe_text};
-            const btn = document.getElementById("copy-btn-{widget_id}");
-            const msg = document.getElementById("copy-msg-{widget_id}");
-            if (!btn) return;
-            async function copy() {{
-              try {{
-                await navigator.clipboard.writeText(text);
-                msg.textContent = "Copied. Paste into ChatGPT.";
-              }} catch (e) {{
-                msg.textContent = "Copy failed. Please manually select and copy from the textbox above.";
-              }}
-              setTimeout(() => {{ msg.textContent = ""; }}, 2500);
-            }}
-            btn.addEventListener("click", copy);
-          }})();
-        </script>
-        """,
-        height=90,
-    )
 
 def generate_clean_card_html(c, usage_count=None):
     if not c:
@@ -537,7 +446,8 @@ def render_stroke_order_sidebar(char: str, size: int = 110):
             async function loadScript(src) {{
                 return new Promise((resolve, reject) => {{
                     const s = document.createElement('script');
-                    s.src = src; s.async = true; s.onload = resolve; s.onerror = reject;
+                    s.src = src; s.async = true;
+                    s.onload = resolve; s.onerror = reject;
                     document.head.appendChild(s);
                 }});
             }}
@@ -904,8 +814,8 @@ def main():
                             st.session_state.page = 1
                             st.rerun()
 
-        # Preview section — works in both grid and list view
-        if st.session_state.preview_comp and st.session_state.show_inputs:
+        # Unified preview section (shows preview if exists, in both modes)
+        if st.session_state.preview_comp:
             st.markdown("---")
             st.markdown("#### Preview")
             preview_char = st.session_state.preview_comp
@@ -915,21 +825,9 @@ def main():
             st.caption(f"Used in {count} characters")
             is_fav = preview_char in st.session_state.favourites_list
             st.checkbox("❤️ Add to Favourites", value=is_fav, key=f"fav_chk_{preview_char}", on_change=toggle_favourite, args=(preview_char,))
-            st.markdown("---")
-            if st.button(f"Explore {preview_char} □", type="primary", use_container_width=True, key="explore_preview_btn"):
-                reset_script_filter_to_any()
-                if st.session_state.selected_comp:
-                    st.session_state.history.append(st.session_state.selected_comp)
-                st.session_state.selected_comp = preview_char
-                st.session_state.last_valid_selected_comp = preview_char
-                st.session_state.show_inputs = False
-                st.session_state.preview_comp = None
-                st.session_state.text_input_comp = preview_char
-                st.session_state.stroke_view_active = False
-                st.session_state.display_mode = "Single Character"
 
-        # Detail view sidebar
-        if not st.session_state.show_inputs:
+        # Detail view sidebar (only when not previewing and in detail mode)
+        if not st.session_state.show_inputs and not st.session_state.preview_comp:
             st.markdown("---")
             current_char = st.session_state.selected_comp
             if current_char:
@@ -953,7 +851,7 @@ def main():
                     st.markdown(f"**Variant: {counterpart}**")
                     render_stroke_order_sidebar(counterpart, size=100)
 
-    # MAIN CONTENT (OUTSIDE SIDEBAR)
+    # MAIN CONTENT
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
         st.stop()
@@ -979,7 +877,7 @@ def main():
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
 
         st.markdown(
-            f"<div class='status-line'>{filter_summary} <span class='status-text'>· Single-click previews. Use Explore button to enter.</span></div>",
+            f"<div class='status-line'>{filter_summary} <span class='status-text'>· Single-click previews. Second click explores.</span></div>",
             unsafe_allow_html=True,
         )
 
@@ -1061,7 +959,7 @@ def main():
                     <span class='status-tag'>Location</span>
                     <span class='map-path'>{path_str}</span>
                 </div>
-                <div class='status-text' style='font-size:0.85em; color:#666;'>Single-click previews. Use Explore button to enter.</div>
+                <div class='status-text' style='font-size:0.85em; color:#666;'>Single-click previews. Second click explores.</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1098,12 +996,14 @@ def main():
                 is_preview = st.session_state.preview_comp == c
 
                 st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
+
                 if st.button(
                     c,
                     key=f"explore_char_{c}",
                     type="primary" if is_preview else "secondary",
                 ):
                     if st.session_state.preview_comp == c:
+                        # Second click → explore
                         reset_script_filter_to_any()
                         if st.session_state.selected_comp:
                             st.session_state.history.append(st.session_state.selected_comp)
@@ -1115,6 +1015,7 @@ def main():
                         st.session_state.stroke_view_active = False
                         st.session_state.display_mode = "Single Character"
                     else:
+                        # First click → preview
                         st.session_state.preview_comp = c
 
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -1126,10 +1027,7 @@ def main():
                 st.markdown("</div>", unsafe_allow_html=True)
 
             with col_details:
-                st.markdown(
-                    generate_clean_card_html(c, usage_count=component_usage_count(c)),
-                    unsafe_allow_html=True
-                )
+                st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c)), unsafe_allow_html=True)
 
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
@@ -1149,10 +1047,7 @@ def main():
                     st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
 
                 with col_details:
-                    st.markdown(
-                        generate_clean_card_html(c, usage_count=component_usage_count(c)),
-                        unsafe_allow_html=True
-                    )
+                    st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c)), unsafe_allow_html=True)
 
                 st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
