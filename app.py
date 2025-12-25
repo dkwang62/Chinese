@@ -964,8 +964,21 @@ def main():
 
     max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
 
-    with st.sidebar:
+with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
+
+        # === ALWAYS VISIBLE NAVIGATION BUTTONS ===
+        col_back, col_root = st.columns([1, 1])
+        with col_back:
+            if st.button("← Back", use_container_width=True):
+                go_back()
+                st.rerun()
+        with col_root:
+            if st.button("🏠 Root", use_container_width=True):
+                go_to_root()
+                st.rerun()
+
+        st.markdown("---")
 
         # 1. Show Favourites button
         if st.button("Show Favourites", use_container_width=True):
@@ -1036,7 +1049,7 @@ def main():
             preview_char = st.session_state.preview_comp
             render_stroke_order_sidebar(preview_char, size=140)
 
-            # Character info below animation
+            # Character info
             count = component_usage_count(preview_char)
             st.markdown(f"**{preview_char}**")
             st.caption(f"Used in {count} characters")
@@ -1053,9 +1066,8 @@ def main():
 
             st.markdown("---")
 
-            # THE NEW EXPLORE BUTTON — now active and contextual!
+            # Green Explore button — only appears during preview
             if st.button(f"Explore {preview_char} □", type="primary", use_container_width=True, key="explore_preview_btn"):
-                # Same behavior as double-clicking the tile
                 reset_script_filter_to_any()
                 if st.session_state.selected_comp:
                     st.session_state.history.append(st.session_state.selected_comp)
@@ -1067,7 +1079,6 @@ def main():
                 st.session_state.stroke_view_active = False
                 st.session_state.display_mode = "Single Character"
                 st.rerun()
-
 
 
     # ==================== MAIN CONTENT (OUTSIDE SIDEBAR) ====================
