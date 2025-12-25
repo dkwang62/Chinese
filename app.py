@@ -130,43 +130,326 @@ stats_cache = get_component_stats(component_map) if component_map else {}
 def apply_dynamic_css():
     css = """
     <style>
-    .results-header-sidebar {font-size: 1.4em; font-weight: bold; color: #2c3e50; margin: 20px 0 10px 0; text-align: center;}
-    .char-card {background: white; padding: 20px; border-radius: 10px; margin-bottom: 0px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);}
-    .meta-row {font-size: 0.95em; color: #555; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;}
-    .meta-pinyin {font-weight: bold; font-size: 2.2em; color: #d35400;}
-    .meta-tag {background: #f1f3f5; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; color: #495057;}
-    .meta-tag-trad {background: #fff8e1; color: #856404; border: 1px solid #ffeeba;}
-    .meta-tag-simp {background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;}
-    .def-row {font-size: 1.1em; line-height: 1.4; color: #2c3e50; margin-bottom: 8px;}
-    .ety-row {font-size: 0.9em; color: #666; font-style: italic; border-top: 1px solid #eee; padding-top: 8px; margin-top: 4px;}
-    .comp-grid .stButton button {font-size: 2em; height: 80px; background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 0; line-height: 80px;}
-    .comp-grid .stButton button:hover {background: #fff5f5; border-color: #f2c6c6; color: #c0392b;}
-    div[data-testid="column"] .stButton button { width: 100%; border-radius: 8px; transition: all 0.2s ease; }
-    .char-btn-wrap button { font-size: 3.5em !important; font-weight: bold !important; background: white !important; border: 2px solid #e0e0e0 !important; padding: 5px !important; min-height: 80px !important; }
-    .char-btn-wrap button:hover { background: #f0f9ff !important; border-color: #3b82f6 !important; }
-    .pen-btn-wrap button { font-size: 1.5em !important; border: 1px solid #eee !important; background: #f8f9fa !important; margin-top: 5px !important; height: 40px !important; line-height: 1 !important; color: #555 !important; }
-    .pen-btn-wrap button:hover { background: #e3f2fd !important; border-color: #90caf9 !important; color: #1565c0 !important; }
-    .char-static-box { font-size: 3.5em; font-weight: bold; background: #fdfdfd; color: #999; border: 2px solid #eee; border-radius: 12px; padding: 5px; min-height: 80px; display: flex; align-items: center; justify-content: center; width: 100%; cursor: default; }
-    .status-line { font-size: 1.1em; font-weight: 600; color: #0f5132; background-color: #d1e7dd; border: 1px solid #badbcc; padding: 15px; border-radius: 8px; margin: 20px 0 30px 0; }
-    .status-tag { background-color: #f1f3f5; color: #2c3e50; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.9em; border: 1px solid #e9ecef; display: inline-flex; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .map-path { font-family: monospace; color: #155724; margin-left: 10px; }
-    .preview-count-line {font-size: 1.3em; text-align: center; color: #2c3e50; margin: 20px 0 25px 0;}
-    .preview-count-line .char {font-size: 1.4em; font-weight: bold; color: #e74c3c;}
-    .jump-footer {margin-top: 40px; padding: 20px; background: #f8f9fa; border-top: 1px solid #e0e0e0; text-align: center;}
-    div[data-testid="stExpander"] .stButton button {font-size: 1.2rem; height: 40px; padding: 0; line-height: 1.2; border-radius: 4px; border: 1px solid #eee; transition: all 0.1s ease-in-out;}
-    div[data-testid="stExpander"] .stButton button:hover {border-color: #bbb; background-color: #f0f0f0;}
-    .stroke-header {font-size: 0.85em; color: #888; border-bottom: 1px solid #eee; margin: 10px 0 5px 0; padding-bottom: 2px;}
-    .compound-item { display: flex; align-items: baseline; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e0e0e0; }
-    .compound-item:last-child { border-bottom: none; margin-bottom: 0; }
-    .cp-word { font-weight: bold; font-size: 1.1em; color: #2c3e50; min-width: 80px; margin-right: 10px; }
-    .cp-pinyin { color: #d35400; font-family: monospace; margin-right: 10px; font-weight: 500; font-size: 1.5em;}
-    .cp-mean { color: #333; font-size: 0.95em; flex: 1; }
-    .splash-wrap {max-width: 1100px; margin: 0 auto; padding: 34px 10px 10px 10px;}
-    .splash-card {background: white; border: 1px solid #eee; border-radius: 18px; padding: 34px; box-shadow: 0 6px 22px rgba(0,0,0,0.06);}
-    .splash-title {font-size: 2.3em; font-weight: 850; line-height: 1.12; color:#111;}
-    .splash-sub {margin-top: 10px; font-size: 1.15em; color:#444; line-height: 1.5;}
-    .splash-demo {margin-top: 18px; padding: 14px 16px; background:#fff8e1; border:1px solid #ffeeba; border-radius: 14px;}
-    .splash-demo-h {font-weight: 750; color:#856404; margin-bottom: 8px;}
+    /* Global Layout */
+    .main .block-container {padding-top: 2rem; padding-bottom: 3rem;}
+    
+    /* Character Cards */
+    .char-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        padding: 24px;
+        border-radius: 16px;
+        margin-bottom: 0px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+    .char-card:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    .meta-row {
+        font-size: 0.95em;
+        color: #555;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .meta-pinyin {
+        font-weight: 700;
+        font-size: 2.4em;
+        color: #d35400;
+        text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1);
+    }
+    .meta-tag {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-size: 0.85em;
+        color: #495057;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+    .meta-tag-trad {
+        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+        color: #856404;
+        border: 1px solid #ffd54f;
+    }
+    .meta-tag-simp {
+        background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%);
+        color: #0f5132;
+        border: 1px solid #81c784;
+    }
+    .def-row {
+        font-size: 1.15em;
+        line-height: 1.6;
+        color: #2c3e50;
+        margin-bottom: 10px;
+        font-weight: 500;
+    }
+    .ety-row {
+        font-size: 0.92em;
+        color: #666;
+        font-style: italic;
+        border-top: 2px solid #e9ecef;
+        padding-top: 12px;
+        margin-top: 8px;
+        line-height: 1.5;
+    }
+    
+    /* Grid Buttons - STRETCH with better styling */
+    .comp-grid .stButton > button {
+        width: 100% !important;
+        font-size: 2.2em !important;
+        height: 85px !important;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
+        border: 2px solid #dee2e6 !important;
+        border-radius: 14px !important;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.08) !important;
+        padding: 0 !important;
+        line-height: 85px !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease !important;
+    }
+    .comp-grid .stButton > button:hover {
+        background: linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%) !important;
+        border-color: #f2c6c6 !important;
+        color: #c0392b !important;
+        transform: translateY(-3px) !important;
+        box-shadow: 0 6px 16px rgba(192, 57, 43, 0.15) !important;
+    }
+    
+    /* Detail List View Buttons - STRETCH */
+    .char-btn-wrap .stButton > button {
+        width: 100% !important;
+        font-size: 3.8em !important;
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%) !important;
+        border: 3px solid #dee2e6 !important;
+        padding: 10px !important;
+        min-height: 90px !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        transition: all 0.25s ease !important;
+    }
+    .char-btn-wrap .stButton > button:hover {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        border-color: #3b82f6 !important;
+        transform: scale(1.02) !important;
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.2) !important;
+    }
+    
+    /* Pen Button - STRETCH */
+    .pen-btn-wrap .stButton > button {
+        width: 100% !important;
+        font-size: 1.6em !important;
+        border: 2px solid #dee2e6 !important;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+        margin-top: 8px !important;
+        height: 45px !important;
+        line-height: 1 !important;
+        color: #555 !important;
+        font-weight: 600 !important;
+        border-radius: 12px !important;
+        transition: all 0.2s ease !important;
+    }
+    .pen-btn-wrap .stButton > button:hover {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        border-color: #64b5f6 !important;
+        color: #1565c0 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(100, 181, 246, 0.2) !important;
+    }
+
+    /* Static Cards */
+    .char-static-box {
+        font-size: 3.8em;
+        font-weight: 700;
+        background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%);
+        color: #bbb;
+        border: 2px solid #e0e0e0;
+        border-radius: 16px;
+        padding: 10px;
+        min-height: 90px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        cursor: default;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    /* Status Line */
+    .status-line {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #0f5132;
+        background: linear-gradient(135deg, #d1e7dd 0%, #c3e6cb 100%);
+        border: 2px solid #95d5b2;
+        padding: 18px;
+        border-radius: 12px;
+        margin: 20px 0 30px 0;
+        box-shadow: 0 3px 10px rgba(15, 81, 50, 0.08);
+    }
+    .status-tag {
+        background: linear-gradient(135deg, #ffffff 0%, #f1f3f5 100%);
+        color: #2c3e50;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.9em;
+        border: 2px solid #dee2e6;
+        display: inline-flex;
+        align-items: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+    .map-path {
+        font-family: 'Monaco', 'Menlo', monospace;
+        color: #155724;
+        margin-left: 10px;
+        font-weight: 600;
+    }
+    
+    /* Count Lines */
+    .preview-count-line {
+        font-size: 1.4em;
+        text-align: center;
+        color: #2c3e50;
+        margin: 25px 0 30px 0;
+        font-weight: 600;
+    }
+    .preview-count-line .char {
+        font-size: 1.5em;
+        font-weight: 800;
+        color: #e74c3c;
+        text-shadow: 0 2px 4px rgba(231, 76, 60, 0.1);
+    }
+    
+    /* Footer */
+    .jump-footer {
+        margin-top: 50px;
+        padding: 25px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-top: 3px solid #dee2e6;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 -3px 10px rgba(0,0,0,0.04);
+    }
+    
+    /* Expander Buttons - STRETCH */
+    div[data-testid="stExpander"] .stButton > button {
+        width: 100% !important;
+        font-size: 1.3rem !important;
+        height: 45px !important;
+        padding: 0 !important;
+        line-height: 1.2 !important;
+        border-radius: 10px !important;
+        border: 2px solid #dee2e6 !important;
+        transition: all 0.2s ease !important;
+        font-weight: 600 !important;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
+    }
+    div[data-testid="stExpander"] .stButton > button:hover {
+        border-color: #adb5bd !important;
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    }
+    
+    .stroke-header {
+        font-size: 0.9em;
+        color: #6c757d;
+        border-bottom: 2px solid #dee2e6;
+        margin: 15px 0 8px 0;
+        padding-bottom: 4px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Compound Lists */
+    .compound-item {
+        display: flex;
+        align-items: baseline;
+        margin-bottom: 10px;
+        padding: 12px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #e9ecef;
+        border-radius: 8px;
+        background: #ffffff;
+        transition: all 0.2s ease;
+    }
+    .compound-item:hover {
+        background: #f8f9fa;
+        transform: translateX(4px);
+    }
+    .compound-item:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    .cp-word {
+        font-weight: 700;
+        font-size: 1.2em;
+        color: #2c3e50;
+        min-width: 85px;
+        margin-right: 15px;
+    }
+    .cp-pinyin {
+        color: #d35400;
+        font-family: 'Monaco', 'Menlo', monospace;
+        margin-right: 15px;
+        font-weight: 600;
+        font-size: 1.5em;
+    }
+    .cp-mean {
+        color: #495057;
+        font-size: 1em;
+        flex: 1;
+        line-height: 1.5;
+    }
+    
+    /* Splash Screen */
+    .splash-wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px 20px 20px;
+    }
+    .splash-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 2px solid #dee2e6;
+        border-radius: 24px;
+        padding: 40px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    }
+    .splash-title {
+        font-size: 2.6em;
+        font-weight: 900;
+        line-height: 1.2;
+        color: #111;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .splash-sub {
+        margin-top: 15px;
+        font-size: 1.2em;
+        color: #495057;
+        line-height: 1.6;
+    }
+    .splash-demo {
+        margin-top: 25px;
+        padding: 18px 20px;
+        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+        border: 2px solid #ffd54f;
+        border-radius: 16px;
+        box-shadow: 0 3px 10px rgba(255, 193, 7, 0.1);
+    }
+    .splash-demo-h {
+        font-weight: 800;
+        color: #856404;
+        margin-bottom: 10px;
+        font-size: 1.1em;
+    }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -968,7 +1251,7 @@ def render_splash():
             ch = demos[idx]
             count = component_usage_count(ch)
             with cols[j]:
-                if st.button(f"Explore {ch}", type="primary", key=f"splash_{ch}_{idx}"):
+                if st.button(f"Explore {ch}", type="primary", key=f"splash_{ch}_{idx}", use_container_width=True):
                     st.session_state.onboarding_done = True
                     enter_component(ch)
                     st.rerun()
@@ -977,7 +1260,7 @@ def render_splash():
     st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([2, 1, 2])
     with c2:
-        if st.button("Enter Radix"):
+        if st.button("Enter Radix", use_container_width=True):
             st.session_state.onboarding_done = True
             st.rerun()
 
@@ -998,7 +1281,7 @@ def main():
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈁 Radix</h1>", unsafe_allow_html=True)
 
-        if st.button("Show Favourites"):
+        if st.button("Show Favourites", use_container_width=True):
             go_to_root()
             st.session_state.onboarding_done = False
             st.rerun()
@@ -1011,9 +1294,9 @@ def main():
             current_char_for_sidebar = st.session_state.stroke_view_char
             c1, c2 = st.columns(2)
             with c1:
-                st.button("← Back", on_click=end_stroke_view)
+                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
             with c2:
-                st.button("🏠 Root", on_click=go_to_root)
+                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
 
             st.markdown("---")
             st.markdown("### Character Info")
@@ -1089,6 +1372,7 @@ def main():
                             idc,
                             key=f"idc_{idc}",
                             type="primary" if st.session_state.component_idc == idc else "secondary",
+                            use_container_width=True,
                         ):
                             st.session_state.component_idc = idc
                             st.session_state.page = 1
@@ -1113,6 +1397,7 @@ def main():
                     f"Explore {current_char_for_sidebar}",
                     key="sb_select_btn",
                     type="primary",
+                    use_container_width=True,
                 ):
                     reset_script_filter_to_any()
                     st.session_state.history = []
@@ -1135,9 +1420,9 @@ def main():
             # DETAIL VIEW Sidebar
             c1, c2 = st.columns(2)
             with c1:
-                st.button("← Back", on_click=go_back)
+                st.button("← Back", on_click=go_back, use_container_width=True)
             with c2:
-                st.button("🏠 Root", on_click=go_to_root)
+                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
 
             current_char_for_sidebar = (
                 st.session_state.preview_comp if st.session_state.preview_comp else st.session_state.selected_comp
@@ -1225,7 +1510,7 @@ def main():
             
             p1, p2, p3 = st.columns([1, 3, 1])
             with p1:
-                if st.button("◀ Prev", disabled=st.session_state.page <= 1):
+                if st.button("◀ Prev", disabled=st.session_state.page <= 1, use_container_width=True):
                     st.session_state.page -= 1
                     st.rerun()
             with p2:
@@ -1236,7 +1521,7 @@ def main():
                     unsafe_allow_html=True,
                 )
             with p3:
-                if st.button("Next ▶", disabled=st.session_state.page >= max_page):
+                if st.button("Next ▶", disabled=st.session_state.page >= max_page, use_container_width=True):
                     st.session_state.page += 1
                     st.rerun()
 
@@ -1252,6 +1537,7 @@ def main():
                         type="primary" if is_preview else "secondary",
                         on_click=tile_click,
                         args=(ch,),
+                        use_container_width=True,
                     )
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1336,11 +1622,12 @@ def main():
                     type="primary" if is_preview else "secondary",
                     on_click=list_tile_click,
                     args=(c,),
+                    use_container_width=True,
                 )
                 st.markdown("</div>", unsafe_allow_html=True)
 
                 st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-                if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order"):
+                if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order", use_container_width=True):
                     st.session_state.stroke_view_char = c
                     st.session_state.stroke_view_active = True
                     st.rerun()
