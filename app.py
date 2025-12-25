@@ -1233,18 +1233,18 @@ def main():
         clickable_chars = apply_script_filter(chars[:LIMIT])
         static_chars = apply_script_filter(chars[LIMIT:])
 
-    for c in clickable_chars:
-        col_char, col_details = st.columns([2, 10])
-        with col_char:
-            is_preview = st.session_state.preview_comp == c
-            st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
-            st.button(
-                c,
-                key=f"explore_char_{c}",
-                type="primary" if is_preview else "secondary",
-                on_click=list_tile_click,
-                args=(c,),
-            )
+        for c in clickable_chars:
+            col_char, col_details = st.columns([2, 10])
+            with col_char:
+                is_preview = st.session_state.preview_comp == c
+                st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
+                st.button(
+                    c,
+                    key=f"explore_char_{c}",
+                    type="primary" if is_preview else "secondary",
+                    on_click=list_tile_click,
+                    args=(c,),
+                )
         st.markdown("</div>", unsafe_allow_html=True)
                 st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
                 if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order"):
