@@ -1,5 +1,5 @@
 # app.py
-# Radix – Component-first Chinese character explorer (Batch SQL Optimization)
+# Radix – Component-first Chinese character explorer (Memory-Optimized for Streamlit Cloud)
 
 import json
 import math
@@ -24,140 +24,133 @@ st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 IDC_CHARS = {"⿰", "⿱", "⿲", "⿳", "⿴", "⿵", "⿶", "⿷", "⿸", "⿹", "⿺", "⿻"}
 SCRIPT_FILTERS = ["Any", "Simplified", "Traditional"]
 
+# --- MEMORY-OPTIMIZED DATA PIPELINE ---
+def zipf_commonness_raw(ch: str) -> float:
+    if not ch or ZIPF is None:
+        return float("-inf")
+    try:
+        z = float(ZIPF(ch, "zh"))
+    except:
+        z = float("-inf")
+    if z <= 0:
+        if cc_s2t:
+            try: z = max(z, float(ZIPF(cc_s2t.convert(ch), "zh")))
+            except: pass
+        if cc_t2s:
+            try: z = max(z, float(ZIPF(cc_t2s.convert(ch), "zh")))
+            except: pass
+    return z
+
+@st.cache_resource
+def get_zipf_frequency():
+    try:
+        from wordfreq import zipf_frequency
+        return zipf_frequency
+    except Exception:
+        return None
+
+ZIPF = get_zipf_frequency()
+
+@st.cache_resource
+def load_and_augment_map():
+    try:
+        with open("enhanced_component_map_with_etymology.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return {}
+
+    for char, info in data.items():
+        meta = info.get("meta", {})
+        rel = info.get("related_characters", [])
+        info['usage_count'] = len({c for c in rel if isinstance(c, str) and len(c) == 1})
+        info['zipf_val'] = zipf_commonness_raw(char)
+        s = meta.get("strokes")
+        try:
+            if isinstance(s, (int, float)) and s > 0:
+                info['stroke_count'] = int(s)
+            elif isinstance(s, str) and s.isdigit():
+                info['stroke_count'] = int(s)
+            else:
+                info['stroke_count'] = None
+        except:
+            info['stroke_count'] = None
+
+    gc.collect()
+    return data
+
+@st.cache_resource
+def get_component_stats(_component_map):
+    r_groups = {}
+    idc_counts = {}
+    used_comps = set()
+
+    for c, data in _component_map.items():
+        r = data.get("meta", {}).get("radical")
+        if r:
+            gs = _component_map.get(r, {}).get('stroke_count') or 999
+            r_groups.setdefault(gs, []).append(r)
+
+        d = data.get("meta", {}).get("decomposition", "")
+        if d and d[0] in IDC_CHARS:
+            idc = d[0]
+            idc_counts[idc] = idc_counts.get(idc, 0) + 1
+
+        for ch in d:
+            if ch not in IDC_CHARS:
+                used_comps.add(ch)
+
+    for gs in r_groups:
+        r_groups[gs] = sorted(list(set(r_groups[gs])))
+
+    gc.collect()
+    return {
+        "rad_groups": r_groups,
+        "idc_counts": idc_counts,
+        "used_components": used_comps
+    }
+
+# --- Load Data (GLOBAL — BEFORE main()) ---
+component_map = load_and_augment_map()
+stats_cache = get_component_stats(component_map) if component_map else {}
+
 def apply_dynamic_css():
     css = """
     <style>
     .results-header-sidebar {font-size: 1.4em; font-weight: bold; color: #2c3e50; margin: 20px 0 10px 0; text-align: center;}
-    /* Char card styling */
     .char-card {background: white; padding: 20px; border-radius: 10px; margin-bottom: 0px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);}
     .meta-row {font-size: 0.95em; color: #555; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;}
-    
-    /* --- UPDATED: DOUBLED PINYIN SIZE --- */
-    .meta-pinyin {font-weight: bold; font-size: 2.2em; color: #d35400;} 
-    
-    /* Tags */
+    .meta-pinyin {font-weight: bold; font-size: 2.2em; color: #d35400;}
     .meta-tag {background: #f1f3f5; padding: 2px 8px; border-radius: 4px; font-size: 0.85em; color: #495057;}
     .meta-tag-trad {background: #fff8e1; color: #856404; border: 1px solid #ffeeba;}
     .meta-tag-simp {background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;}
     .def-row {font-size: 1.1em; line-height: 1.4; color: #2c3e50; margin-bottom: 8px;}
     .ety-row {font-size: 0.9em; color: #666; font-style: italic; border-top: 1px solid #eee; padding-top: 8px; margin-top: 4px;}
-    
-    /* Grid buttons */
     .comp-grid .stButton button {font-size: 2em; height: 80px; background: white; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); padding: 0; line-height: 80px;}
     .comp-grid .stButton button:hover {background: #fff5f5; border-color: #f2c6c6; color: #c0392b;}
-    
-    /* UNIFIED BUTTON STYLING FOR LIST VIEW */
-    div[data-testid="column"] .stButton button {
-        width: 100%;
-        border-radius: 8px;
-        transition: all 0.2s ease;
-    }
-    
-    /* Specifics for the big character button */
-    .char-btn-wrap button {
-        font-size: 3.5em !important; 
-        font-weight: bold !important; 
-        background: white !important; 
-        border: 2px solid #e0e0e0 !important; 
-        padding: 5px !important; 
-        min-height: 80px !important; 
-    }
-    .char-btn-wrap button:hover {
-        background: #f0f9ff !important; 
-        border-color: #3b82f6 !important;
-    }
-    
-    /* Specifics for the pen button */
-    .pen-btn-wrap button {
-        font-size: 1.5em !important;
-        border: 1px solid #eee !important;
-        background: #f8f9fa !important;
-        margin-top: 5px !important; 
-        height: 40px !important;
-        line-height: 1 !important;
-        color: #555 !important;
-    }
-    .pen-btn-wrap button:hover {
-        background: #e3f2fd !important;
-        border-color: #90caf9 !important;
-        color: #1565c0 !important;
-    }
-
-    /* STATIC CARD STYLING (For > 60 items) */
-    .char-static-box {
-        font-size: 3.5em;
-        font-weight: bold;
-        background: #fdfdfd;
-        color: #999;
-        border: 2px solid #eee;
-        border-radius: 12px;
-        padding: 5px;
-        min-height: 80px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        cursor: default;
-    }
-
-    /* Status line / Navigation Map */
-    .status-line {
-        font-size: 1.1em; 
-        font-weight: 600; 
-        color: #0f5132; 
-        background-color: #d1e7dd; 
-        border: 1px solid #badbcc; 
-        padding: 15px; 
-        border-radius: 8px; 
-        margin: 20px 0 30px 0; 
-    }
-    .status-tag {
-        background-color: #f1f3f5; 
-        color: #2c3e50; 
-        padding: 4px 10px; 
-        border-radius: 6px; 
-        font-weight: 600; 
-        font-size: 0.9em; 
-        border: 1px solid #e9ecef; 
-        display: inline-flex; 
-        align-items: center; 
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    
-    .map-path {
-        font-family: monospace;
-        color: #155724;
-        margin-left: 10px;
-    }
-    
-    /* Sidebar Count Lines */
+    div[data-testid="column"] .stButton button { width: 100%; border-radius: 8px; transition: all 0.2s ease; }
+    .char-btn-wrap button { font-size: 3.5em !important; font-weight: bold !important; background: white !important; border: 2px solid #e0e0e0 !important; padding: 5px !important; min-height: 80px !important; }
+    .char-btn-wrap button:hover { background: #f0f9ff !important; border-color: #3b82f6 !important; }
+    .pen-btn-wrap button { font-size: 1.5em !important; border: 1px solid #eee !important; background: #f8f9fa !important; margin-top: 5px !important; height: 40px !important; line-height: 1 !important; color: #555 !important; }
+    .pen-btn-wrap button:hover { background: #e3f2fd !important; border-color: #90caf9 !important; color: #1565c0 !important; }
+    .char-static-box { font-size: 3.5em; font-weight: bold; background: #fdfdfd; color: #999; border: 2px solid #eee; border-radius: 12px; padding: 5px; min-height: 80px; display: flex; align-items: center; justify-content: center; width: 100%; cursor: default; }
+    .status-line { font-size: 1.1em; font-weight: 600; color: #0f5132; background-color: #d1e7dd; border: 1px solid #badbcc; padding: 15px; border-radius: 8px; margin: 20px 0 30px 0; }
+    .status-tag { background-color: #f1f3f5; color: #2c3e50; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.9em; border: 1px solid #e9ecef; display: inline-flex; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .map-path { font-family: monospace; color: #155724; margin-left: 10px; }
     .preview-count-line {font-size: 1.3em; text-align: center; color: #2c3e50; margin: 20px 0 25px 0;}
     .preview-count-line .char {font-size: 1.4em; font-weight: bold; color: #e74c3c;}
-    
-    /* General UI */
     .jump-footer {margin-top: 40px; padding: 20px; background: #f8f9fa; border-top: 1px solid #e0e0e0; text-align: center;}
     div[data-testid="stExpander"] .stButton button {font-size: 1.2rem; height: 40px; padding: 0; line-height: 1.2; border-radius: 4px; border: 1px solid #eee; transition: all 0.1s ease-in-out;}
     div[data-testid="stExpander"] .stButton button:hover {border-color: #bbb; background-color: #f0f0f0;}
     .stroke-header {font-size: 0.85em; color: #888; border-bottom: 1px solid #eee; margin: 10px 0 5px 0; padding-bottom: 2px;}
-    
-    /* Compound List Styling */
     .compound-item { display: flex; align-items: baseline; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid #e0e0e0; }
     .compound-item:last-child { border-bottom: none; margin-bottom: 0; }
     .cp-word { font-weight: bold; font-size: 1.1em; color: #2c3e50; min-width: 80px; margin-right: 10px; }
-    
-    /* --- UPDATED: LARGER PINYIN IN LISTS --- */
     .cp-pinyin { color: #d35400; font-family: monospace; margin-right: 10px; font-weight: 500; font-size: 1.5em;}
-    
     .cp-mean { color: #333; font-size: 0.95em; flex: 1; }
-    
-    /* Favourites / Splash */
     .splash-wrap {max-width: 1100px; margin: 0 auto; padding: 34px 10px 10px 10px;}
     .splash-card {background: white; border: 1px solid #eee; border-radius: 18px; padding: 34px; box-shadow: 0 6px 22px rgba(0,0,0,0.06);}
     .splash-title {font-size: 2.3em; font-weight: 850; line-height: 1.12; color:#111;}
     .splash-sub {margin-top: 10px; font-size: 1.15em; color:#444; line-height: 1.5;}
-    .splash-demo {margin-top: 18px; padding: 14px 16px; background:#fff8e1; border:1px solid #ffeeba; border-radius: 14px;}
-    .splash-demo-h {font-weight: 750; color:#856404; margin-bottom: 8px;}
-    .splash-tip {text-align:center; color:#777; margin-top: 10px;}
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -1033,7 +1026,6 @@ def main():
                 with cols[i % GRID_COLS]:
                     if st.button(ch, key=f"b_{ch}_{st.session_state.page}", type="primary"):
                         if st.session_state.preview_comp == ch:
-                            # Double-click → explore
                             reset_script_filter_to_any()
                             st.session_state.history = []
                             st.session_state.selected_comp = ch
@@ -1044,7 +1036,6 @@ def main():
                             st.session_state.stroke_view_active = False
                             st.session_state.display_mode = "Single Character"
                         else:
-                            # Single-click → preview
                             st.session_state.preview_comp = ch
 
             st.markdown("</div>", unsafe_allow_html=True)
@@ -1113,7 +1104,6 @@ def main():
                     type="primary" if is_preview else "secondary",
                 ):
                     if st.session_state.preview_comp == c:
-                        # Second click → explore
                         reset_script_filter_to_any()
                         if st.session_state.selected_comp:
                             st.session_state.history.append(st.session_state.selected_comp)
@@ -1125,7 +1115,6 @@ def main():
                         st.session_state.stroke_view_active = False
                         st.session_state.display_mode = "Single Character"
                     else:
-                        # First click → preview
                         st.session_state.preview_comp = c
 
                 st.markdown("</div>", unsafe_allow_html=True)
