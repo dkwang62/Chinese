@@ -967,45 +967,58 @@ def main():
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
-        if st.button("Show Favourites"):
+        # 1. Quick Access: Favourites button
+        if st.button("Show Favourites", use_container_width=True):
             go_to_root()
             st.session_state.onboarding_done = False
             st.rerun()
 
-        st.text_input("Shortcut: Paste/Type characters", key="sb_search", on_change=sync_sidebar_text)
+        # 2. Shortcut search
+        st.text_input(
+            "Shortcut: Paste/Type characters",
+            key="sb_search",
+            on_change=sync_sidebar_text,
+            placeholder="e.g. 水",
+        )
 
-        if st.session_state.stroke_view_active:
-            current_char = st.session_state.stroke_view_char
-            c1, c2 = st.columns(2)
-            with c1:
-                st.button("← Back", on_click=end_stroke_view)
-            with c2:
-                st.button("🏠 Root", on_click=go_to_root)
-            st.markdown("---")
-            st.markdown("### Character Info")
-            st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char}</div>", unsafe_allow_html=True)
-            st.markdown(generate_clean_card_html(current_char), unsafe_allow_html=True)
+        # 3. Main Explore button (prominent)
+        if st.button("Explore □", type="primary", use_container_width=True):
+            # If currently in preview/detail mode, go back to grid
+            if not st.session_state.show_inputs:
+                st.session_state.show_inputs = True
+                st.session_state.preview_comp = None
+                st.session_state.selected_comp = ""
+                st.session_state.history = []
+                st.rerun()
 
-            s_char = cc_t2s.convert(current_char) if cc_t2s else current_char
-            t_char = cc_s2t.convert(current_char) if cc_s2t else current_char
-            counterpart = t_char if current_char == s_char and t_char != current_char else s_char if current_char == t_char and s_char != current_char else None
-            if counterpart:
-                st.markdown("---")
-                st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px; color:#666;'>{counterpart}</div>", unsafe_allow_html=True)
-                st.markdown(generate_clean_card_html(counterpart), unsafe_allow_html=True)
+        st.markdown("---")
 
-        elif st.session_state.show_inputs:
-            st.markdown("### Filters")
-            st.checkbox("Show Components Only", key="w_component_only", value=st.session_state.component_only, on_change=sync_component_only)
+        # 4. Filters (only show in grid mode)
+        if st.session_state.show_inputs:
+            st.markdown("#### Filters")
 
-            min_s, max_s = st.session_state.stroke_range
-            with st.expander(f"Strokes: {min_s} – {max_s}", expanded=False):
-                st.slider("Select Stroke Range", min_value=1, max_value=max_s_val, value=st.session_state.stroke_range,
-                          key="w_stroke_range", on_change=sync_stroke_range, label_visibility="collapsed")
+            st.checkbox(
+                "Show Components Only",
+                key="w_component_only",
+                value=st.session_state.component_only,
+                on_change=sync_component_only,
+            )
+
+            cur_min, cur_max = st.session_state.stroke_range
+            with st.expander(f"Strokes: {cur_min}–{cur_max}", expanded=False):
+                st.slider(
+                    "Stroke range",
+                    min_value=1,
+                    max_value=max_s_val,
+                    value=st.session_state.stroke_range,
+                    key="w_stroke_range",
+                    on_change=sync_stroke_range,
+                    label_visibility="collapsed",
+                )
 
             with st.expander(f"Radical: {st.session_state.radical if st.session_state.radical != 'none' else '(Any)'}", expanded=False):
                 for s in sorted(stats_cache["rad_groups"].keys()):
-                    st.markdown(f"<div class='stroke-header'>{s if s != 999 else '?'} Strokes</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='stroke-header'>{s if s != 999 else '?'} strokes</div>", unsafe_allow_html=True)
                     rads = stats_cache["rad_groups"][s]
                     cols = st.columns(5)
                     for i, r in enumerate(rads):
@@ -1025,49 +1038,17 @@ def main():
                             st.session_state.page = 1
                             st.rerun()
 
+
+        # Optional: Add preview info in sidebar when previewing
+        if st.session_state.preview_comp and st.session_state.show_inputs:
             st.markdown("---")
+            st.markdown("#### Preview")
+            render_stroke_order_sidebar(st.session_state.preview_comp, size=110)
+            count = component_usage_count(st.session_state.preview_comp)
+            st.caption(f"Used in {count} characters")
 
-            if st.session_state.preview_comp:
-                render_stroke_order_sidebar(st.session_state.preview_comp, size=110)
-                is_fav = st.session_state.preview_comp in st.session_state.favourites_list
-                st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{st.session_state.preview_comp}",
-                            on_change=toggle_favourite, args=(st.session_state.preview_comp,))
-                if st.button(f"Explore {st.session_state.preview_comp}", type="primary", key="sb_select_btn"):
-                    reset_script_filter_to_any()
-                    st.session_state.history = []
-                    st.session_state.selected_comp = st.session_state.preview_comp
-                    st.session_state.last_valid_selected_comp = st.session_state.preview_comp
-                    st.session_state.show_inputs = False
-                    st.session_state.preview_comp = None
-                    st.session_state.text_input_comp = st.session_state.preview_comp
-                    st.session_state.display_mode = "Single Character"
-                    st.rerun()
 
-                related = component_map.get(st.session_state.preview_comp, {}).get("related_characters", [])
-                count = len({c for c in related if isinstance(c, str) and len(c) == 1})
-                st.markdown(f"<div class='preview-count-line'>{count} characters contain <span class='char'>{st.session_state.preview_comp}</span></div>", unsafe_allow_html=True)
-
-        else:
-            c1, c2 = st.columns(2)
-            with c1:
-                st.button("← Back", on_click=go_back)
-            with c2:
-                st.button("🏠 Root", on_click=go_to_root)
-
-            current_char = st.session_state.preview_comp or st.session_state.selected_comp
-            if current_char:
-                render_stroke_order_sidebar(current_char, size=140)
-                is_fav = current_char in st.session_state.favourites_list
-                st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{current_char}",
-                            on_change=toggle_favourite, args=(current_char,))
-                st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(st.session_state.script_filter),
-                         key="w_script_filter", on_change=sync_script_filter)
-
-                related = component_map.get(current_char, {}).get("related_characters", [])
-                chars_all = [c for c in related if isinstance(c, str) and len(c) == 1 and c in component_map]
-                chars_filtered = apply_script_filter(chars_all)
-                st.markdown(f"<div class='preview-count-line'>{len(chars_filtered)} characters contain <span class='char'>{current_char}</span></div>", unsafe_allow_html=True)
-
+    # ==================== MAIN CONTENT (OUTSIDE SIDEBAR) ====================
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
         st.stop()
