@@ -1067,7 +1067,7 @@ def main():
             st.markdown("---")
 
             # Green Explore button — only appears during preview
-            if st.button(f"Explore {preview_char} □", type="primary", use_container_width=True, key="explore_preview_btn"):
+            if st.button(f"Explore {preview_char}", type="primary", use_container_width=True, key="explore_preview_btn"):
                 reset_script_filter_to_any()
                 if st.session_state.selected_comp:
                     st.session_state.history.append(st.session_state.selected_comp)
