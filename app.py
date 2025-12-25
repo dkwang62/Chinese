@@ -1209,7 +1209,7 @@ def render_splash():
         """
         <div class="splash-wrap">
           <div class="splash-card" style="text-align:center;">
-            <div class="splash-title">Radix 🈑 Chinese Characters Explorer</div>
+            <div class="splash-title">Radix 🈑 Chinese Characters</div>
             <div class="splash-sub">
               Spot the COMPONENTS (字部件). Read and write HANZI (汉字 / 漢字).
             </div>
@@ -1286,7 +1286,7 @@ def render_splash():
                             st.session_state.onboarding_done = True
                             enter_component(ch)
                             st.rerun()
-                        st.caption(f"{count} characters")
+                        st.caption(f"used in {count} characters")
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='height:30px;'></div>", unsafe_allow_html=True)
