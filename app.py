@@ -1041,7 +1041,7 @@ def main():
                             st.session_state.page = 1
                             st.rerun()
 
-        # ==================== PREVIEW SECTION (only when previewing) ====================
+        # ==================== PREVIEW SECTION (grid mode preview) ====================
         if st.session_state.preview_comp and st.session_state.show_inputs:
             st.markdown("---")
             st.markdown("#### Preview")
@@ -1049,12 +1049,10 @@ def main():
             preview_char = st.session_state.preview_comp
             render_stroke_order_sidebar(preview_char, size=140)
 
-            # Character info
             count = component_usage_count(preview_char)
             st.markdown(f"**{preview_char}**")
             st.caption(f"Used in {count} characters")
 
-            # Favourites checkbox
             is_fav = preview_char in st.session_state.favourites_list
             st.checkbox(
                 "❤️ Add to Favourites",
@@ -1066,8 +1064,7 @@ def main():
 
             st.markdown("---")
 
-            # Green Explore button — only appears during preview
-            if st.button(f"Explore {preview_char}", type="primary", use_container_width=True, key="explore_preview_btn"):
+            if st.button(f"Explore {preview_char} □", type="primary", use_container_width=True, key="explore_preview_btn"):
                 reset_script_filter_to_any()
                 if st.session_state.selected_comp:
                     st.session_state.history.append(st.session_state.selected_comp)
@@ -1079,6 +1076,42 @@ def main():
                 st.session_state.stroke_view_active = False
                 st.session_state.display_mode = "Single Character"
                 st.rerun()
+
+        # ==================== DETAIL VIEW SIDEBAR (when exploring a character) ====================
+        if not st.session_state.show_inputs:
+            st.markdown("---")
+            current_char = st.session_state.selected_comp
+
+            if current_char:
+                render_stroke_order_sidebar(current_char, size=140)
+
+                count = component_usage_count(current_char)
+                st.markdown(f"**{current_char}**")
+                st.caption(f"Used in {count} characters")
+
+                is_fav = current_char in st.session_state.favourites_list
+                st.checkbox(
+                    "❤️ Add to Favourites",
+                    value=is_fav,
+                    key=f"fav_chk_detail_{current_char}",
+                    on_change=toggle_favourite,
+                    args=(current_char,),
+                )
+
+                # Show variant if exists
+                counterpart = None
+                if cc_t2s:
+                    s = cc_t2s.convert(current_char)
+                    if s != current_char and s in component_map:
+                        counterpart = s
+                if cc_s2t and counterpart is None:
+                    t = cc_s2t.convert(current_char)
+                    if t != current_char and t in component_map:
+                        counterpart = t
+                if counterpart:
+                    st.markdown("---")
+                    st.markdown(f"**Variant: {counterpart}**")
+                    render_stroke_order_sidebar(counterpart, size=100)
 
 
     # ==================== MAIN CONTENT (OUTSIDE SIDEBAR) ====================
