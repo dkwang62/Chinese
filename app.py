@@ -1548,23 +1548,39 @@ def main():
         )
 
         selected = st.session_state.selected_comp
-
-        # Components first
-        decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
-        components_list = [c for c in decomp_raw if c not in IDC_CHARS and c != "?" and c != "—"]
-
-        # Children next
-        related_raw = component_map.get(selected, {}).get("related_characters", [])
-        children_list = [c for c in related_raw if isinstance(c, str) and len(c) == 1]
-        children_sorted = sorted(children_list, key=sort_key_usage_then_zipf)
-
-        # Merge (dedupe)
         final_chars_list = []
         seen_chars = set()
+
+        # 1. THE ANCHOR: The Selected Character itself
+        if selected in component_map:
+            final_chars_list.append(selected)
+            seen_chars.add(selected)
+
+        # 2. THE EQUIVALENT: Traditional/Simplified variant
+        if cc_t2s and cc_s2t:
+            s_cand = cc_t2s.convert(selected)
+            t_cand = cc_s2t.convert(selected)
+            
+            variant = s_cand if s_cand != selected else t_cand
+            
+            if variant != selected and variant in component_map:
+                final_chars_list.append(variant)
+                seen_chars.add(variant)
+
+        # 3. COMPONENTS: Structural parts
+        decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
+        components_list = [c for c in decomp_raw if c not in IDC_CHARS and c != "?" and c != "—"]
+        
         for c in components_list:
             if c not in seen_chars and c in component_map:
                 final_chars_list.append(c)
                 seen_chars.add(c)
+
+        # 4. CHILDREN: Characters containing the selected character
+        related_raw = component_map.get(selected, {}).get("related_characters", [])
+        children_list = [c for c in related_raw if isinstance(c, str) and len(c) == 1]
+        children_sorted = sorted(children_list, key=sort_key_usage_then_zipf)
+
         for c in children_sorted:
             if c not in seen_chars and c in component_map:
                 final_chars_list.append(c)
