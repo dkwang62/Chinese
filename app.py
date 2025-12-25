@@ -345,7 +345,7 @@ def sync_sidebar_text():
 def tile_click(c):
     if st.session_state.show_inputs:
         if st.session_state.preview_comp == c:
-            # Double-click in grid → explore
+            # Double-click → explore
             reset_script_filter_to_any()
             st.session_state.history = []
             st.session_state.selected_comp = c
@@ -356,15 +356,28 @@ def tile_click(c):
             st.session_state.stroke_view_active = False
             st.session_state.display_mode = "Single Character"
         else:
+            # Single-click → preview
             st.session_state.preview_comp = c
+            st.rerun()  # Force immediate update
 
 def list_tile_click(c):
-    """One click in list/detail view → immediate preview"""
-    if st.session_state.preview_comp != c:
+    # Exactly the same as tile_click — single-click preview, second click explore
+    if st.session_state.preview_comp == c:
+        # Second click on same character → explore
+        reset_script_filter_to_any()
+        if st.session_state.selected_comp:
+            st.session_state.history.append(st.session_state.selected_comp)
+        st.session_state.selected_comp = c
+        st.session_state.last_valid_selected_comp = c
+        st.session_state.show_inputs = False
+        st.session_state.preview_comp = None
+        st.session_state.text_input_comp = c
+        st.session_state.stroke_view_active = False
+        st.session_state.display_mode = "Single Character"
+    else:
+        # First click or different character → preview
         st.session_state.preview_comp = c
-        st.rerun()
-    # If same character clicked again, do nothing (no double-click explore)
-    # Full explore only via green button
+        st.rerun()  # This is the key line — forces sidebar preview to update
 
 def go_back():
     st.session_state.preview_comp = None
