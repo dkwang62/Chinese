@@ -964,7 +964,7 @@ def main():
 
     max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
 
-with st.sidebar:
+    with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
         # === ALWAYS VISIBLE NAVIGATION BUTTONS ===
