@@ -1233,10 +1233,12 @@ def main():
         clickable_chars = apply_script_filter(chars[:LIMIT])
         static_chars = apply_script_filter(chars[LIMIT:])
 
-        for c in clickable_chars:
+for c in clickable_chars:
             col_char, col_details = st.columns([2, 10])
+            
             with col_char:
                 is_preview = st.session_state.preview_comp == c
+                
                 st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
                 st.button(
                     c,
@@ -1245,28 +1247,45 @@ def main():
                     on_click=list_tile_click,
                     args=(c,),
                 )
-            st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+
                 st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
                 if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order"):
                     st.session_state.stroke_view_char = c
                     st.session_state.stroke_view_active = True
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
+            
             with col_details:
-                st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c)), unsafe_allow_html=True)
+                st.markdown(
+                    generate_clean_card_html(c, usage_count=component_usage_count(c)),
+                    unsafe_allow_html=True
+                )
+            
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
         if static_chars:
             st.markdown("---")
-            st.markdown(f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>⬇️ {len(static_chars)} More Results (Copy & Paste into Shortcut sidebar to explore) ⬇️</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>"
+                f"⬇️ {len(static_chars)} More Results (Copy & Paste into Shortcut sidebar to explore) ⬇️"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            
             for c in static_chars:
                 col_char, col_details = st.columns([2, 10])
+                
                 with col_char:
                     st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
+                
                 with col_details:
-                    st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c)), unsafe_allow_html=True)
+                    st.markdown(
+                        generate_clean_card_html(c, usage_count=component_usage_count(c)),
+                        unsafe_allow_html=True
+                    )
+                
                 st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
-
 
 if __name__ == "__main__":
     main()
