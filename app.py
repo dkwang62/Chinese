@@ -7,6 +7,7 @@ import html
 import sqlite3
 import unicodedata
 import gc
+import base64
 import streamlit as st
 from streamlit.components.v1 import html as st_html
 
@@ -450,10 +451,46 @@ def apply_dynamic_css():
         margin-bottom: 10px;
         font-size: 1.1em;
     }
+    
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
+def render_ipad_safe_download(data_str, filename, label):
+    """
+    Triggers a background download on iPadOS. 
+    Prevents Safari from navigating away to a 'dead-end' preview screen.
+    """
+    b64 = base64.b64encode(data_str.encode()).decode()
+    # Using 'application/octet-stream' forces the browser to download 
+    # rather than attempt to 'open' or 'preview' the JSON.
+    href = f'data:application/octet-stream;base64,{b64}'
+    
+    html_button = f"""
+    <div style="text-align:center; margin: 10px 0;">
+        <a href="{href}" download="{filename}" target="_self" style="
+            text-decoration: none;
+            color: white;
+            background-color: #d35400;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 700;
+            display: inline-block;
+            box-shadow: 0 4px 12px rgba(211, 84, 0, 0.2);
+            -webkit-appearance: none;
+        ">
+            {label}
+        </a>
+    </div>
+    <script>
+        // Optional: Provide visual feedback that the download started
+        const link = document.querySelector('a[download="{filename}"]');
+        link.addEventListener('click', () => {{
+            console.log('Download triggered');
+        }});
+    </script>
+    """
+    st.markdown(html_button, unsafe_allow_html=True)
 
 # --- Database ---
 @st.cache_resource
@@ -1171,15 +1208,10 @@ def render_splash():
     st.markdown(
         """
         <div class="splash-wrap">
-          <div class="splash-card">
-            <div class="splash-title">Radix 🈑 Explore Characters by Components</div>
+          <div class="splash-card" style="text-align:center;">
+            <div class="splash-title">Radix 🈑 Chinese Characters Explorer</div>
             <div class="splash-sub">
-              Learn to read and write Chinese characters by identifying <b>components</b>.
-              <b>Components</b> are recurring parts that hint at meaning or pronunciation.
-            </div>
-            <div class="splash-demo">
-              <div class="splash-demo-h">Favourites Collection</div>
-              <div>This list revolves as you add new characters. Load/Save your collection below.</div>
+              Spot the COMPONENTS (字部件). Read and write HANZI (汉字 / 漢字).
             </div>
           </div>
         </div>
@@ -1187,54 +1219,77 @@ def render_splash():
         unsafe_allow_html=True,
     )
 
-    lc1, lc2, lc3 = st.columns([1, 2, 1])
-    with lc2:
-        with st.expander("Manage Favourites (Save/Load)"):
-            c_dl, c_ul = st.columns(2)
-            with c_dl:
-                json_data = json.dumps(st.session_state.favourites_list, ensure_ascii=False, indent=2)
-                st.download_button(
-                    label="💾 Save Favourites",
-                    data=json_data,
-                    file_name="favourites.json",
-                    mime="application/json",
-                )
-            with c_ul:
-                st.file_uploader(
-                    "Load Favourites",
-                    type=["json"],
-                    key="fav_uploader",
-                    on_change=handle_file_upload,
-                    label_visibility="collapsed",
-                )
+    # 2. Main Entry Point (Unified Hero Gate)
+    st.markdown(
+        """
+        <div style="text-align:center; margin: 40px 0;">
+            <a href="/?onboarding=done" target="_self" style="text-decoration:none; display:inline-block;">
+                <div style="font-size: 100px; cursor:pointer; line-height:1; transition: transform 0.3s ease;" 
+                     onmouseover="this.style.transform='scale(1.15)';" 
+                     onmouseout="this.style.transform='scale(1)';" >
+                     ⛩️
+                </div>
+                <div style="color: #C0392B !important; font-size: 26px !important; 
+                             font-weight: 900 !important; margin-top: 15px; 
+                             font-family: 'Segoe UI', sans-serif; letter-spacing: 2px;">
+                    Enter Radix 🈑
+                </div>
+            </a>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
 
+    # Handle entry trigger
+    if st.query_params.get("onboarding") == "done":
+        st.session_state.onboarding_done = True
+        st.query_params.clear() 
+        st.rerun()
+
+    # 3. Quick Access & Management Section (Expander just above the boxes)
     demos = st.session_state.favourites_list
-    COLS = 5
-    rows = (len(demos) + COLS - 1) // COLS
+    if demos:
+        st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
+        # Repositioned Expander
+        lc1, lc2, lc3 = st.columns([1, 2, 1])
+        with lc2:
+            with st.expander("📂 Manage Favourites (Save/Load)", expanded=False):
+                c_dl, c_ul = st.columns(2)
+                with c_dl:
+                    json_data = json.dumps(st.session_state.favourites_list, ensure_ascii=False, indent=2)
+                    render_ipad_safe_download(json_data, "favourites.json", "💾 Save Favourites")
+                with c_ul:
+                    st.file_uploader("Load", type=["json"], key="fav_uploader", on_change=handle_file_upload, label_visibility="collapsed")
+        
+        # 4. Restored Colored Grid Logic
+        st.markdown("<div class='comp-grid'>", unsafe_allow_html=True) # Re-apply grid styling
+        
+        unique_demos = []
+        seen_in_list = set()
+        for d in demos:
+            if d not in seen_in_list:
+                unique_demos.append(d)
+                seen_in_list.add(d)
 
-    for r in range(rows):
-        cols = st.columns(COLS)
-        for j in range(COLS):
-            idx = r * COLS + j
-            if idx >= len(demos):
-                continue
-            ch = demos[idx]
-            count = component_usage_count(ch)
-            with cols[j]:
-                if st.button(f"Explore {ch}", type="primary", key=f"splash_{ch}_{idx}", use_container_width=True):
-                    st.session_state.onboarding_done = True
-                    enter_component(ch)
-                    st.rerun()
-                st.caption(f"{count} characters")
+        COLS = 5
+        rows = (len(unique_demos) + COLS - 1) // COLS
+        for r in range(rows):
+            cols = st.columns(COLS)
+            for j in range(COLS):
+                idx = r * COLS + j
+                if idx < len(unique_demos):
+                    ch = unique_demos[idx]
+                    count = component_usage_count(ch)
+                    with cols[j]:
+                        btn_key = f"v4_splash_btn_{idx}_{ord(ch)}"
+                        if st.button(f"Explore {ch}", key=btn_key, use_container_width=True, type="primary"):
+                            st.session_state.onboarding_done = True
+                            enter_component(ch)
+                            st.rerun()
+                        st.caption(f"{count} characters")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([2, 1, 2])
-    with c2:
-        if st.button("Enter Radix", use_container_width=True):
-            st.session_state.onboarding_done = True
-            st.rerun()
-
-
+    st.markdown("<div style='height:30px;'></div>", unsafe_allow_html=True)
 def main():
     if not component_map:
         st.error("Component dataset not loaded. Ensure enhanced_component_map_with_etymology.json exists.")
@@ -1551,23 +1606,22 @@ def main():
         final_chars_list = []
         seen_chars = set()
 
-        # 1. THE ANCHOR: The Selected Character itself
+        # 1. THE ANCHOR: Selected Character (Rank #1)
         if selected in component_map:
             final_chars_list.append(selected)
             seen_chars.add(selected)
 
-        # 2. THE EQUIVALENT: Traditional/Simplified variant
+        # 2. THE EQUIVALENT: Traditional/Simplified (Rank #2)
         if cc_t2s and cc_s2t:
             s_cand = cc_t2s.convert(selected)
             t_cand = cc_s2t.convert(selected)
-            
             variant = s_cand if s_cand != selected else t_cand
             
             if variant != selected and variant in component_map:
                 final_chars_list.append(variant)
                 seen_chars.add(variant)
 
-        # 3. COMPONENTS: Structural parts
+        # 3. COMPONENTS: Structural parts (Rank #3)
         decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
         components_list = [c for c in decomp_raw if c not in IDC_CHARS and c != "?" and c != "—"]
         
@@ -1576,7 +1630,7 @@ def main():
                 final_chars_list.append(c)
                 seen_chars.add(c)
 
-        # 4. CHILDREN: Characters containing the selected character
+        # 4. CHILDREN: Containing characters (Rank #4)
         related_raw = component_map.get(selected, {}).get("related_characters", [])
         children_list = [c for c in related_raw if isinstance(c, str) and len(c) == 1]
         children_sorted = sorted(children_list, key=sort_key_usage_then_zipf)
@@ -1587,7 +1641,6 @@ def main():
                 seen_chars.add(c)
 
         chars = final_chars_list
-
         # Hybrid render: 120 clickable, rest static
         LIMIT = 120
         clickable_chars = chars[:LIMIT]
