@@ -398,7 +398,7 @@ def tile_click(c):
 
 def list_tile_click(c):
     if st.session_state.preview_comp == c:
-        # Double-click behavior: fully explore the character
+        # Double-click: fully explore the character
         reset_script_filter_to_any()
         if st.session_state.selected_comp:
             st.session_state.history.append(st.session_state.selected_comp)
@@ -411,9 +411,9 @@ def list_tile_click(c):
         st.session_state.display_mode = "Single Character"
         st.rerun()
     else:
-        # Single-click: just preview (same as grid)
+        # Single-click: preview the character
         st.session_state.preview_comp = c
-        st.rerun()  # Important: force rerun to show preview immediately
+        st.rerun()  # <-- THIS IS THE MISSING LINE! Forces sidebar to update
 
 def go_back():
     st.session_state.preview_comp = None
