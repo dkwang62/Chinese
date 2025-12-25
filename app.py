@@ -19,7 +19,7 @@ except ImportError:
     cc_t2s = None
     cc_s2t = None
 
-st.set_page_config(layout="wide", page_title="Radix", page_icon="🈁")
+st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 
 IDC_CHARS = {"⿰", "⿱", "⿲", "⿳", "⿴", "⿵", "⿶", "⿷", "⿸", "⿹", "⿺", "⿻"}
 SCRIPT_FILTERS = ["Any", "Simplified", "Traditional"]
@@ -1202,7 +1202,7 @@ def render_splash():
         """
         <div class="splash-wrap">
           <div class="splash-card">
-            <div class="splash-title">Radix 🈁 Explore Characters by Components</div>
+            <div class="splash-title">Radix 🈑 Explore Characters by Components</div>
             <div class="splash-sub">
               Learn to read and write Chinese characters by identifying <b>components</b>.
               <b>Components</b> are recurring parts that hint at meaning or pronunciation.
@@ -1279,7 +1279,7 @@ def main():
     max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
 
     with st.sidebar:
-        st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈁 Radix</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
         if st.button("Show Favourites", use_container_width=True):
             go_to_root()
