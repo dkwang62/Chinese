@@ -398,6 +398,7 @@ def tile_click(c):
 
 def list_tile_click(c):
     if st.session_state.preview_comp == c:
+        # Double-click behavior: fully explore the character
         reset_script_filter_to_any()
         if st.session_state.selected_comp:
             st.session_state.history.append(st.session_state.selected_comp)
@@ -408,9 +409,11 @@ def list_tile_click(c):
         st.session_state.text_input_comp = c
         st.session_state.stroke_view_active = False
         st.session_state.display_mode = "Single Character"
+        st.rerun()
     else:
+        # Single-click: just preview (same as grid)
         st.session_state.preview_comp = c
-
+        st.rerun()  # Important: force rerun to show preview immediately
 
 def go_back():
     st.session_state.preview_comp = None
