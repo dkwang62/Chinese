@@ -1233,7 +1233,7 @@ def main():
         clickable_chars = apply_script_filter(chars[:LIMIT])
         static_chars = apply_script_filter(chars[LIMIT:])
 
-for c in clickable_chars:
+        for c in clickable_chars:
             col_char, col_details = st.columns([2, 10])
             
             with col_char:
