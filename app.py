@@ -359,9 +359,12 @@ def tile_click(c):
             st.session_state.preview_comp = c
 
 def list_tile_click(c):
-    """One click in list view → preview only"""
-    st.session_state.preview_comp = c
-    st.rerun()
+    """One click in list/detail view → immediate preview"""
+    if st.session_state.preview_comp != c:
+        st.session_state.preview_comp = c
+        st.rerun()
+    # If same character clicked again, do nothing (no double-click explore)
+    # Full explore only via green button
 
 def go_back():
     st.session_state.preview_comp = None
