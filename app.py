@@ -397,25 +397,12 @@ def tile_click(c):
 
 
 def list_tile_click(c):
-    # Always treat a click as preview first
-    # If it's the same as current preview → treat as "double-click" (explore)
-    if st.session_state.preview_comp == c:
-        # This is the second click on the same character → FULL EXPLORE
-        reset_script_filter_to_any()
-        if st.session_state.selected_comp:
-            st.session_state.history.append(st.session_state.selected_comp)
-        st.session_state.selected_comp = c
-        st.session_state.last_valid_selected_comp = c
-        st.session_state.show_inputs = False
-        st.session_state.preview_comp = None
-        st.session_state.text_input_comp = c
-        st.session_state.stroke_view_active = False
-        st.session_state.display_mode = "Single Character"
-        st.rerun()
-    else:
-        # First click OR click on a different character → SHOW PREVIEW
-        st.session_state.preview_comp = c
-        st.rerun()  # Critical: forces sidebar to update immediately
+    """
+    In list/detail view: single click = preview only
+    (No double-click to explore — use the green Explore button instead)
+    """
+    st.session_state.preview_comp = c
+    st.rerun()  # Immediate preview update
 
 def go_back():
     st.session_state.preview_comp = None
@@ -1246,13 +1233,19 @@ def main():
         clickable_chars = apply_script_filter(chars[:LIMIT])
         static_chars = apply_script_filter(chars[LIMIT:])
 
-        for c in clickable_chars:
-            col_char, col_details = st.columns([2, 10])
-            with col_char:
-                is_preview = st.session_state.preview_comp == c
-                st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
-                st.button(c, key=f"explore_char_{c}", type="primary" if is_preview else "secondary", on_click=list_tile_click, args=(c,))
-                st.markdown("</div>", unsafe_allow_html=True)
+    for c in clickable_chars:
+        col_char, col_details = st.columns([2, 10])
+        with col_char:
+            is_preview = st.session_state.preview_comp == c
+            st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
+            st.button(
+                c,
+                key=f"explore_char_{c}",
+                type="primary" if is_preview else "secondary",
+                on_click=list_tile_click,
+                args=(c,),
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
                 st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
                 if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order"):
                     st.session_state.stroke_view_char = c
