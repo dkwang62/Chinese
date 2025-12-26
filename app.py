@@ -1335,7 +1335,7 @@ def main():
         render_stroke_order_view(st.session_state.stroke_view_char)
         st.stop()
 
-        if st.session_state.show_inputs:
+    if st.session_state.show_inputs:
         # GRID VIEW
         filter_parts = []
         cur_min, cur_max = st.session_state.stroke_range
