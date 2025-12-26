@@ -652,7 +652,7 @@ def generate_clean_card_html(c, usage_count=None):
 
     meta_items = []
     
-    # Script Variants
+    # 1. RESTORED: Script Variants with Original Coloring
     if cc_t2s:
         simplified = cc_t2s.convert(c)
         if simplified != c:
@@ -662,16 +662,20 @@ def generate_clean_card_html(c, usage_count=None):
         if traditional != c:
             meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. ➔ {traditional}</span>")
 
-    # Metadata
+    # 2. RESTORED: Usage Count (Characters containing this component)
+    if usage_count is not None and usage_count > 0:
+        meta_items.append(f"<span class='meta-tag'>Used in {usage_count} characters</span>")
+
+    # 3. Metadata
     if strokes:
         meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
     if decomp and decomp != "—":
         meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
 
-    # Layout: Pinyin font-size increased for older eyes
+    # High-legibility layout with large pinyin on top
     pinyin_html = f"<div style='font-size: 2.2em; color: #d35400; text-align: center; line-height: 1; font-weight:400;'>{pinyin}</div>" if pinyin and pinyin != '—' else ""
     
-    html_content = f"""
+    return f"""
     <div class='char-card' style='display: flex; align-items: flex-start;'>
         <div style='display: flex; flex-direction: column; align-items: center; margin-right: 25px; min-width: 100px;'>
             {pinyin_html}
@@ -684,7 +688,6 @@ def generate_clean_card_html(c, usage_count=None):
         </div>
     </div>
     """
-    return html_content
     
 def render_stroke_order_sidebar(char: str, size: int = 110):
     char = (char or "").strip()[:1]
@@ -1088,6 +1091,12 @@ def main():
 
         if st.session_state.stroke_view_active:
             current_char_for_sidebar = st.session_state.stroke_view_char
+            
+            # A. Sidebar Map for Stroke View
+            path_items = ["🏠 Root"] + st.session_state.history + [st.session_state.selected_comp, "🖊️"]
+            st.markdown(f"<div style='font-size:0.95em; color:#555; margin-bottom:15px; font-weight:400;'>{' &nbsp;→&nbsp; '.join(path_items)}</div>", unsafe_allow_html=True)
+
+            # B. Navigation
             c1, c2 = st.columns(2)
             with c1:
                 st.button("← Back", on_click=end_stroke_view, use_container_width=True)
@@ -1095,12 +1104,9 @@ def main():
                 st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
 
             st.markdown("---")
-            st.markdown("### Character Info")
+            st.markdown("<h4 style='font-weight:400; color:#666;'>Current Character Info</h4>", unsafe_allow_html=True)
 
-            st.markdown(
-                f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>",
-                unsafe_allow_html=True,
-            )
+            # C. Render Info Card in Sidebar (Correctly formatted)
             st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
 
             s_char = cc_t2s.convert(current_char_for_sidebar) if cc_t2s else current_char_for_sidebar
