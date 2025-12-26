@@ -646,14 +646,28 @@ def generate_clean_card_html(c, usage_count=None):
     meta = info.get("meta", {})
     pinyin = clean_field(meta.get("pinyin", ""))
     strokes = info.get('stroke_count')
-    radical = clean_field(meta.get("radical", ""))
     decomp = format_decomposition(c)
     definition = clean_field(meta.get("definition", ""))
     etymology = get_etymology_text(meta)
 
     meta_items = []
+    
+    # 1. Primary Pinyin (Rank #1 in metadata)
     if pinyin and pinyin != "—":
         meta_items.append(f"<span class='meta-pinyin'>{pinyin}</span>")
+    
+    # 2. RESTORED: Traditional <-> Simplified Conversion
+    # Checks both OpenCC converters to find the counterpart
+    if cc_t2s:
+        simplified = cc_t2s.convert(c)
+        if simplified != c:
+            meta_items.append(f"<span class='meta-tag meta-tag-trad'>Trad. ➔ {simplified}</span>")
+    if cc_s2t:
+        traditional = cc_s2t.convert(c)
+        if traditional != c:
+            meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. ➔ {traditional}</span>")
+
+    # 3. Structural Metadata
     if strokes:
         meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
     if decomp and decomp != "—":
@@ -661,7 +675,7 @@ def generate_clean_card_html(c, usage_count=None):
     if usage_count is not None and usage_count > 0:
         meta_items.append(f"<span class='meta-tag'>In {usage_count} chars</span>")
 
-    # Layout: Subject character on left, info on right
+    # Final Layout: Large Subject + Enlarged Text
     html_content = f"""
     <div class='char-card' style='display: flex; align-items: flex-start;'>
         <div class='card-subject'>{c}</div>
