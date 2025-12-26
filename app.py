@@ -667,22 +667,20 @@ def generate_clean_card_html(c, usage_count=None):
         meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
     if decomp and decomp != "—":
         meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
-    if usage_count is not None and usage_count > 0:
-        meta_items.append(f"<span class='meta-tag'>In {usage_count} chars</span>")
 
-    # Layout: Pinyin stacked on top of character
-    pinyin_html = f"<div style='font-size: 1.3em; color: #d35400; text-align: center; line-height: 1;'>{pinyin}</div>" if pinyin and pinyin != '—' else ""
+    # Layout: Pinyin font-size increased for older eyes
+    pinyin_html = f"<div style='font-size: 2.2em; color: #d35400; text-align: center; line-height: 1; font-weight:400;'>{pinyin}</div>" if pinyin and pinyin != '—' else ""
     
     html_content = f"""
     <div class='char-card' style='display: flex; align-items: flex-start;'>
-        <div style='display: flex; flex-direction: column; align-items: center; margin-right: 25px; min-width: 80px;'>
+        <div style='display: flex; flex-direction: column; align-items: center; margin-right: 25px; min-width: 100px;'>
             {pinyin_html}
-            <div class='card-subject' style='margin-top: 5px;'>{c}</div>
+            <div class='card-subject' style='margin-top: 10px; font-weight:400;'>{c}</div>
         </div>
         <div style='flex: 1;'>
-            <div class='meta-row'>{''.join(meta_items)}</div>
-            <div class='def-row'>{definition}</div>
-            {f"<div class='ety-row'>Origin: {etymology}</div>" if etymology else ""}
+            <div class='meta-row' style='font-weight:400;'>{''.join(meta_items)}</div>
+            <div class='def-row' style='font-weight:400;'>{definition}</div>
+            {f"<div class='ety-row' style='font-weight:400;'>Origin: {etymology}</div>" if etymology else ""}
         </div>
     </div>
     """
@@ -1216,6 +1214,13 @@ def main():
 
         else:
             # DETAIL VIEW Sidebar
+            # Ensure the path logic is explicitly placed here
+            path_items = ["🏠 Root"] + st.session_state.history + [st.session_state.selected_comp]
+            path_str = " &nbsp;→&nbsp; ".join(path_items)
+            
+            # This renders the map directly above the navigation buttons
+            st.markdown(f"<div style='font-size:1.1em; color:#555; margin-bottom:20px; font-weight:400;'>{path_str}</div>", unsafe_allow_html=True)
+
             c1, c2 = st.columns(2)
             with c1:
                 st.button("← Back", on_click=go_back, use_container_width=True)
