@@ -132,326 +132,108 @@ def apply_dynamic_css():
     css = """
     <style>
     /* Global Layout */
-    .main .block-container {padding-top: 2rem; padding-bottom: 3rem;}
+    .main .block-container {padding-top: 1rem; padding-bottom: 2rem;}
     
-    /* Character Cards */
+    /* Character Cards - Optimized for accessibility and older eyes */
     .char-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        padding: 24px;
+        padding: 16px 20px; /* Tightened padding to prevent size bloat */
         border-radius: 16px;
         margin-bottom: 0px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-        border: 1px solid #e9ecef;
+        border: 2px solid #dee2e6; /* Thicker border for better visual separation */
         transition: all 0.3s ease;
     }
-    .char-card:hover {
-        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
-        transform: translateY(-2px);
-    }
     
+    /* Subject Character inside Card (Step 1 requirement) */
+    .card-subject {
+        font-size: 3.5em; 
+        font-weight: 800;
+        color: #2c3e50;
+        margin-right: 20px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+    }
+
     .meta-row {
-        font-size: 0.95em;
-        color: #555;
-        margin-bottom: 12px;
+        font-size: 1.1em; /* Enlarged for readability */
+        color: #444;
+        margin-bottom: 8px;
         display: flex;
         align-items: center;
         flex-wrap: wrap;
         gap: 12px;
     }
     .meta-pinyin {
-        font-weight: 700;
-        font-size: 2.4em;
+        font-weight: 800;
+        font-size: 2.8em; /* Enlarged for older folks */
         color: #d35400;
         text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1);
     }
     .meta-tag {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        padding: 4px 12px;
-        border-radius: 8px;
-        font-size: 0.85em;
-        color: #495057;
-        font-weight: 600;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        background: #f1f3f5;
+        padding: 6px 14px;
+        border-radius: 10px;
+        font-size: 1.0em; /* Enlarged from 0.85em */
+        color: #333;
+        font-weight: 700;
+        border: 1px solid #ced4da;
     }
-    .meta-tag-trad {
-        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
-        color: #856404;
-        border: 1px solid #ffd54f;
-    }
-    .meta-tag-simp {
-        background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%);
-        color: #0f5132;
-        border: 1px solid #81c784;
-    }
+    
     .def-row {
-        font-size: 1.15em;
-        line-height: 1.6;
-        color: #2c3e50;
+        font-size: 1.4em; /* Significantly enlarged for accessibility */
+        line-height: 1.4;
+        color: #000000; /* Maximum contrast black */
         margin-bottom: 10px;
-        font-weight: 500;
+        font-weight: 600;
     }
+    
     .ety-row {
-        font-size: 0.92em;
-        color: #666;
+        font-size: 1.05em; /* Enlarged for readability */
+        color: #333;
         font-style: italic;
+        background: #fffbe6; /* Light yellow background for visual distinction */
         border-top: 2px solid #e9ecef;
-        padding-top: 12px;
-        margin-top: 8px;
+        padding: 10px;
+        border-radius: 8px;
+        margin-top: 12px;
         line-height: 1.5;
     }
     
-    /* Grid Buttons - STRETCH with better styling */
+    /* Grid Buttons - Preserved Teal background from previous functional success */
     .comp-grid .stButton > button {
         width: 100% !important;
-        font-size: 2.2em !important;
+        font-size: 2.4em !important;
         height: 85px !important;
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
-        border: 2px solid #dee2e6 !important;
+        background: linear-gradient(135deg, #006064 0%, #004d40 100%) !important;
+        color: white !important;
+        border: none !important;
         border-radius: 14px !important;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.08) !important;
-        padding: 0 !important;
-        line-height: 85px !important;
-        font-weight: 600 !important;
-        transition: all 0.2s ease !important;
-    }
-    .comp-grid .stButton > button:hover {
-        background: linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%) !important;
-        border-color: #f2c6c6 !important;
-        color: #c0392b !important;
-        transform: translateY(-3px) !important;
-        box-shadow: 0 6px 16px rgba(192, 57, 43, 0.15) !important;
+        font-weight: 700 !important;
     }
     
-    /* Detail List View Buttons - STRETCH */
+    /* Detail View Buttons */
     .char-btn-wrap .stButton > button {
         width: 100% !important;
         font-size: 3.8em !important;
         font-weight: 700 !important;
         background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%) !important;
         border: 3px solid #dee2e6 !important;
-        padding: 10px !important;
-        min-height: 90px !important;
         border-radius: 16px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
-        transition: all 0.25s ease !important;
-    }
-    .char-btn-wrap .stButton > button:hover {
-        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
-        border-color: #3b82f6 !important;
-        transform: scale(1.02) !important;
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.2) !important;
-    }
-    
-    /* Pen Button - STRETCH */
-    .pen-btn-wrap .stButton > button {
-        width: 100% !important;
-        font-size: 1.6em !important;
-        border: 2px solid #dee2e6 !important;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
-        margin-top: 8px !important;
-        height: 45px !important;
-        line-height: 1 !important;
-        color: #555 !important;
-        font-weight: 600 !important;
-        border-radius: 12px !important;
-        transition: all 0.2s ease !important;
-    }
-    .pen-btn-wrap .stButton > button:hover {
-        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
-        border-color: #64b5f6 !important;
-        color: #1565c0 !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(100, 181, 246, 0.2) !important;
     }
 
-    /* Static Cards */
-    .char-static-box {
-        font-size: 3.8em;
-        font-weight: 700;
-        background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%);
-        color: #bbb;
-        border: 2px solid #e0e0e0;
-        border-radius: 16px;
-        padding: 10px;
-        min-height: 90px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        cursor: default;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    }
-
-    /* Status Line */
+    /* Status Line Enhancement */
     .status-line {
-        font-size: 1.1em;
-        font-weight: 600;
+        font-size: 1.2em;
+        font-weight: 700;
         color: #0f5132;
-        background: linear-gradient(135deg, #d1e7dd 0%, #c3e6cb 100%);
-        border: 2px solid #95d5b2;
-        padding: 18px;
+        background: #e8f5e9;
+        border: 2px solid #81c784;
+        padding: 15px;
         border-radius: 12px;
-        margin: 20px 0 30px 0;
-        box-shadow: 0 3px 10px rgba(15, 81, 50, 0.08);
+        margin: 15px 0 25px 0;
     }
-    .status-tag {
-        background: linear-gradient(135deg, #ffffff 0%, #f1f3f5 100%);
-        color: #2c3e50;
-        padding: 6px 14px;
-        border-radius: 8px;
-        font-weight: 700;
-        font-size: 0.9em;
-        border: 2px solid #dee2e6;
-        display: inline-flex;
-        align-items: center;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-    }
-    .map-path {
-        font-family: 'Monaco', 'Menlo', monospace;
-        color: #155724;
-        margin-left: 10px;
-        font-weight: 600;
-    }
-    
-    /* Count Lines */
-    .preview-count-line {
-        font-size: 1.4em;
-        text-align: center;
-        color: #2c3e50;
-        margin: 25px 0 30px 0;
-        font-weight: 600;
-    }
-    .preview-count-line .char {
-        font-size: 1.5em;
-        font-weight: 800;
-        color: #e74c3c;
-        text-shadow: 0 2px 4px rgba(231, 76, 60, 0.1);
-    }
-    
-    /* Footer */
-    .jump-footer {
-        margin-top: 50px;
-        padding: 25px;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-top: 3px solid #dee2e6;
-        border-radius: 12px;
-        text-align: center;
-        box-shadow: 0 -3px 10px rgba(0,0,0,0.04);
-    }
-    
-    /* Expander Buttons - STRETCH */
-    div[data-testid="stExpander"] .stButton > button {
-        width: 100% !important;
-        font-size: 1.3rem !important;
-        height: 45px !important;
-        padding: 0 !important;
-        line-height: 1.2 !important;
-        border-radius: 10px !important;
-        border: 2px solid #dee2e6 !important;
-        transition: all 0.2s ease !important;
-        font-weight: 600 !important;
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
-    }
-    div[data-testid="stExpander"] .stButton > button:hover {
-        border-color: #adb5bd !important;
-        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-    }
-    
-    .stroke-header {
-        font-size: 0.9em;
-        color: #6c757d;
-        border-bottom: 2px solid #dee2e6;
-        margin: 15px 0 8px 0;
-        padding-bottom: 4px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    /* Compound Lists */
-    .compound-item {
-        display: flex;
-        align-items: baseline;
-        margin-bottom: 10px;
-        padding: 12px;
-        padding-bottom: 12px;
-        border-bottom: 2px solid #e9ecef;
-        border-radius: 8px;
-        background: #ffffff;
-        transition: all 0.2s ease;
-    }
-    .compound-item:hover {
-        background: #f8f9fa;
-        transform: translateX(4px);
-    }
-    .compound-item:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
-    }
-    .cp-word {
-        font-weight: 700;
-        font-size: 1.2em;
-        color: #2c3e50;
-        min-width: 85px;
-        margin-right: 15px;
-    }
-    .cp-pinyin {
-        color: #d35400;
-        font-family: 'Monaco', 'Menlo', monospace;
-        margin-right: 15px;
-        font-weight: 600;
-        font-size: 1.5em;
-    }
-    .cp-mean {
-        color: #495057;
-        font-size: 1em;
-        flex: 1;
-        line-height: 1.5;
-    }
-    
-    /* Splash Screen */
-    .splash-wrap {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 40px 20px 20px 20px;
-    }
-    .splash-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        border: 2px solid #dee2e6;
-        border-radius: 24px;
-        padding: 40px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-    }
-    .splash-title {
-        font-size: 2.6em;
-        font-weight: 900;
-        line-height: 1.2;
-        color: #111;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    .splash-sub {
-        margin-top: 15px;
-        font-size: 1.2em;
-        color: #495057;
-        line-height: 1.6;
-    }
-    .splash-demo {
-        margin-top: 25px;
-        padding: 18px 20px;
-        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
-        border: 2px solid #ffd54f;
-        border-radius: 16px;
-        box-shadow: 0 3px 10px rgba(255, 193, 7, 0.1);
-    }
-    .splash-demo-h {
-        font-weight: 800;
-        color: #856404;
-        margin-bottom: 10px;
-        font-size: 1.1em;
-    }
-    
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -874,28 +656,24 @@ def generate_clean_card_html(c, usage_count=None):
         meta_items.append(f"<span class='meta-pinyin'>{pinyin}</span>")
     if strokes:
         meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
-    if radical and radical != "—":
-        meta_items.append(f"<span class='meta-tag'>Rad. {radical}</span>")
     if decomp and decomp != "—":
         meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
     if usage_count is not None and usage_count > 0:
-        meta_items.append(f"<span class='meta-tag'>Used in {usage_count} chars</span>")
+        meta_items.append(f"<span class='meta-tag'>In {usage_count} chars</span>")
 
-    if cc_t2s:
-        simplified = cc_t2s.convert(c)
-        if simplified != c:
-            meta_items.append(f"<span class='meta-tag meta-tag-trad'>Trad. → {simplified}</span>")
-    if cc_s2t:
-        traditional = cc_s2t.convert(c)
-        if traditional != c:
-            meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. → {traditional}</span>")
-
-    meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
-    def_html = f"<div class='def-row'>{definition}</div>" if definition and definition != "—" else ""
-    ety_html = f"<div class='ety-row'>{etymology}</div>" if etymology else ""
-    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}</div>"
-
-
+    # Layout: Subject character on left, info on right
+    html_content = f"""
+    <div class='char-card' style='display: flex; align-items: flex-start;'>
+        <div class='card-subject'>{c}</div>
+        <div style='flex: 1;'>
+            <div class='meta-row'>{''.join(meta_items)}</div>
+            <div class='def-row'>{definition}</div>
+            {f"<div class='ety-row'><b>Origin:</b> {etymology}</div>" if etymology else ""}
+        </div>
+    </div>
+    """
+    return html_content
+    
 def render_stroke_order_sidebar(char: str, size: int = 110):
     char = (char or "").strip()[:1]
     if not char:
@@ -1210,47 +988,34 @@ def render_splash():
         <div class="splash-wrap">
           <div class="splash-card" style="text-align:center;">
             <div class="splash-title">Radix 🈑 Chinese Characters</div>
-            <div class="splash-sub">
-              Spot the COMPONENTS (字部件). Read and write HANZI (汉字 / 漢字).
-            </div>
+            <div class="splash-sub">Spot the COMPONENTS. Read and write HANZI.</div>
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # 2. Main Entry Point (Unified Hero Gate)
+    # Central Gate Entry
     st.markdown(
         """
-        <div style="text-align:center; margin: 40px 0;">
-            <a href="/?onboarding=done" target="_self" style="text-decoration:none; display:inline-block;">
-                <div style="font-size: 100px; cursor:pointer; line-height:1; transition: transform 0.3s ease;" 
-                     onmouseover="this.style.transform='scale(1.15)';" 
-                     onmouseout="this.style.transform='scale(1)';" >
-                     ⛩️
-                </div>
-                <div style="color: #C0392B !important; font-size: 26px !important; 
-                             font-weight: 900 !important; margin-top: 15px; 
-                             font-family: 'Segoe UI', sans-serif; letter-spacing: 2px;">
-                    Enter Radix 🈑
-                </div>
+        <div style="text-align:center; margin: 30px 0;">
+            <a href="/?onboarding=done" target="_self" style="text-decoration:none;">
+                <div style="font-size: 100px; cursor:pointer;">⛩️</div>
+                <div style="color: #C0392B; font-size: 24px; font-weight: 800; margin-top: 10px;">ENTER RADIX</div>
             </a>
         </div>
         """, 
         unsafe_allow_html=True
     )
 
-    # Handle entry trigger
     if st.query_params.get("onboarding") == "done":
         st.session_state.onboarding_done = True
         st.query_params.clear() 
         st.rerun()
 
-    # 3. Quick Access & Management Section (Expander just above the boxes)
     demos = st.session_state.favourites_list
     if demos:
-        st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
-        # Repositioned Expander
+        # Placement: Expander moved here, just above the boxes
         lc1, lc2, lc3 = st.columns([1, 2, 1])
         with lc2:
             with st.expander("📂 Manage Favourites (Save/Load)", expanded=False):
@@ -1260,17 +1025,12 @@ def render_splash():
                     render_ipad_safe_download(json_data, "favourites.json", "💾 Save Favourites")
                 with c_ul:
                     st.file_uploader("Load", type=["json"], key="fav_uploader", on_change=handle_file_upload, label_visibility="collapsed")
-        
-        # 4. Restored Colored Grid Logic
-        st.markdown("<div class='comp-grid'>", unsafe_allow_html=True) # Re-apply grid styling
-        
-        unique_demos = []
-        seen_in_list = set()
-        for d in demos:
-            if d not in seen_in_list:
-                unique_demos.append(d)
-                seen_in_list.add(d)
 
+        st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
+        
+        # Grid with Restored Colors
+        st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+        unique_demos = list(dict.fromkeys(demos))
         COLS = 5
         rows = (len(unique_demos) + COLS - 1) // COLS
         for r in range(rows):
@@ -1281,15 +1041,14 @@ def render_splash():
                     ch = unique_demos[idx]
                     count = component_usage_count(ch)
                     with cols[j]:
-                        btn_key = f"v4_splash_btn_{idx}_{ord(ch)}"
-                        if st.button(f"Explore {ch}", key=btn_key, use_container_width=True, type="primary"):
+                        if st.button(f"Explore {ch}", key=f"spl_{ch}_{idx}", use_container_width=True, type="primary"):
                             st.session_state.onboarding_done = True
                             enter_component(ch)
                             st.rerun()
                         st.caption(f"used in {count} characters")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("<div style='height:30px;'></div>", unsafe_allow_html=True)
+    
 def main():
     if not component_map:
         st.error("Component dataset not loaded. Ensure enhanced_component_map_with_etymology.json exists.")
