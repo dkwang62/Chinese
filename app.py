@@ -1443,6 +1443,14 @@ def main():
 
         else:
             # DETAIL VIEW Sidebar
+            # Breadcrumb path moved here (above navigation)
+            path_items = ["🏠 Root"] + st.session_state.history + [f"<b>{st.session_state.selected_comp}</b>"]
+            path_str = " → ".join(path_items)
+            st.markdown(
+                f"<div style='font-size:0.95em; margin-bottom:18px; color:#444; text-align:center; font-weight:500;'>{path_str}</div>",
+                unsafe_allow_html=True,
+            )
+
             c1, c2 = st.columns(2)
             with c1:
                 st.button("← Back", on_click=go_back, use_container_width=True)
@@ -1586,17 +1594,12 @@ def main():
         # DETAIL LIST VIEW
         st.session_state.display_mode = "Single Character"
 
-        path_items = ["🏠 Root"] + st.session_state.history + [f"<b>{st.session_state.selected_comp}</b>"]
-        path_str = " &nbsp;→&nbsp; ".join(path_items)
-
         st.markdown(
-            f"""
+            """
             <div class='status-line'>
-                <div style='margin-bottom:8px;'>
-                    <span class='status-tag'>Location</span> 
-                    <span class='map-path'>{path_str}</span>
+                <div class='status-text' style='font-size:0.85em; color:#666;'>
+                    Single-click previews · Double-click explores
                 </div>
-                <div class='status-text' style='font-size:0.85em; color:#666;'>Single-click previews. Double-click explores.</div>
             </div>
             """,
             unsafe_allow_html=True,
