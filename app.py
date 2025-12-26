@@ -133,6 +133,38 @@ def apply_dynamic_css():
     /* Global Layout */
     .main .block-container {padding-top: 1rem; padding-bottom: 2rem;}
     
+    /* RESTORED: Professional Green Grid Bar (Status Line) 
+       This restores the gradient and shadow from your favorite version. */
+    .status-line {
+        font-size: 1.1em;
+        font-weight: 400 !important;
+        color: #0f5132;
+        background: linear-gradient(135deg, #d1e7dd 0%, #c3e6cb 100%);
+        border: 2px solid #95d5b2;
+        padding: 16px;
+        border-radius: 12px;
+        margin: 15px 0 25px 0;
+        box-shadow: 0 3px 10px rgba(15, 81, 50, 0.08);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    /* RESTORED: Status Tags (The white boxes inside the green bar) */
+    .status-tag {
+        background: linear-gradient(135deg, #ffffff 0%, #f1f3f5 100%);
+        color: #2c3e50;
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-weight: 400 !important;
+        font-size: 0.9em;
+        border: 1px solid #dee2e6;
+        display: inline-flex;
+        align-items: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
     /* Character Cards - High contrast, no bold, large text */
     .char-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
@@ -144,7 +176,6 @@ def apply_dynamic_css():
         transition: all 0.3s ease;
     }
     
-    /* Character Subject inside Card - Large but not bold */
     .card-subject {
         font-size: 4em; 
         font-weight: 400 !important;
@@ -163,23 +194,26 @@ def apply_dynamic_css():
         flex-wrap: wrap;
         gap: 12px;
     }
+
     .meta-pinyin {
         font-weight: 400 !important;
         font-size: 2.8em;
         color: #d35400;
         text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1);
     }
-    .meta-tag {
-        background: #f1f3f5;
-        padding: 6px 14px;
-        border-radius: 10px;
-        font-size: 1.0em;
-        color: #333;
-        font-weight: 400 !important;
-        border: 1px solid #ced4da;
+
+    /* Meta-tags for script variants inside cards */
+    .meta-tag-trad {
+        background: #fff8e1 !important; 
+        color: #856404 !important;
+        border: 1px solid #ffd54f !important;
+    }
+    .meta-tag-simp {
+        background: #d1e7dd !important;
+        color: #0f5132 !important;
+        border: 1px solid #81c784 !important;
     }
     
-    /* Pure black high contrast definition, no bold */
     .def-row {
         font-size: 1.4em;
         line-height: 1.4;
@@ -201,7 +235,7 @@ def apply_dynamic_css():
         font-weight: 400 !important;
     }
     
-    /* Grid Buttons - No bold weight */
+    /* Grid Buttons - Professional Teal background */
     .comp-grid .stButton > button {
         width: 100% !important;
         font-size: 2.4em !important;
@@ -213,7 +247,7 @@ def apply_dynamic_css():
         font-weight: 400 !important;
     }
     
-    /* Detail View Buttons - Large font, no bold */
+    /* Detail View Buttons */
     .char-btn-wrap .stButton > button {
         width: 100% !important;
         font-size: 3.8em !important;
@@ -223,49 +257,7 @@ def apply_dynamic_css():
         border-radius: 16px !important;
     }
 
-    /* Status Line - No bold */
-    .status-line {
-        font-size: 1.2em;
-        font-weight: 400 !important;
-        color: #0f5132;
-        background: #e8f5e9;
-        border: 2px solid #81c784;
-        padding: 15px;
-        border-radius: 12px;
-        margin: 15px 0 25px 0;
-    }
-    .compound-item {
-        display: flex;
-        align-items: flex-start; /* Prevents stretching */
-        margin-bottom: 12px;
-        padding: 12px 18px;
-        border-bottom: 1px solid #eef2f3;
-        background: #ffffff;
-        border-radius: 10px;
-    }
-    .cp-word {
-        font-weight: 400 !important; /* No-bold requirement */
-        font-size: 1.7em;
-        color: #1a1a1a;
-        min-width: 100px; /* Forces characters into their own column */
-        margin-right: 20px;
-    }
-    .cp-pinyin {
-        color: #d35400;
-        font-family: 'Segoe UI', Tahoma, sans-serif;
-        min-width: 160px; /* Forces pinyin into its own column */
-        margin-right: 20px;
-        font-weight: 400 !important;
-        font-size: 1.4em;
-    }
-    .cp-mean {
-        color: #444;
-        font-size: 1.15em;
-        flex: 1; /* Definition takes up all remaining space */
-        line-height: 1.5;
-        font-weight: 400 !important;
-    }
-        /* Sidebar specific card adjustments to prevent 'the mess' */
+    /* Sidebar specific card adjustments to prevent 'the mess' */
     [data-testid="stSidebar"] .char-card {
         padding: 12px !important;
         margin-bottom: 10px !important;
@@ -277,14 +269,41 @@ def apply_dynamic_css():
         margin-right: 0 !important;
     }
 
-    [data-testid="stSidebar"] .def-row {
-        font-size: 1.1em !important;
-        line-height: 1.3 !important;
+    /* Phrase Table Structural Alignment */
+    .compound-item {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 12px;
+        padding: 12px 18px;
+        border-bottom: 1px solid #eef2f3;
+        background: #ffffff;
+        border-radius: 10px;
+    }
+    .cp-word {
+        font-weight: 400 !important;
+        font-size: 1.7em;
+        color: #1a1a1a;
+        min-width: 100px;
+        margin-right: 20px;
+    }
+    .cp-pinyin {
+        color: #d35400;
+        min-width: 160px;
+        margin-right: 20px;
+        font-weight: 400 !important;
+        font-size: 1.4em;
+    }
+    .cp-mean {
+        color: #444;
+        font-size: 1.15em;
+        flex: 1;
+        line-height: 1.5;
+        font-weight: 400 !important;
     }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
-
+    
 def render_ipad_safe_download(data_str, filename, label):
     """
     Triggers a background download on iPadOS. 
@@ -1316,32 +1335,38 @@ def main():
         render_stroke_order_view(st.session_state.stroke_view_char)
         st.stop()
 
-    if st.session_state.show_inputs:
+        if st.session_state.show_inputs:
         # GRID VIEW
         filter_parts = []
         cur_min, cur_max = st.session_state.stroke_range
+        
+        # Stroke Tag
         if not (cur_min == 1 and cur_max == max_s_val):
             if cur_min == cur_max:
                 filter_parts.append(f"<span class='status-tag'>{cur_min} strokes</span>")
-            elif cur_min == 1:
-                filter_parts.append(f"<span class='status-tag'>≤ {cur_max} strokes</span>")
-            elif cur_max == max_s_val:
-                filter_parts.append(f"<span class='status-tag'>≥ {cur_min} strokes</span>")
             else:
                 filter_parts.append(f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>")
+        
+        # Radical Tag
         if st.session_state.radical != "none":
             filter_parts.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
+        
+        # Structure Tag (Added the box styling here)
         if st.session_state.component_idc != "none":
             filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
+            
+        # Components Only Tag
         if st.session_state.component_only:
             filter_parts.append("<span class='status-tag'>Components Only</span>")
+            
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
         
+        # Render the Bar
         st.markdown(
-            f"<div class='status-line'>{filter_summary} <span class='status-text'>· Single-click previews. Double-click explores.</span></div>",
+            f"<div class='status-line'>{filter_summary} <span style='margin-left:auto;'>· Single-click previews. Double-click explores.</span></div>",
             unsafe_allow_html=True,
         )
-
+        
         filtered = [
             c for c in component_map
             if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max
