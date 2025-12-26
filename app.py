@@ -234,6 +234,41 @@ def apply_dynamic_css():
         border-radius: 12px;
         margin: 15px 0 25px 0;
     }
+    .compound-item {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 15px;
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+        background: #ffffff;
+        border-radius: 8px;
+        font-weight: 400 !important;
+    }
+
+    .cp-word {
+        font-size: 1.6em; /* Larger for senior readability */
+        color: #111;
+        min-width: 120px; /* Fixed width prevents overlapping */
+        margin-right: 20px;
+        font-weight: 400 !important;
+    }
+
+    .cp-pinyin {
+        color: #d35400;
+        font-size: 1.3em;
+        min-width: 180px; /* Allocated space for long pinyin strings */
+        margin-right: 20px;
+        font-weight: 400 !important;
+    }
+
+    .cp-mean {
+        color: #444;
+        font-size: 1.2em;
+        flex: 1; /* Definition takes remaining space */
+        line-height: 1.5;
+        font-weight: 400 !important;
+    }
+    
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -639,9 +674,8 @@ def render_copy_to_clipboard(prompt_text: str, widget_id: str):
     )
 
 
-def generate_clean_card_html(c, usage_count=None):
-    if not c:
-        return ""
+def generate_clean_card_html(c, usage_count=None, is_sidebar=False):
+    if not c: return ""
     info = component_map.get(c, {})
     meta = info.get("meta", {})
     pinyin = clean_field(meta.get("pinyin", ""))
@@ -650,9 +684,13 @@ def generate_clean_card_html(c, usage_count=None):
     definition = clean_field(meta.get("definition", ""))
     etymology = get_etymology_text(meta)
 
-    meta_items = []
+    # Scale down sizes slightly for sidebar to prevent overlap
+    subj_size = "2.5em" if is_sidebar else "4em"
+    pinyin_size = "1.5em" if is_sidebar else "2.2em"
+    card_padding = "10px" if is_sidebar else "20px"
     
-    # 1. RESTORED: Script Variants with Original Coloring
+    meta_items = []
+    # Restored script variants with original coloring
     if cc_t2s:
         simplified = cc_t2s.convert(c)
         if simplified != c:
@@ -662,29 +700,21 @@ def generate_clean_card_html(c, usage_count=None):
         if traditional != c:
             meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. ➔ {traditional}</span>")
 
-    # 2. RESTORED: Usage Count (Characters containing this component)
     if usage_count is not None and usage_count > 0:
-        meta_items.append(f"<span class='meta-tag'>Used in {usage_count} characters</span>")
+        meta_items.append(f"<span class='meta-tag'>Used in {usage_count} chars</span>")
 
-    # 3. Metadata
-    if strokes:
-        meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
-    if decomp and decomp != "—":
-        meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
-
-    # High-legibility layout with large pinyin on top
-    pinyin_html = f"<div style='font-size: 2.2em; color: #d35400; text-align: center; line-height: 1; font-weight:400;'>{pinyin}</div>" if pinyin and pinyin != '—' else ""
+    pinyin_html = f"<div style='font-size: {pinyin_size}; color: #d35400; text-align: center; line-height: 1; font-weight:400;'>{pinyin}</div>" if pinyin and pinyin != '—' else ""
     
     return f"""
-    <div class='char-card' style='display: flex; align-items: flex-start;'>
-        <div style='display: flex; flex-direction: column; align-items: center; margin-right: 25px; min-width: 100px;'>
+    <div class='char-card' style='display: flex; flex-direction: {"column" if is_sidebar else "row"}; padding: {card_padding};'>
+        <div style='display: flex; flex-direction: column; align-items: center; margin-bottom: 10px; margin-right: {"0" if is_sidebar else "25px"}; min-width: 100px;'>
             {pinyin_html}
-            <div class='card-subject' style='margin-top: 10px; font-weight:400;'>{c}</div>
+            <div class='card-subject' style='font-size: {subj_size}; margin-top: 5px; font-weight:400;'>{c}</div>
         </div>
         <div style='flex: 1;'>
             <div class='meta-row' style='font-weight:400;'>{''.join(meta_items)}</div>
-            <div class='def-row' style='font-weight:400;'>{definition}</div>
-            {f"<div class='ety-row' style='font-weight:400;'>Origin: {etymology}</div>" if etymology else ""}
+            <div class='def-row' style='font-weight:400; font-size: {"1.1em" if is_sidebar else "1.4em"};'>{definition}</div>
+            {f"<div class='ety-row' style='font-weight:400;'>Origin: {etymology}</div>" if etymology and not is_sidebar else ""}
         </div>
     </div>
     """
@@ -1092,17 +1122,18 @@ def main():
         if st.session_state.stroke_view_active:
             current_char_for_sidebar = st.session_state.stroke_view_char
             
-            # A. Sidebar Map for Stroke View
+            # 1. Path/Map
             path_items = ["🏠 Root"] + st.session_state.history + [st.session_state.selected_comp, "🖊️"]
-            st.markdown(f"<div style='font-size:0.95em; color:#555; margin-bottom:15px; font-weight:400;'>{' &nbsp;→&nbsp; '.join(path_items)}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size:0.9em; color:#555; margin-bottom:15px;'>{' &nbsp;→&nbsp; '.join(path_items)}</div>", unsafe_allow_html=True)
 
-            # B. Navigation
+            # 2. Controls
             c1, c2 = st.columns(2)
-            with c1:
-                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
-            with c2:
-                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+            with c1: st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+            with c2: st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
 
+            st.markdown("---")
+            # 3. Compact Info Card for Sidebar
+            st.markdown(generate_clean_card_html(current_char_for_sidebar, is_sidebar=True), unsafe_allow_html=True)
             st.markdown("---")
             st.markdown("<h4 style='font-weight:400; color:#666;'>Current Character Info</h4>", unsafe_allow_html=True)
 
