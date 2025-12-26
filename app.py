@@ -867,44 +867,57 @@ def render_copy_to_clipboard(prompt_text: str, widget_id: str):
         height=90,
     )
 
+import html  # Make sure this is at the top of your file if not already
+
 def generate_clean_card_html(c: str, usage_count: int | None = None):
     info = component_map.get(c, {})
     meta = info.get("meta", {})
     
-    # Safely extract values with defaults
-    pinyin_list = meta.get("pinyin") or ["?"]
-    pinyin = pinyin_list[0] if pinyin_list else "?"
-    
-    definition = meta.get("definition") or "No definition available."
-    if definition is None:
+    # Pinyin - safe extraction
+    pinyin_list = meta.get("pinyin")
+    if pinyin_list and isinstance(pinyin_list, list) and len(pinyin_list) > 0:
+        pinyin = pinyin_list[0]
+    else:
+        pinyin = "?"
+
+    # Definition
+    definition = meta.get("definition")
+    if not definition:
         definition = "No definition available."
-    
-    etymology = meta.get("etymology")
-    if not etymology:  # Covers None, "", [], etc.
-        etymology = ""
-    # Now etymology is guaranteed to be a non-None string
-    
+
+    # Etymology - THE CRITICAL SAFE HANDLING
+    etymology_raw = meta.get("etymology")
+    etymology = ""
+    if etymology_raw and isinstance(etymology_raw, str):
+        etymology = etymology_raw.strip()
+        if etymology:  # Only escape if there's actual content
+            etymology = html.escape(etymology)
+
+    # Strokes and radical
     strokes = info.get("stroke_count")
     radical = meta.get("radical", "")
 
-    # Script tag
+    # Script tag (Simplified/Traditional)
     script_tag = ""
     if cc_t2s and cc_s2t:
-        s = cc_t2s.convert(c)
-        t = cc_s2t.convert(c)
-        if c == s and t != c:
-            script_tag = "<span class='meta-tag meta-tag-simp'>Simplified</span>"
-        elif c == t and s != c:
-            script_tag = "<span class='meta-tag meta-tag-trad'>Traditional</span>"
+        try:
+            s = cc_t2s.convert(c)
+            t = cc_s2t.convert(c)
+            if c == s and t != c and t in component_map:
+                script_tag = "<span class='meta-tag meta-tag-simp'>Simplified</span>"
+            elif c == t and s != c and s in component_map:
+                script_tag = "<span class='meta-tag meta-tag-trad'>Traditional</span>"
+        except:
+            pass
 
     usage_text = f"Used in {usage_count} chars" if usage_count is not None else ""
 
-    # Build etymology part safely — only escape if there's content
-    etymology_html = f'<div class="ety-row">{html.escape(etymology)}</div>' if etymology.strip() else ""
+    # Build etymology HTML only if we have content
+    etymology_html = f'<div class="ety-row">{etymology}</div>' if etymology else ""
 
     return f"""
     <div class="char-card">
-        <!-- Large Character + Big Pinyin -->
+        <!-- Large Character + Big Pinyin Overlay -->
         <div style="
             position: relative;
             height: 180px;
@@ -943,7 +956,7 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
         <div class="meta-row">
             {script_tag}
             {f'<span class="meta-tag">Rad. {html.escape(radical)}</span>' if radical else ''}
-            {f'<span class="meta-tag">{strokes} strokes</span>' if strokes else ''}
+            {f'<span class="meta-tag">{strokes} strokes</span>' if strokes is not None else ''}
             {f'<span class="meta-tag">{usage_text}</span>' if usage_text else ''}
         </div>
 
@@ -952,7 +965,7 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
             {html.escape(definition)}
         </div>
 
-        <!-- Etymology - safe -->
+        <!-- Etymology (safe) -->
         {etymology_html}
     </div>
     """
