@@ -574,6 +574,15 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
             etymology = html.escape(cleaned)
     
     strokes = info.get("stroke_count")
+    radical = meta.gdef generate_clean_card_html(c: str, usage_count: int | None = None):
+    info = component_map.get(c, {})
+    meta = info.get("meta", {})
+
+    pinyin_list = meta.get("pinyin")
+    pinyin = pinyin_list[0] if isinstance(pinyin_list, list) and pinyin_list else "?"
+    definition = meta.get("definition") or "No definition available."
+
+    strokes = info.get("stroke_count")
     radical = meta.get("radical", "")
 
     script_tag = ""
@@ -589,34 +598,34 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
             pass
 
     usage_text = f"Used in {usage_count} chars" if usage_count is not None else ""
-    etymology_html = f'<div class="ety-row">{etymology}</div>' if etymology else ""
 
-    large_header = f"""
-    <div style="position:relative; height:160px; background:linear-gradient(135deg,#f8fbff 0%,#eef4ff 100%); border-radius:16px; margin-bottom:20px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 15px rgba(0,0,0,0.08); overflow:hidden;">
+    large_header = dedent(f"""
+    <div style="position:relative; height:160px; background:linear-gradient(135deg,#f8fbff 0%,#eef4ff 100%);
+                border-radius:16px; margin-bottom:20px; display:flex; align-items:center; justify-content:center;
+                box-shadow:0 4px 15px rgba(0,0,0,0.08); overflow:hidden;">
         <div style="font-size:7.5em; font-weight:900; color:#1a1a1a; line-height:1;">
-            {html.escape(c)}
+            {_html.escape(c)}
         </div>
-        <div style="position:absolute; top:14px; left:0; right:0; text-align:center; font-size:2.0em; font-weight:700; color:#d35400; text-shadow:0 2px 4px rgba(211,84,0,0.2); letter-spacing:1.8px;">
-            {html.escape(pinyin)}
+        <div style="position:absolute; top:14px; left:0; right:0; text-align:center; font-size:2.0em; font-weight:700;
+                    color:#d35400; text-shadow:0 2px 4px rgba(211,84,0,0.2); letter-spacing:1.8px;">
+            {_html.escape(pinyin)}
         </div>
     </div>
-    """.strip()
+    """).strip()
 
-    return f"""
+    card_html = dedent(f"""
     <div class="char-card">
         {large_header}
         <div class="meta-row">
             {script_tag}
-            {f'<span class="meta-tag">Rad. {html.escape(radical)}</span>' if radical else ''}
+            {f'<span class="meta-tag">Rad. {_html.escape(radical)}</span>' if radical else ''}
             {f'<span class="meta-tag">{strokes} strokes</span>' if strokes is not None else ''}
-            {f'<span class="meta-tag">{usage_text}</span>' if usage_text else ''}
+            {f'<span class="meta-tag">{_html.escape(usage_text)}</span>' if usage_text else ''}
         </div>
-        <div class="def-row">
-            {html.escape(definition)}
-        </div>
-        {etymology_html}
+        <div class="def-row">{_html.escape(definition)}</div>
     </div>
-    """.strip()
+    """).strip()
+
     
 def render_stroke_order_sidebar(char: str, size: int = 110):
     char = (char or "").strip()[:1]
