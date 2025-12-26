@@ -978,17 +978,7 @@ def render_stroke_order_view(char_input: str):
         st.info("No character selected for stroke order.")
         return
 
-    if st.session_state.display_mode == "Single Character":
-        st.session_state.display_mode = "2-Character Phrases"
-        st.rerun()
-
-    st.markdown("### Stroke Order & Phrases")
-    modes = ["2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
-    current_index = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 0
-    new_mode = st.radio("Display Mode", options=modes, index=current_index, horizontal=True, key="w_display_stroke_view")
-    if new_mode != st.session_state.display_mode:
-        st.session_state.display_mode = new_mode
-        st.rerun()
+    st.markdown("### Stroke Order Animation")
 
     s_char = cc_t2s.convert(primary_char) if cc_t2s else primary_char
     t_char = cc_s2t.convert(primary_char) if cc_s2t else primary_char
@@ -1130,54 +1120,57 @@ def render_stroke_order_view(char_input: str):
 
     st.markdown("---")
 
-    n = {"2-Character Phrases": 2, "3-Character Phrases": 3, "4-Character Phrases": 4}.get(st.session_state.display_mode, 0)
-    meta_compounds = component_map.get(primary_char, {}).get("meta", {}).get("compounds", [])
-    relevant_compounds = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
+    # Show phrases based on display mode (controlled from sidebar)
+    if st.session_state.display_mode != "Single Character":
+        n = {"2-Character Phrases": 2, "3-Character Phrases": 3, "4-Character Phrases": 4}.get(st.session_state.display_mode, 0)
+        meta_compounds = component_map.get(primary_char, {}).get("meta", {}).get("compounds", [])
+        relevant_compounds = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
 
-    if relevant_compounds:
-        db_conn = get_db_connection()
-        sorted_compounds = sorted(relevant_compounds)
+        if relevant_compounds:
+            db_conn = get_db_connection()
+            sorted_compounds = sorted(relevant_compounds)
 
-        if not db_conn:
-            st.warning("⚠️ 'phrases.db' not found. Please upload it to your repository to see phrases.")
-        else:
-            phrases_map = batch_get_phrase_details(sorted_compounds, db_conn)
-            items_html = []
-            for word in sorted_compounds:
-                entry = phrases_map.get(word)
-                pinyin = entry.get("pinyin", "") if entry else ""
-                meanings = entry.get("meanings", "") if entry else ""
-                display_meanings = html.escape(meanings[:100] + ("..." if len(meanings) > 100 else ""))
+            if not db_conn:
+                st.warning("⚠️ 'phrases.db' not found. Please upload it to your repository to see phrases.")
+            else:
+                phrases_map = batch_get_phrase_details(sorted_compounds, db_conn)
+                items_html = []
+                for word in sorted_compounds:
+                    entry = phrases_map.get(word)
+                    pinyin = entry.get("pinyin", "") if entry else ""
+                    meanings = entry.get("meanings", "") if entry else ""
+                    display_meanings = html.escape(meanings[:100] + ("..." if len(meanings) > 100 else ""))
 
-                if entry:
-                    items_html.append(
-                        f"<div class='compound-item'>"
-                        f"<span class='cp-word'>{word}</span>"
-                        f"<span class='cp-pinyin'>{pinyin}</span>"
-                        f"<span class='cp-mean'>{display_meanings}</span>"
-                        f"</div>"
-                    )
-                else:
-                    items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
+                    if entry:
+                        items_html.append(
+                            f"<div class='compound-item'>"
+                            f"<span class='cp-word'>{word}</span>"
+                            f"<span class='cp-pinyin'>{pinyin}</span>"
+                            f"<span class='cp-mean'>{display_meanings}</span>"
+                            f"</div>"
+                        )
+                    else:
+                        items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
 
-            full_list_html = "".join(items_html)
-            st.markdown(
-                f"""
-                <div style='padding:15px; background:#f1f8e9; border-radius:8px; 
-                     margin:10px auto; border:1px solid #dcedc8; max-width:800px; max-height:400px; overflow-y:auto;'>
-                  <div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; 
-                       border-bottom:2px solid #a5d6a7; padding-bottom:5px; text-align:center;'>
-                    {st.session_state.display_mode} containing {primary_char}
-                  </div>
-                  {full_list_html}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-    elif n > 0:
-        st.info(f"No {st.session_state.display_mode} found for {primary_char}.")
+                full_list_html = "".join(items_html)
+                st.markdown(
+                    f"""
+                    <div style='padding:15px; background:#f1f8e9; border-radius:8px; 
+                         margin:10px auto; border:1px solid #dcedc8; max-width:800px; max-height:400px; overflow-y:auto;'>
+                      <div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; 
+                           border-bottom:2px solid #a5d6a7; padding-bottom:5px; text-align:center;'>
+                        {st.session_state.display_mode} containing {primary_char}
+                      </div>
+                      {full_list_html}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        elif n > 0:
+            st.info(f"No {st.session_state.display_mode} found for {primary_char}.")
 
-    st.markdown("---")
+        st.markdown("---")
+
     st.markdown("### ChatGPT Prompt (Chinese definition + bilingual examples)")
 
     prompt_text = build_chatgpt_prompt(primary_char)
@@ -1364,6 +1357,7 @@ def main():
 
         current_main_char = st.session_state.stroke_view_char if st.session_state.stroke_view_active else st.session_state.selected_comp
 
+        # Breadcrumb and navigation
         if current_main_char:
             path_items = ["🏠 Root"] + st.session_state.history
             if st.session_state.stroke_view_active:
@@ -1387,14 +1381,48 @@ def main():
 
         st.markdown("---")
 
+        # Determine current character for sidebar display
         current_char_for_sidebar = (
             st.session_state.stroke_view_char if st.session_state.stroke_view_active
             else (st.session_state.preview_comp or st.session_state.selected_comp)
         )
 
         if current_char_for_sidebar:
+            # In stroke order view, add script variant switcher
+            if st.session_state.stroke_view_active:
+                s_char = cc_t2s.convert(current_char_for_sidebar) if cc_t2s else current_char_for_sidebar
+                t_char = cc_s2t.convert(current_char_for_sidebar) if cc_s2t else current_char_for_sidebar
+                
+                if s_char != t_char:
+                    st.markdown("### Script Variant")
+                    variant_options = []
+                    if current_char_for_sidebar == s_char:
+                        variant_options = [("Simplified", s_char), ("Traditional", t_char)]
+                    else:
+                        variant_options = [("Traditional", t_char), ("Simplified", s_char)]
+                    
+                    current_idx = 0 if current_char_for_sidebar == variant_options[0][1] else 1
+                    
+                    selected_variant = st.radio(
+                        "Switch variant",
+                        options=[v[0] for v in variant_options],
+                        index=current_idx,
+                        key="variant_switcher",
+                        label_visibility="collapsed"
+                    )
+                    
+                    new_char = variant_options[0][1] if selected_variant == variant_options[0][0] else variant_options[1][1]
+                    if new_char != current_char_for_sidebar:
+                        st.session_state.stroke_view_char = new_char
+                        st.rerun()
+                    
+                    current_char_for_sidebar = new_char
+                    st.markdown("---")
+            
+            # Stroke order animation in sidebar
             render_stroke_order_sidebar(current_char_for_sidebar, size=140 if not st.session_state.stroke_view_active else 110)
 
+            # Favourite checkbox
             is_fav = current_char_for_sidebar in st.session_state.favourites_list
             st.checkbox(
                 "Show in Favourites",
@@ -1404,7 +1432,28 @@ def main():
                 args=(current_char_for_sidebar,),
             )
 
-            if not st.session_state.stroke_view_active:
+            # Display Mode selector (for list view and stroke order view)
+            if not st.session_state.show_inputs:
+                st.markdown("---")
+                st.markdown("### Display Mode")
+                modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
+                current_mode_idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 0
+                
+                new_mode = st.radio(
+                    "Select mode",
+                    options=modes,
+                    index=current_mode_idx,
+                    key="sidebar_display_mode",
+                    label_visibility="collapsed"
+                )
+                
+                if new_mode != st.session_state.display_mode:
+                    st.session_state.display_mode = new_mode
+                    st.rerun()
+
+            # Script filter (only in regular list view, not stroke view or grid view)
+            if not st.session_state.stroke_view_active and not st.session_state.show_inputs:
+                st.markdown("---")
                 st.radio(
                     "Filter Results",
                     options=SCRIPT_FILTERS,
@@ -1423,29 +1472,16 @@ def main():
                     f"<div class='preview-count-line'>{count_filtered} characters contain <span class='char'>{current_char_for_sidebar}</span></div>",
                     unsafe_allow_html=True,
                 )
-            else:
+            
+            # Character info card (only in stroke order view)
+            if st.session_state.stroke_view_active:
+                st.markdown("---")
                 st.markdown("### Character Info")
                 st.markdown(
                     f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>",
                     unsafe_allow_html=True,
                 )
                 st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
-
-                s_char = cc_t2s.convert(current_char_for_sidebar) if cc_t2s else current_char_for_sidebar
-                t_char = cc_s2t.convert(current_char_for_sidebar) if cc_s2t else current_char_for_sidebar
-                counterpart = None
-                if current_char_for_sidebar == s_char and t_char != current_char_for_sidebar:
-                    counterpart = t_char
-                elif current_char_for_sidebar == t_char and s_char != current_char_for_sidebar:
-                    counterpart = s_char
-
-                if counterpart:
-                    st.markdown("---")
-                    st.markdown(
-                        f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px; color:#666;'>{counterpart}</div>",
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown(generate_clean_card_html(counterpart), unsafe_allow_html=True)
     
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
@@ -1545,7 +1581,7 @@ def main():
             st.markdown("</div>", unsafe_allow_html=True)
 
     else:
-        st.session_state.display_mode = "Single Character"
+        st.session_state.display_mode = st.session_state.get("display_mode", "Single Character")
 
         st.markdown(
             """
@@ -1558,6 +1594,63 @@ def main():
             unsafe_allow_html=True,
         )
 
+        # Determine which character to show phrases for (preview takes priority)
+        phrase_char = st.session_state.preview_comp or st.session_state.selected_comp
+
+        # Show phrases if a phrase mode is selected
+        if st.session_state.display_mode != "Single Character" and phrase_char:
+            st.markdown(f"## Phrases containing {phrase_char}")
+            
+            n = {"2-Character Phrases": 2, "3-Character Phrases": 3, "4-Character Phrases": 4}.get(st.session_state.display_mode, 0)
+            meta_compounds = component_map.get(phrase_char, {}).get("meta", {}).get("compounds", [])
+            relevant_compounds = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
+
+            if relevant_compounds:
+                db_conn = get_db_connection()
+                sorted_compounds = sorted(relevant_compounds)
+
+                if not db_conn:
+                    st.warning("⚠️ 'phrases.db' not found. Please upload it to your repository to see phrases.")
+                else:
+                    phrases_map = batch_get_phrase_details(sorted_compounds, db_conn)
+                    items_html = []
+                    for word in sorted_compounds:
+                        entry = phrases_map.get(word)
+                        pinyin = entry.get("pinyin", "") if entry else ""
+                        meanings = entry.get("meanings", "") if entry else ""
+                        display_meanings = html.escape(meanings[:100] + ("..." if len(meanings) > 100 else ""))
+
+                        if entry:
+                            items_html.append(
+                                f"<div class='compound-item'>"
+                                f"<span class='cp-word'>{word}</span>"
+                                f"<span class='cp-pinyin'>{pinyin}</span>"
+                                f"<span class='cp-mean'>{display_meanings}</span>"
+                                f"</div>"
+                            )
+                        else:
+                            items_html.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
+
+                    full_list_html = "".join(items_html)
+                    st.markdown(
+                        f"""
+                        <div style='padding:15px; background:#f1f8e9; border-radius:8px; 
+                             margin:10px auto; border:1px solid #dcedc8; max-width:900px; max-height:500px; overflow-y:auto;'>
+                          <div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; 
+                               border-bottom:2px solid #a5d6a7; padding-bottom:5px; text-align:center;'>
+                            {st.session_state.display_mode} containing {phrase_char}
+                          </div>
+                          {full_list_html}
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+            else:
+                st.info(f"No {st.session_state.display_mode} found for {phrase_char}.")
+            
+            st.markdown("---")
+
+        # Show character list (Single Character mode or alongside phrases)
         selected = st.session_state.selected_comp
         final_chars_list = []
         seen_chars = set()
