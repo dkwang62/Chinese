@@ -265,7 +265,22 @@ def apply_dynamic_css():
         line-height: 1.5;
         font-weight: 400 !important;
     }
-    
+        /* Sidebar specific card adjustments to prevent 'the mess' */
+    [data-testid="stSidebar"] .char-card {
+        padding: 12px !important;
+        margin-bottom: 10px !important;
+        border: 1px solid #ddd !important;
+    }
+
+    [data-testid="stSidebar"] .card-subject {
+        font-size: 2.8em !important;
+        margin-right: 0 !important;
+    }
+
+    [data-testid="stSidebar"] .def-row {
+        font-size: 1.1em !important;
+        line-height: 1.3 !important;
+    }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -1122,41 +1137,37 @@ def main():
         current_char_for_sidebar = None
 
         if st.session_state.stroke_view_active:
-            current_char_for_sidebar = st.session_state.stroke_view_char
+            current_char = st.session_state.stroke_view_char
             
-            # 1. Path/Map
+            # A. Navigation & Map
             path_items = ["🏠 Root"] + st.session_state.history + [st.session_state.selected_comp, "🖊️"]
-            st.markdown(f"<div style='font-size:0.9em; color:#555; margin-bottom:15px;'>{' &nbsp;→&nbsp; '.join(path_items)}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size:0.95em; color:#555; margin-bottom:15px; font-weight:400;'>{' &nbsp;→&nbsp; '.join(path_items)}</div>", unsafe_allow_html=True)
 
-            # 2. Controls
             c1, c2 = st.columns(2)
-            with c1: st.button("← Back", on_click=end_stroke_view, use_container_width=True)
-            with c2: st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+            with c1:
+                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+            with c2:
+                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
 
             st.markdown("---")
-            # 3. Compact Info Card for Sidebar
-            st.markdown(generate_clean_card_html(current_char_for_sidebar, is_sidebar=True), unsafe_allow_html=True)
-            st.markdown("---")
-            st.markdown("<h4 style='font-weight:400; color:#666;'>Current Character Info</h4>", unsafe_allow_html=True)
+            
+            # B. Display the MAIN character info card (sidebar mode)
+            # Use the compact sidebar layout we defined in generate_clean_card_html
+            st.markdown(generate_clean_card_html(current_char, is_sidebar=True), unsafe_allow_html=True)
 
-            # C. Render Info Card in Sidebar (Correctly formatted)
-            st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
+            # C. Determine and show the SELECTABLE counterpart
+            s_char = cc_t2s.convert(current_char) if cc_t2s else current_char
+            t_char = cc_s2t.convert(current_char) if cc_s2t else current_char
+            counterpart = t_char if current_char == s_char else s_char
 
-            s_char = cc_t2s.convert(current_char_for_sidebar) if cc_t2s else current_char_for_sidebar
-            t_char = cc_s2t.convert(current_char_for_sidebar) if cc_s2t else current_char_for_sidebar
-            counterpart = None
-            if current_char_for_sidebar == s_char and t_char != current_char_for_sidebar:
-                counterpart = t_char
-            elif current_char_for_sidebar == t_char and s_char != current_char_for_sidebar:
-                counterpart = s_char
-
-            if counterpart:
-                st.markdown("---")
-                st.markdown(
-                    f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px; color:#666;'>{counterpart}</div>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(generate_clean_card_html(counterpart), unsafe_allow_html=True)
+            if counterpart != current_char:
+                st.markdown("<div style='margin-top:20px; text-align:center;'>", unsafe_allow_html=True)
+                st.caption(f"Switch to {'Traditional' if counterpart == t_char else 'Simplified'} view:")
+                # Clickable button to switch the animation and info card to the other variant
+                if st.button(f"Draw {counterpart}", key="switch_stroke_variant", use_container_width=True):
+                    st.session_state.stroke_view_char = counterpart
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
         elif st.session_state.show_inputs:
             st.markdown("### Filters")
