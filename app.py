@@ -1315,156 +1315,58 @@ def main():
 
         current_char_for_sidebar = None
 
-        if st.session_state.stroke_view_active:
-            current_char_for_sidebar = st.session_state.stroke_view_char
-            c1, c2 = st.columns(2)
-            with c1:
-                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
-            with c2:
-                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+        # === COMMON SIDEBAR ELEMENTS FOR ALL DETAIL VIEWS ===
+        # This block handles breadcrumb + navigation for BOTH regular detail and stroke view
 
-            st.markdown("---")
-            st.markdown("### Character Info")
+        current_main_char = st.session_state.stroke_view_char if st.session_state.stroke_view_active else st.session_state.selected_comp
 
+        # Breadcrumb path — shown in ALL detail modes (including stroke view)
+        if current_main_char:
+            path_items = ["🏠 Root"] + st.session_state.history
+            if st.session_state.stroke_view_active:
+                path_items += [f"<i>{current_main_char}</i> (Stroke Order)"]
+            else:
+                path_items += [f"<b>{current_main_char}</b>"]
+            path_str = " → ".join(path_items)
             st.markdown(
-                f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>",
+                f"<div style='font-size:0.95em; margin:18px 0; color:#444; text-align:center; font-weight:500;'>{path_str}</div>",
                 unsafe_allow_html=True,
             )
-            st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
 
-            s_char = cc_t2s.convert(current_char_for_sidebar) if cc_t2s else current_char_for_sidebar
-            t_char = cc_s2t.convert(current_char_for_sidebar) if cc_s2t else current_char_for_sidebar
-            counterpart = None
-            if current_char_for_sidebar == s_char and t_char != current_char_for_sidebar:
-                counterpart = t_char
-            elif current_char_for_sidebar == t_char and s_char != current_char_for_sidebar:
-                counterpart = s_char
-
-            if counterpart:
-                st.markdown("---")
-                st.markdown(
-                    f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px; color:#666;'>{counterpart}</div>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(generate_clean_card_html(counterpart), unsafe_allow_html=True)
-
-        elif st.session_state.show_inputs:
-            st.markdown("### Filters")
-            st.checkbox(
-                "Show Components Only",
-                key="w_component_only",
-                value=st.session_state.component_only,
-                on_change=sync_component_only,
-            )
-
-            min_s, max_s = st.session_state.stroke_range
-            s_label = f"Strokes: {min_s} — {max_s}"
-            with st.expander(s_label, expanded=False):
-                st.slider(
-                    "Select Stroke Range",
-                    min_value=1,
-                    max_value=max_s_val,
-                    value=st.session_state.stroke_range,
-                    key="w_stroke_range",
-                    on_change=sync_stroke_range,
-                    label_visibility="collapsed",
-                )
-
-            r_label = f"Radical: {st.session_state.radical}" if st.session_state.radical != "none" else "Radical (Any)"
-            with st.expander(r_label, expanded=False):
-                for s in sorted(stats_cache["rad_groups"].keys()):
-                    st.markdown(f"<div class='stroke-header'>{s if s != 999 else '?'} Strokes</div>", unsafe_allow_html=True)
-                    rads = stats_cache["rad_groups"][s]
-                    cols = st.columns(5)
-                    for i, r in enumerate(rads):
-                        with cols[i % 5]:
-                            if st.button(r, key=f"rad_{r}", type="primary" if st.session_state.radical == r else "secondary"):
-                                st.session_state.radical = r
-                                st.session_state.page = 1
-                                st.rerun()
-
-            idc_label = (
-                f"Structure: {st.session_state.component_idc}"
-                if st.session_state.component_idc != "none"
-                else "Structure (Any)"
-            )
-            with st.expander(idc_label, expanded=False):
-                idc_keys = sorted(stats_cache["idc_counts"].keys())
-                idc_cols = st.columns(5)
-                for i, idc in enumerate(idc_keys):
-                    with idc_cols[i % 5]:
-                        if st.button(
-                            idc,
-                            key=f"idc_{idc}",
-                            type="primary" if st.session_state.component_idc == idc else "secondary",
-                            use_container_width=True,
-                        ):
-                            st.session_state.component_idc = idc
-                            st.session_state.page = 1
-                            st.rerun()
-
-            st.markdown("---")
-
-            if st.session_state.preview_comp:
-                current_char_for_sidebar = st.session_state.preview_comp
-                render_stroke_order_sidebar(current_char_for_sidebar, size=110)
-
-                is_fav = current_char_for_sidebar in st.session_state.favourites_list
-                st.checkbox(
-                    "Show in Favourites",
-                    value=is_fav,
-                    key=f"fav_chk_{current_char_for_sidebar}",
-                    on_change=toggle_favourite,
-                    args=(current_char_for_sidebar,),
-                )
-
-                if st.button(
-                    f"Explore {current_char_for_sidebar}",
-                    key="sb_select_btn",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    reset_script_filter_to_any()
-                    st.session_state.history = []
-                    st.session_state.selected_comp = current_char_for_sidebar
-                    st.session_state.last_valid_selected_comp = current_char_for_sidebar
-                    st.session_state.show_inputs = False
-                    st.session_state.preview_comp = None
-                    st.session_state.text_input_comp = current_char_for_sidebar
-                    st.session_state.display_mode = "Single Character"
-                    st.rerun()
-
-                related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
-                count = len(set([c for c in related if isinstance(c, str) and len(c) == 1]))
-                st.markdown(
-                    f"<div class='preview-count-line'>{count} characters contain <span class='char'>{current_char_for_sidebar}</span></div>",
-                    unsafe_allow_html=True,
-                )
-
-        else:
-            # DETAIL VIEW Sidebar
-            c1, c2 = st.columns(2)
-            with c1:
+        # Navigation buttons
+        nav_col1, nav_col2 = st.columns(2)
+        with nav_col1:
+            if st.session_state.stroke_view_active:
+                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+            else:
                 st.button("← Back", on_click=go_back, use_container_width=True)
-            with c2:
-                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+        with nav_col2:
+            st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
 
-            current_char_for_sidebar = (
-                st.session_state.preview_comp if st.session_state.preview_comp else st.session_state.selected_comp
+        st.markdown("---")
+
+        # Current character for display (preview or selected, or stroke view char)
+        current_char_for_sidebar = (
+            st.session_state.stroke_view_char if st.session_state.stroke_view_active
+            else (st.session_state.preview_comp or st.session_state.selected_comp)
+        )
+
+        if current_char_for_sidebar:
+            # Stroke order animation in sidebar
+            render_stroke_order_sidebar(current_char_for_sidebar, size=140 if not st.session_state.stroke_view_active else 110)
+
+            # Favourite checkbox
+            is_fav = current_char_for_sidebar in st.session_state.favourites_list
+            st.checkbox(
+                "Show in Favourites",
+                value=is_fav,
+                key=f"fav_chk_{current_char_for_sidebar}",
+                on_change=toggle_favourite,
+                args=(current_char_for_sidebar,),
             )
 
-            if current_char_for_sidebar:
-                render_stroke_order_sidebar(current_char_for_sidebar, size=140)
-
-                is_fav = current_char_for_sidebar in st.session_state.favourites_list
-                st.checkbox(
-                    "Show in Favourites",
-                    value=is_fav,
-                    key=f"fav_chk_{current_char_for_sidebar}",
-                    on_change=toggle_favourite,
-                    args=(current_char_for_sidebar,),
-                )
-
+            # Script filter (only in regular detail view, not stroke view)
+            if not st.session_state.stroke_view_active:
                 st.radio(
                     "Filter Results",
                     options=SCRIPT_FILTERS,
@@ -1483,7 +1385,30 @@ def main():
                     f"<div class='preview-count-line'>{count_filtered} characters contain <span class='char'>{current_char_for_sidebar}</span></div>",
                     unsafe_allow_html=True,
                 )
+            else:
+                # In stroke view: show character info cards (simplified/traditional)
+                st.markdown("### Character Info")
+                st.markdown(
+                    f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
 
+                s_char = cc_t2s.convert(current_char_for_sidebar) if cc_t2s else current_char_for_sidebar
+                t_char = cc_s2t.convert(current_char_for_sidebar) if cc_s2t else current_char_for_sidebar
+                counterpart = None
+                if current_char_for_sidebar == s_char and t_char != current_char_for_sidebar:
+                    counterpart = t_char
+                elif current_char_for_sidebar == t_char and s_char != current_char_for_sidebar:
+                    counterpart = s_char
+
+                if counterpart:
+                    st.markdown("---")
+                    st.markdown(
+                        f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px; color:#666;'>{counterpart}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(generate_clean_card_html(counterpart), unsafe_allow_html=True)
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
         st.stop()
@@ -1586,17 +1511,12 @@ def main():
         # DETAIL LIST VIEW
         st.session_state.display_mode = "Single Character"
 
-        path_items = ["🏠 Root"] + st.session_state.history + [f"<b>{st.session_state.selected_comp}</b>"]
-        path_str = " &nbsp;→&nbsp; ".join(path_items)
-
         st.markdown(
-            f"""
+            """
             <div class='status-line'>
-                <div style='margin-bottom:8px;'>
-                    <span class='status-tag'>Location</span> 
-                    <span class='map-path'>{path_str}</span>
+                <div class='status-text' style='font-size:0.85em; color:#666;'>
+                    Single-click previews · Double-click explores
                 </div>
-                <div class='status-text' style='font-size:0.85em; color:#666;'>Single-click previews. Double-click explores.</div>
             </div>
             """,
             unsafe_allow_html=True,
