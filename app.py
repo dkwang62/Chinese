@@ -1418,8 +1418,9 @@ def main():
                     f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>",
                     unsafe_allow_html=True,
                 )
+                # ← FIXED: Added unsafe_allow_html=True
                 st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
-
+                
                 s_char = cc_t2s.convert(current_char_for_sidebar) if cc_t2s else current_char_for_sidebar
                 t_char = cc_s2t.convert(current_char_for_sidebar) if cc_s2t else current_char_for_sidebar
                 counterpart = None
@@ -1427,13 +1428,14 @@ def main():
                     counterpart = t_char
                 elif current_char_for_sidebar == t_char and s_char != current_char_for_sidebar:
                     counterpart = s_char
-
+                
                 if counterpart:
                     st.markdown("---")
                     st.markdown(
                         f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px; color:#666;'>{counterpart}</div>",
                         unsafe_allow_html=True,
                     )
+                    # ← FIXED: Added unsafe_allow_html=True
                     st.markdown(generate_clean_card_html(counterpart), unsafe_allow_html=True)
 
     if st.session_state.stroke_view_active:
