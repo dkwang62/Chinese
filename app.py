@@ -917,10 +917,10 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
 
     return f"""
     <div class="char-card">
-        <!-- Large Character + Big Pinyin Overlay -->
+    <!-- Large Character + Pinyin (Balanced Size) -->
         <div style="
             position: relative;
-            height: 180px;
+            height: 140px;                  /* Reduced from 180px */
             background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
             border-radius: 16px;
             margin-bottom: 20px;
@@ -931,7 +931,7 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
             overflow: hidden;
         ">
             <div style="
-                font-size: 9.5em;
+                font-size: 6.8em;           /* Reduced from 9.5em → comfortable large */
                 font-weight: 900;
                 color: #1a1a1a;
                 opacity: 0.96;
@@ -940,15 +940,15 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
             
             <div style="
                 position: absolute;
-                top: 12px;
+                top: 10px;
                 left: 0;
                 right: 0;
                 text-align: center;
-                font-size: 2.1em;
+                font-size: 1.8em;           /* Reduced from 2.1em → clear but not overwhelming */
                 font-weight: 700;
                 color: #d35400;
-                text-shadow: 0 2px 6px rgba(211,84,0,0.2);
-                letter-spacing: 1px;
+                text-shadow: 0 2px 5px rgba(211,84,0,0.2);
+                letter-spacing: 1.5px;
             ">{html.escape(pinyin)}</div>
         </div>
 
