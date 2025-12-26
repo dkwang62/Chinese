@@ -1346,7 +1346,7 @@ def main():
 
                 # Component only checkbox
                 st.checkbox(
-                    "Show only used components",
+                    "Components only",
                     value=st.session_state.component_only,
                     key="w_component_only",
                     on_change=sync_component_only
