@@ -239,19 +239,6 @@ def apply_dynamic_css():
         align-items: center !important;
         justify-content: center !important;
     }
-    /* Detail List View Buttons - Now smaller since big char is in card */
-    .char-btn-wrap .stButton > button {
-        width: 100% !important;
-        font-size: 3.2em !important;   /* Reduced from huge */
-        font-weight: 700 !important;
-        background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%) !important;
-        border: 3px solid #dee2e6 !important;
-        padding: 10px !important;
-        min-height: 90px !important;
-        border-radius: 16px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
-        transition: all 0.25s ease !important;
-    }
     
     /* Pen Button - Slightly larger */
     .pen-btn-wrap .stButton > button {
@@ -915,14 +902,14 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
     # Safe etymology HTML
     etymology_html = f'<div class="ety-row">{etymology}</div>' if etymology else ""
 
-    # Large character + pinyin header (balanced size, no indentation issues)
+    # Large character + pinyin header — perfectly sized and aligned
     large_header = f"""
-    <!-- Large Character + Pinyin (Balanced Size) -->
-    <div style="position: relative; height: 140px; background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%); border-radius: 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.08); overflow: hidden;">
-        <div style="font-size: 6.8em; font-weight: 900; color: #1a1a1a; opacity: 0.96; line-height: 1;">
+    <!-- Large Character + Pinyin -->
+    <div style="position:relative; height:150px; background:linear-gradient(135deg,#f8fbff 0%,#eef4ff 100%); border-radius:16px; margin-bottom:20px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 15px rgba(0,0,0,0.08); overflow:hidden;">
+        <div style="font-size:7.2em; font-weight:900; color:#1a1a1a; line-height:1;">
             {html.escape(c)}
         </div>
-        <div style="position: absolute; top: 10px; left: 0; right: 0; text-align: center; font-size: 1.8em; font-weight: 700; color: #d35400; text-shadow: 0 2px 5px rgba(211,84,0,0.2); letter-spacing: 1.5px;">
+        <div style="position:absolute; top:12px; left:0; right:0; text-align:center; font-size:1.9em; font-weight:700; color:#d35400; text-shadow:0 2px 4px rgba(211,84,0,0.2); letter-spacing:1.5px;">
             {html.escape(pinyin)}
         </div>
     </div>
