@@ -1312,54 +1312,53 @@ def main():
 
         st.text_input("Shortcut: Paste/Type characters", key="sb_search", on_change=sync_sidebar_text)
 
-        # === RESTORED FILTERS SECTION ===
-        st.markdown("---")
-        st.markdown("### Filters")
-        
-        # Stroke range slider
-        st.slider(
-            "Stroke count",
-            min_value=1,
-            max_value=max_s_val,
-            value=st.session_state.stroke_range,
-            key="w_stroke_range",
-            on_change=sync_stroke_range
-        )
+        # === FILTERS: Only show in grid/root view ===
+        if st.session_state.show_inputs:
+            st.markdown("---")
+            with st.expander("🔍 Filters", expanded=False):
+                # Stroke range slider
+                st.slider(
+                    "Stroke count",
+                    min_value=1,
+                    max_value=max_s_val,
+                    value=st.session_state.stroke_range,
+                    key="w_stroke_range",
+                    on_change=sync_stroke_range
+                )
 
-        # Radical filter
-        all_radicals = sorted(set(
-            info.get("meta", {}).get("radical")
-            for info in component_map.values()
-            if info.get("meta", {}).get("radical")
-        ))
-        radical_options = ["none"] + all_radicals
-        st.selectbox(
-            "Radical",
-            options=radical_options,
-            index=radical_options.index(st.session_state.radical) if st.session_state.radical in radical_options else 0,
-            key="w_radical",
-            on_change=sync_radical
-        )
+                # Radical filter
+                all_radicals = sorted(set(
+                    info.get("meta", {}).get("radical")
+                    for info in component_map.values()
+                    if info.get("meta", {}).get("radical")
+                ))
+                radical_options = ["none"] + all_radicals
+                st.selectbox(
+                    "Radical",
+                    options=radical_options,
+                    index=radical_options.index(st.session_state.radical) if st.session_state.radical in radical_options else 0,
+                    key="w_radical",
+                    on_change=sync_radical
+                )
 
-        # IDC structure filter
-        idc_options = ["none"] + sorted(stats_cache.get("idc_counts", {}).keys())
-        st.selectbox(
-            "Structure (IDC)",
-            options=idc_options,
-            index=idc_options.index(st.session_state.component_idc) if st.session_state.component_idc in idc_options else 0,
-            key="w_idc",
-            on_change=sync_idc
-        )
+                # IDC structure filter
+                idc_options = ["none"] + sorted(stats_cache.get("idc_counts", {}).keys())
+                st.selectbox(
+                    "Structure (IDC)",
+                    options=idc_options,
+                    index=idc_options.index(st.session_state.component_idc) if st.session_state.component_idc in idc_options else 0,
+                    key="w_idc",
+                    on_change=sync_idc
+                )
 
-        # Component only checkbox
-        st.checkbox(
-            "Show only used components",
-            value=st.session_state.component_only,
-            key="w_component_only",
-            on_change=sync_component_only
-        )
-
-        st.markdown("---")
+                # Component only checkbox
+                st.checkbox(
+                    "Show only used components",
+                    value=st.session_state.component_only,
+                    key="w_component_only",
+                    on_change=sync_component_only
+                )
+            st.markdown("---")
 
         current_char_for_sidebar = None
 
