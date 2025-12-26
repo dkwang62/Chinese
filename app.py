@@ -873,31 +873,31 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
     info = component_map.get(c, {})
     meta = info.get("meta", {})
     
-    # Pinyin - safe extraction
+    # Pinyin - safe
     pinyin_list = meta.get("pinyin")
     if pinyin_list and isinstance(pinyin_list, list) and len(pinyin_list) > 0:
         pinyin = pinyin_list[0]
     else:
         pinyin = "?"
-
-    # Definition
+    
+    # Definition - safe
     definition = meta.get("definition")
     if not definition:
         definition = "No definition available."
-
-    # Etymology - THE CRITICAL SAFE HANDLING
+    
+    # Etymology - safe
     etymology_raw = meta.get("etymology")
     etymology = ""
     if etymology_raw and isinstance(etymology_raw, str):
-        etymology = etymology_raw.strip()
-        if etymology:  # Only escape if there's actual content
-            etymology = html.escape(etymology)
-
+        cleaned = etymology_raw.strip()
+        if cleaned:
+            etymology = html.escape(cleaned)
+    
     # Strokes and radical
     strokes = info.get("stroke_count")
     radical = meta.get("radical", "")
 
-    # Script tag (Simplified/Traditional)
+    # Simplified/Traditional tag
     script_tag = ""
     if cc_t2s and cc_s2t:
         try:
@@ -912,45 +912,25 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
 
     usage_text = f"Used in {usage_count} chars" if usage_count is not None else ""
 
-    # Build etymology HTML only if we have content
+    # Safe etymology HTML
     etymology_html = f'<div class="ety-row">{etymology}</div>' if etymology else ""
+
+    # Large character + pinyin header (balanced size, no indentation issues)
+    large_header = f"""
+    <!-- Large Character + Pinyin (Balanced Size) -->
+    <div style="position: relative; height: 140px; background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%); border-radius: 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.08); overflow: hidden;">
+        <div style="font-size: 6.8em; font-weight: 900; color: #1a1a1a; opacity: 0.96; line-height: 1;">
+            {html.escape(c)}
+        </div>
+        <div style="position: absolute; top: 10px; left: 0; right: 0; text-align: center; font-size: 1.8em; font-weight: 700; color: #d35400; text-shadow: 0 2px 5px rgba(211,84,0,0.2); letter-spacing: 1.5px;">
+            {html.escape(pinyin)}
+        </div>
+    </div>
+    """.strip()
 
     return f"""
     <div class="char-card">
-    <!-- Large Character + Pinyin (Balanced Size) -->
-        <div style="
-            position: relative;
-            height: 140px;                  /* Reduced from 180px */
-            background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
-            border-radius: 16px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            overflow: hidden;
-        ">
-            <div style="
-                font-size: 6.8em;           /* Reduced from 9.5em → comfortable large */
-                font-weight: 900;
-                color: #1a1a1a;
-                opacity: 0.96;
-                line-height: 1;
-            ">{html.escape(c)}</div>
-            
-            <div style="
-                position: absolute;
-                top: 10px;
-                left: 0;
-                right: 0;
-                text-align: center;
-                font-size: 1.8em;           /* Reduced from 2.1em → clear but not overwhelming */
-                font-weight: 700;
-                color: #d35400;
-                text-shadow: 0 2px 5px rgba(211,84,0,0.2);
-                letter-spacing: 1.5px;
-            ">{html.escape(pinyin)}</div>
-        </div>
+        {large_header}
 
         <!-- Meta tags -->
         <div class="meta-row">
@@ -965,10 +945,10 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
             {html.escape(definition)}
         </div>
 
-        <!-- Etymology (safe) -->
+        <!-- Etymology -->
         {etymology_html}
     </div>
-    """
+    """.strip()
 
 def render_stroke_order_sidebar(char: str, size: int = 110):
     char = (char or "").strip()[:1]
