@@ -222,24 +222,28 @@ def apply_dynamic_css():
         box-shadow: 0 6px 16px rgba(192, 57, 43, 0.15) !important;
     }
     
-    /* Detail List View Buttons - STRETCH */
+    /* Detail List View Buttons - BIGGER for better readability */
     .char-btn-wrap .stButton > button {
         width: 100% !important;
-        font-size: 3.8em !important;
-        font-weight: 700 !important;
+        font-size: 5.2em !important;  /* Increased from 3.8em → much larger */
+        font-weight: 800 !important;
         background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%) !important;
         border: 3px solid #dee2e6 !important;
         padding: 10px !important;
-        min-height: 90px !important;
-        border-radius: 16px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        min-height: 120px !important;  /* Taller button to accommodate bigger text */
+        border-radius: 18px !important;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.1) !important;
         transition: all 0.25s ease !important;
+        line-height: 1.1 !important;   /* Better vertical centering */
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
     .char-btn-wrap .stButton > button:hover {
         background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
         border-color: #3b82f6 !important;
-        transform: scale(1.02) !important;
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.2) !important;
+        transform: scale(1.03) !important;
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.25) !important;
     }
     
     /* Pen Button - STRETCH */
