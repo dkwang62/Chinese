@@ -860,14 +860,11 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
     info = component_map.get(c, {})
     meta = info.get("meta", {})
     
-    # Pinyin
     pinyin_list = meta.get("pinyin")
     pinyin = pinyin_list[0] if pinyin_list and isinstance(pinyin_list, list) and len(pinyin_list) > 0 else "?"
     
-    # Definition
     definition = meta.get("definition") or "No definition available."
     
-    # Etymology
     etymology_raw = meta.get("etymology")
     etymology = ""
     if etymology_raw and isinstance(etymology_raw, str):
@@ -878,7 +875,6 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
     strokes = info.get("stroke_count")
     radical = meta.get("radical", "")
 
-    # Script tag
     script_tag = ""
     if cc_t2s and cc_s2t:
         try:
@@ -920,7 +916,7 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
         {etymology_html}
     </div>
     """.strip()
-
+    
 def render_stroke_order_sidebar(char: str, size: int = 110):
     char = (char or "").strip()[:1]
     if not char:
