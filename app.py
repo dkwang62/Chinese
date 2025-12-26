@@ -867,22 +867,27 @@ def render_copy_to_clipboard(prompt_text: str, widget_id: str):
         height=90,
     )
 
-
 def generate_clean_card_html(c: str, usage_count: int | None = None):
     info = component_map.get(c, {})
     meta = info.get("meta", {})
-    pinyin = meta.get("pinyin", ["?"])[0] if meta.get("pinyin") else "?"
-    definition = meta.get("definition", "No definition available.")
-    etymology = meta.get("etymology", "")  # Default to empty string, not None
     
-    # Ensure etymology is always a string
-    if etymology is None:
+    # Safely extract values with defaults
+    pinyin_list = meta.get("pinyin") or ["?"]
+    pinyin = pinyin_list[0] if pinyin_list else "?"
+    
+    definition = meta.get("definition") or "No definition available."
+    if definition is None:
+        definition = "No definition available."
+    
+    etymology = meta.get("etymology")
+    if not etymology:  # Covers None, "", [], etc.
         etymology = ""
-
+    # Now etymology is guaranteed to be a non-None string
+    
     strokes = info.get("stroke_count")
     radical = meta.get("radical", "")
 
-    # Handle traditional/simplified tag
+    # Script tag
     script_tag = ""
     if cc_t2s and cc_s2t:
         s = cc_t2s.convert(c)
@@ -894,9 +899,12 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
 
     usage_text = f"Used in {usage_count} chars" if usage_count is not None else ""
 
+    # Build etymology part safely — only escape if there's content
+    etymology_html = f'<div class="ety-row">{html.escape(etymology)}</div>' if etymology.strip() else ""
+
     return f"""
     <div class="char-card">
-        <!-- Large Character + Big Pinyin Overlay -->
+        <!-- Large Character + Big Pinyin -->
         <div style="
             position: relative;
             height: 180px;
@@ -944,8 +952,8 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
             {html.escape(definition)}
         </div>
 
-        <!-- Etymology - now safe because etymology is guaranteed to be str -->
-        {f'<div class="ety-row">{html.escape(etymology)}</div>' if etymology else ''}
+        <!-- Etymology - safe -->
+        {etymology_html}
     </div>
     """
 
