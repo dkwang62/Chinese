@@ -239,11 +239,18 @@ def apply_dynamic_css():
         align-items: center !important;
         justify-content: center !important;
     }
-    .char-btn-wrap .stButton > button:hover {
-        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
-        border-color: #3b82f6 !important;
-        transform: scale(1.03) !important;
-        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.25) !important;
+    /* Detail List View Buttons - Now smaller since big char is in card */
+    .char-btn-wrap .stButton > button {
+        width: 100% !important;
+        font-size: 3.2em !important;   /* Reduced from huge */
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%) !important;
+        border: 3px solid #dee2e6 !important;
+        padding: 10px !important;
+        min-height: 90px !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        transition: all 0.25s ease !important;
     }
     
     /* Pen Button - Slightly larger */
@@ -861,44 +868,81 @@ def render_copy_to_clipboard(prompt_text: str, widget_id: str):
     )
 
 
-def generate_clean_card_html(c, usage_count=None):
-    if not c:
-        return ""
+def generate_clean_card_html(c: str, usage_count: int | None = None):
     info = component_map.get(c, {})
     meta = info.get("meta", {})
-    pinyin = clean_field(meta.get("pinyin", ""))
-    strokes = info.get('stroke_count')
-    radical = clean_field(meta.get("radical", ""))
-    decomp = format_decomposition(c)
-    definition = clean_field(meta.get("definition", ""))
-    etymology = get_etymology_text(meta)
+    pinyin = meta.get("pinyin", ["?"])[0] if meta.get("pinyin") else "?"
+    definition = meta.get("definition", "No definition available.")
+    etymology = meta.get("etymology", "")
+    strokes = info.get("stroke_count")
+    radical = meta.get("radical", "")
 
-    meta_items = []
-    if pinyin and pinyin != "—":
-        meta_items.append(f"<span class='meta-pinyin'>{pinyin}</span>")
-    if strokes:
-        meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
-    if radical and radical != "—":
-        meta_items.append(f"<span class='meta-tag'>Rad. {radical}</span>")
-    if decomp and decomp != "—":
-        meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
-    if usage_count is not None and usage_count > 0:
-        meta_items.append(f"<span class='meta-tag'>Used in {usage_count} chars</span>")
+    # Handle traditional/simplified tag
+    script_tag = ""
+    if cc_t2s and cc_s2t:
+        s = cc_t2s.convert(c)
+        t = cc_s2t.convert(c)
+        if c == s and t != c:
+            script_tag = "<span class='meta-tag meta-tag-simp'>Simplified</span>"
+        elif c == t and s != c:
+            script_tag = "<span class='meta-tag meta-tag-trad'>Traditional</span>"
 
-    if cc_t2s:
-        simplified = cc_t2s.convert(c)
-        if simplified != c:
-            meta_items.append(f"<span class='meta-tag meta-tag-trad'>Trad. → {simplified}</span>")
-    if cc_s2t:
-        traditional = cc_s2t.convert(c)
-        if traditional != c:
-            meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. → {traditional}</span>")
+    usage_text = f"Used in {usage_count} chars" if usage_count is not None else ""
 
-    meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
-    def_html = f"<div class='def-row'>{definition}</div>" if definition and definition != "—" else ""
-    ety_html = f"<div class='ety-row'>{etymology}</div>" if etymology else ""
-    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}</div>"
+    return f"""
+    <div class="char-card">
+        <!-- Large Character + Big Pinyin Overlay -->
+        <div style="
+            position: relative;
+            height: 180px;
+            background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            overflow: hidden;
+        ">
+            <div style="
+                font-size: 9.5em;
+                font-weight: 900;
+                color: #1a1a1a;
+                opacity: 0.96;
+                line-height: 1;
+            ">{html.escape(c)}</div>
+            
+            <div style="
+                position: absolute;
+                top: 12px;
+                left: 0;
+                right: 0;
+                text-align: center;
+                font-size: 2.1em;
+                font-weight: 700;
+                color: #d35400;
+                text-shadow: 0 2px 6px rgba(211,84,0,0.2);
+                letter-spacing: 1px;
+            ">{html.escape(pinyin)}</div>
+        </div>
 
+        <!-- Meta tags -->
+        <div class="meta-row">
+            {script_tag}
+            {f'<span class="meta-tag">Rad. {html.escape(radical)}</span>' if radical else ''}
+            {f'<span class="meta-tag">{strokes} strokes</span>' if strokes else ''}
+            {f'<span class="meta-tag">{usage_text}</span>' if usage_text else ''}
+        </div>
+
+        <!-- Definition -->
+        <div class="def-row">
+            {html.escape(definition)}
+        </div>
+
+        <!-- Etymology -->
+        {f'<div class="ety-row">{html.escape(etymology)}</div>' if etymology else ''}
+    </div>
+    """
 
 def render_stroke_order_sidebar(char: str, size: int = 110):
     char = (char or "").strip()[:1]
