@@ -25,7 +25,6 @@ st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 IDC_CHARS = {"⿰", "⿱", "⿲", "⿳", "⿴", "⿵", "⿶", "⿷", "⿸", "⿹", "⿺", "⿻"}
 SCRIPT_FILTERS = ["Any", "Simplified", "Traditional"]
 
-
 # --- MEMORY-OPTIMIZED DATA PIPELINE WITH ZIPF ---
 def zipf_commonness_raw(ch: str) -> float:
     if not ch or ZIPF is None:
@@ -43,7 +42,6 @@ def zipf_commonness_raw(ch: str) -> float:
             except: pass
     return z
 
-
 @st.cache_resource
 def get_zipf_frequency():
     try:
@@ -52,9 +50,7 @@ def get_zipf_frequency():
     except Exception:
         return None
 
-
 ZIPF = get_zipf_frequency()
-
 
 @st.cache_resource
 def load_and_augment_map():
@@ -64,18 +60,14 @@ def load_and_augment_map():
     except FileNotFoundError:
         return {}
 
-    # Augment in-place to minimize memory footprint
     for char, info in data.items():
         meta = info.get("meta", {})
         
-        # Pre-calculate usage count
         rel = info.get("related_characters", [])
         info['usage_count'] = len({c for c in rel if isinstance(c, str) and len(c) == 1})
         
-        # Pre-calculate Zipf value
         info['zipf_val'] = zipf_commonness_raw(char)
         
-        # Clean stroke count
         s = meta.get("strokes")
         try:
             if isinstance(s, (int, float)) and s > 0:
@@ -89,7 +81,6 @@ def load_and_augment_map():
     
     gc.collect()
     return data
-
 
 @st.cache_resource
 def get_component_stats(_component_map):
@@ -122,11 +113,9 @@ def get_component_stats(_component_map):
         "used_components": used_comps
     }
 
-
 # --- Load Data ---
 component_map = load_and_augment_map()
 stats_cache = get_component_stats(component_map) if component_map else {}
-
 
 def apply_dynamic_css():
     css = """
@@ -157,12 +146,6 @@ def apply_dynamic_css():
         align-items: center;
         flex-wrap: wrap;
         gap: 12px;
-    }
-    .meta-pinyin {
-        font-weight: 700;
-        font-size: 2.4em;
-        color: #d35400;
-        text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1);
     }
     .meta-tag {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -200,7 +183,7 @@ def apply_dynamic_css():
         line-height: 1.5;
     }
     
-    /* Grid Buttons - STRETCH with better styling */
+    /* Grid Buttons */
     .comp-grid .stButton > button {
         width: 100% !important;
         font-size: 2.2em !important;
@@ -214,55 +197,41 @@ def apply_dynamic_css():
         font-weight: 600 !important;
         transition: all 0.2s ease !important;
     }
-    .comp-grid .stButton > button:hover {
-        background: linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%) !important;
-        border-color: #f2c6c6 !important;
-        color: #c0392b !important;
-        transform: translateY(-3px) !important;
-        box-shadow: 0 6px 16px rgba(192, 57, 43, 0.15) !important;
-    }
     
-    /* Detail List View Buttons - BIGGER for better readability */
+    /* Detail List View Buttons - Large */
     .char-btn-wrap .stButton > button {
         width: 100% !important;
-        font-size: 5.2em !important;  /* Increased from 3.8em → much larger */
+        font-size: 5.2em !important;
         font-weight: 800 !important;
         background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%) !important;
         border: 3px solid #dee2e6 !important;
         padding: 10px !important;
-        min-height: 120px !important;  /* Taller button to accommodate bigger text */
+        min-height: 120px !important;
         border-radius: 18px !important;
         box-shadow: 0 6px 16px rgba(0,0,0,0.1) !important;
         transition: all 0.25s ease !important;
-        line-height: 1.1 !important;   /* Better vertical centering */
+        line-height: 1.1 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
     }
     
-    /* Pen Button - Slightly larger */
+    /* Pen Button */
     .pen-btn-wrap .stButton > button {
         width: 100% !important;
-        font-size: 1.9em !important;  /* Bigger pen icon */
+        font-size: 1.9em !important;
         border: 2px solid #dee2e6 !important;
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
         margin-top: 8px !important;
-        height: 52px !important;  /* Taller */
+        height: 52px !important;
         line-height: 1 !important;
         color: #555 !important;
         font-weight: 600 !important;
         border-radius: 14px !important;
         transition: all 0.2s ease !important;
     }
-    .pen-btn-wrap .stButton > button:hover {
-        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
-        border-color: #64b5f6 !important;
-        color: #1565c0 !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(100, 181, 246, 0.2) !important;
-    }
-
-    /* Static Cards */
+    
+    /* Static Box */
     .char-static-box {
         font-size: 3.8em;
         font-weight: 700;
@@ -279,7 +248,7 @@ def apply_dynamic_css():
         cursor: default;
         box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
-
+    
     /* Status Line */
     .status-line {
         font-size: 1.1em;
@@ -292,26 +261,7 @@ def apply_dynamic_css():
         margin: 20px 0 30px 0;
         box-shadow: 0 3px 10px rgba(15, 81, 50, 0.08);
     }
-    .status-tag {
-        background: linear-gradient(135deg, #ffffff 0%, #f1f3f5 100%);
-        color: #2c3e50;
-        padding: 6px 14px;
-        border-radius: 8px;
-        font-weight: 700;
-        font-size: 0.9em;
-        border: 2px solid #dee2e6;
-        display: inline-flex;
-        align-items: center;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-    }
-    .map-path {
-        font-family: 'Monaco', 'Menlo', monospace;
-        color: #155724;
-        margin-left: 10px;
-        font-weight: 600;
-    }
     
-    /* Count Lines */
     .preview-count-line {
         font-size: 1.4em;
         text-align: center;
@@ -319,149 +269,12 @@ def apply_dynamic_css():
         margin: 25px 0 30px 0;
         font-weight: 600;
     }
-    .preview-count-line .char {
-        font-size: 1.5em;
-        font-weight: 800;
-        color: #e74c3c;
-        text-shadow: 0 2px 4px rgba(231, 76, 60, 0.1);
-    }
-    
-    /* Footer */
-    .jump-footer {
-        margin-top: 50px;
-        padding: 25px;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-top: 3px solid #dee2e6;
-        border-radius: 12px;
-        text-align: center;
-        box-shadow: 0 -3px 10px rgba(0,0,0,0.04);
-    }
-    
-    /* Expander Buttons - STRETCH */
-    div[data-testid="stExpander"] .stButton > button {
-        width: 100% !important;
-        font-size: 1.3rem !important;
-        height: 45px !important;
-        padding: 0 !important;
-        line-height: 1.2 !important;
-        border-radius: 10px !important;
-        border: 2px solid #dee2e6 !important;
-        transition: all 0.2s ease !important;
-        font-weight: 600 !important;
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
-    }
-    div[data-testid="stExpander"] .stButton > button:hover {
-        border-color: #adb5bd !important;
-        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-    }
-    
-    .stroke-header {
-        font-size: 0.9em;
-        color: #6c757d;
-        border-bottom: 2px solid #dee2e6;
-        margin: 15px 0 8px 0;
-        padding-bottom: 4px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    /* Compound Lists */
-    .compound-item {
-        display: flex;
-        align-items: baseline;
-        margin-bottom: 10px;
-        padding: 12px;
-        padding-bottom: 12px;
-        border-bottom: 2px solid #e9ecef;
-        border-radius: 8px;
-        background: #ffffff;
-        transition: all 0.2s ease;
-    }
-    .compound-item:hover {
-        background: #f8f9fa;
-        transform: translateX(4px);
-    }
-    .compound-item:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
-    }
-    .cp-word {
-        font-weight: 700;
-        font-size: 1.2em;
-        color: #2c3e50;
-        min-width: 85px;
-        margin-right: 15px;
-    }
-    .cp-pinyin {
-        color: #d35400;
-        font-family: 'Monaco', 'Menlo', monospace;
-        margin-right: 15px;
-        font-weight: 600;
-        font-size: 1.5em;
-    }
-    .cp-mean {
-        color: #495057;
-        font-size: 1em;
-        flex: 1;
-        line-height: 1.5;
-    }
-    
-    /* Splash Screen */
-    .splash-wrap {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 40px 20px 20px 20px;
-    }
-    .splash-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        border: 2px solid #dee2e6;
-        border-radius: 24px;
-        padding: 40px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-    }
-    .splash-title {
-        font-size: 2.6em;
-        font-weight: 900;
-        line-height: 1.2;
-        color: #111;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    .splash-sub {
-        margin-top: 15px;
-        font-size: 1.2em;
-        color: #495057;
-        line-height: 1.6;
-    }
-    .splash-demo {
-        margin-top: 25px;
-        padding: 18px 20px;
-        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
-        border: 2px solid #ffd54f;
-        border-radius: 16px;
-        box-shadow: 0 3px 10px rgba(255, 193, 7, 0.1);
-    }
-    .splash-demo-h {
-        font-weight: 800;
-        color: #856404;
-        margin-bottom: 10px;
-        font-size: 1.1em;
-    }
-    
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
 def render_ipad_safe_download(data_str, filename, label):
-    """
-    Triggers a background download on iPadOS. 
-    Prevents Safari from navigating away to a 'dead-end' preview screen.
-    """
     b64 = base64.b64encode(data_str.encode()).decode()
-    # Using 'application/octet-stream' forces the browser to download 
-    # rather than attempt to 'open' or 'preview' the JSON.
     href = f'data:application/octet-stream;base64,{b64}'
     
     html_button = f"""
@@ -480,17 +293,9 @@ def render_ipad_safe_download(data_str, filename, label):
             {label}
         </a>
     </div>
-    <script>
-        // Optional: Provide visual feedback that the download started
-        const link = document.querySelector('a[download="{filename}"]');
-        link.addEventListener('click', () => {{
-            console.log('Download triggered');
-        }});
-    </script>
     """
     st.markdown(html_button, unsafe_allow_html=True)
 
-# --- Database ---
 @st.cache_resource
 def get_db_connection():
     try:
@@ -499,9 +304,7 @@ def get_db_connection():
     except Exception:
         return None
 
-
 def batch_get_phrase_details(words, conn):
-    """Fetches details for a list of words in a SINGLE query."""
     if not conn or not words:
         return {}
     try:
@@ -514,18 +317,13 @@ def batch_get_phrase_details(words, conn):
     except Exception:
         return {}
 
-
-# --- Optimized Helpers ---
 def get_stroke_count(char):
     return component_map.get(char, {}).get("stroke_count")
-
 
 def component_usage_count(comp: str) -> int:
     return component_map.get(comp, {}).get("usage_count", 0)
 
-
 def sort_key_usage_then_zipf(ch: str):
-    """Smart sorting: high-usage components by frequency, low-usage by language commonness"""
     info = component_map.get(ch, {})
     use = info.get('usage_count', 0)
     z = info.get('zipf_val', float("-inf"))
@@ -535,7 +333,6 @@ def sort_key_usage_then_zipf(ch: str):
         return (group, -use, -z, strokes, ch)
     return (group, -z, strokes, ch)
 
-
 def apply_script_filter(chars: list[str]) -> list[str]:
     f = st.session_state.get("script_filter", "Any")
     if f == "Any":
@@ -544,27 +341,12 @@ def apply_script_filter(chars: list[str]) -> list[str]:
         return [c for c in chars if not cc_t2s or cc_t2s.convert(c) == c]
     return [c for c in chars if not cc_s2t or cc_s2t.convert(c) == c]
 
-
 def clean_field(field):
     return field[0] if isinstance(field, list) and field else field or "—"
-
-
-def get_etymology_text(meta):
-    etymology = meta.get("etymology", {})
-    hint = clean_field(etymology.get("hint", ""))
-    if not hint or hint.lower() == "no hint":
-        hint = ""
-    details = clean_field(etymology.get("details", ""))
-    if details == "—":
-        details = ""
-    parts = [p for p in [hint, details] if p]
-    return "; ".join(parts) if parts else None
-
 
 def format_decomposition(char):
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     return "—" if not d or "?" in d else d
-
 
 def normalize_single_hanzi(raw: str) -> str:
     if not raw:
@@ -573,9 +355,7 @@ def normalize_single_hanzi(raw: str) -> str:
     chars = [ch for ch in s.strip() if not ch.isspace() and unicodedata.category(ch) != "Cf"]
     return chars[0] if len(chars) == 1 else ""
 
-
 def resolve_to_known_variant(ch: str) -> str:
-    """Try to find a known variant (simplified/traditional) if the exact char isn't in the map"""
     if not ch:
         return ""
     if ch in component_map:
@@ -590,11 +370,9 @@ def resolve_to_known_variant(ch: str) -> str:
             return s
     return ""
 
-
 def reset_script_filter_to_any():
     st.session_state.script_filter = "Any"
     st.session_state.pop("w_script_filter", None)
-
 
 # --- Session State ---
 defaults = {
@@ -618,12 +396,10 @@ defaults = {
     "fav_cursor": 0,
     "history": [],
 }
-
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# Load favourites
 if not st.session_state.favourites_list:
     try:
         with open("favourites.json", "r", encoding="utf-8") as f:
@@ -634,26 +410,21 @@ if not st.session_state.favourites_list:
     except FileNotFoundError:
         pass
 
-
 # --- Callbacks ---
 def sync_stroke_range():
     st.session_state.stroke_range = st.session_state.w_stroke_range
     st.session_state.page = 1
 
-
 def sync_idc():
     st.session_state.component_idc = st.session_state.w_idc
     st.session_state.page = 1
-
 
 def sync_component_only():
     st.session_state.component_only = st.session_state.w_component_only
     st.session_state.page = 1
 
-
 def sync_script_filter():
     st.session_state.script_filter = st.session_state.w_script_filter
-
 
 def sync_text():
     raw = st.session_state.get("w_text", "")
@@ -676,7 +447,6 @@ def sync_text():
     st.session_state.stroke_view_active = False
     st.session_state.display_mode = "Single Character"
 
-
 def sync_sidebar_text():
     raw = st.session_state.get("sb_search", "")
     v = normalize_single_hanzi(raw)
@@ -698,7 +468,6 @@ def sync_sidebar_text():
     st.session_state.stroke_view_char = ""
     st.session_state.display_mode = "Single Character"
 
-
 def tile_click(c):
     if st.session_state.show_inputs:
         if st.session_state.preview_comp == c:
@@ -714,7 +483,6 @@ def tile_click(c):
         else:
             st.session_state.preview_comp = c
 
-
 def list_tile_click(c):
     if st.session_state.preview_comp == c:
         reset_script_filter_to_any()
@@ -729,7 +497,6 @@ def list_tile_click(c):
         st.session_state.display_mode = "Single Character"
     else:
         st.session_state.preview_comp = c
-
 
 def go_back():
     st.session_state.preview_comp = None
@@ -747,7 +514,6 @@ def go_back():
     else:
         st.session_state.show_inputs = True
 
-
 def go_to_root():
     st.session_state.history = []
     st.session_state.preview_comp = None
@@ -760,11 +526,9 @@ def go_to_root():
     reset_script_filter_to_any()
     st.session_state.display_mode = "Single Character"
 
-
 def end_stroke_view():
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
-
 
 def toggle_favourite(char):
     is_now_checked = st.session_state.get(f"fav_chk_{char}", False)
@@ -780,7 +544,6 @@ def toggle_favourite(char):
         if char in st.session_state.favourites_list:
             st.session_state.favourites_list.remove(char)
 
-
 def handle_file_upload():
     uploaded_file = st.session_state.get("fav_uploader")
     if uploaded_file is not None:
@@ -793,68 +556,6 @@ def handle_file_upload():
                 st.toast("Favourites loaded successfully!", icon="✅")
         except Exception as e:
             st.error(f"Error loading file: {e}")
-
-
-def build_chatgpt_prompt(char: str) -> str:
-    char = (char or "").strip()[:1]
-    meta = component_map.get(char, {}).get("meta", {})
-    def_en = clean_field(meta.get("definition", ""))
-    decomp = format_decomposition(char)
-
-    return f"""You are a bilingual Chinese dictionary editor.
-
-Task:
-For the single Hanzi below, give two example sentences that BEST illustrate the meaning (prefer everyday usage unless the character is primarily literary).
-
-For each example, provide:
-a) Traditional Chinese sentence
-b) Simplified Chinese sentence
-c) Natural English translation
-d) Target word/phrase (must include the character)
-e) Read-aloud pinyin of the full Chinese sentence (with tone marks, natural word grouping)
-
-Hanzi: {char}
-- English definition: {def_en}
-"""
-
-
-def render_copy_to_clipboard(prompt_text: str, widget_id: str):
-    safe_text = json.dumps(prompt_text, ensure_ascii=False)
-    st_html(
-        f"""
-        <div style="display:flex; justify-content:center; margin:10px 0 0 0;">
-          <button id="copy-btn-{widget_id}" style="
-              padding:10px 14px; border-radius:10px; border:1px solid #ddd;
-              background:#fff; cursor:pointer; font-weight:700;">
-            Copy Prompt to Clipboard
-          </button>
-        </div>
-        <div id="copy-msg-{widget_id}" style="text-align:center; margin-top:8px; color:#2e7d32; font-weight:600;"></div>
-        <script>
-          (function() {{
-            const text = {safe_text};
-            const btn = document.getElementById("copy-btn-{widget_id}");
-            const msg = document.getElementById("copy-msg-{widget_id}");
-            if (!btn) return;
-
-            async function copy() {{
-              try {{
-                await navigator.clipboard.writeText(text);
-                msg.textContent = "Copied. Paste into ChatGPT.";
-              }} catch (e) {{
-                msg.textContent = "Copy failed. Please manually select and copy from the textbox above.";
-              }}
-              setTimeout(() => {{ msg.textContent = ""; }}, 2500);
-            }}
-
-            btn.addEventListener("click", copy);
-          }})();
-        </script>
-        """,
-        height=90,
-    )
-
-import html  # Make sure this is at the top of your file if not already
 
 def generate_clean_card_html(c: str, usage_count: int | None = None):
     info = component_map.get(c, {})
