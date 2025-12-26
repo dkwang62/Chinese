@@ -557,34 +557,29 @@ def handle_file_upload():
         except Exception as e:
             st.error(f"Error loading file: {e}")
 
-def generate_clean_card_html(c: str, usage_count: int | None = None):
-    info = component_map.get(c, {})
-    meta = info.get("meta", {})
-    
-    pinyin_list = meta.get("pinyin")
-    pinyin = pinyin_list[0] if pinyin_list and isinstance(pinyin_list, list) and len(pinyin_list) > 0 else "?"
-    
-    definition = meta.get("definition") or "No definition available."
-    
-    etymology_raw = meta.get("etymology")
-    etymology = ""
-    if etymology_raw and isinstance(etymology_raw, str):
-        cleaned = etymology_raw.strip()
-        if cleaned:
-            etymology = html.escape(cleaned)
-    
-    strokes = info.get("stroke_count")
-    radical = meta.gdef generate_clean_card_html(c: str, usage_count: int | None = None):
+def generate_clean_card_html(c: str, usage_count: int | None = None) -> str:
     info = component_map.get(c, {})
     meta = info.get("meta", {})
 
+    # Pinyin
     pinyin_list = meta.get("pinyin")
     pinyin = pinyin_list[0] if isinstance(pinyin_list, list) and pinyin_list else "?"
+
+    # Definition
     definition = meta.get("definition") or "No definition available."
+
+    # Etymology (optional)
+    etymology_html = ""
+    ety_raw = meta.get("etymology")
+    if isinstance(ety_raw, str):
+        cleaned = ety_raw.strip()
+        if cleaned:
+            etymology_html = f"<div class='ety-row'>{html.escape(cleaned)}</div>"
 
     strokes = info.get("stroke_count")
     radical = meta.get("radical", "")
 
+    # Script tag (optional)
     script_tag = ""
     if cc_t2s and cc_s2t:
         try:
@@ -599,32 +594,45 @@ def generate_clean_card_html(c: str, usage_count: int | None = None):
 
     usage_text = f"Used in {usage_count} chars" if usage_count is not None else ""
 
-    large_header = dedent(f"""
-    <div style="position:relative; height:160px; background:linear-gradient(135deg,#f8fbff 0%,#eef4ff 100%);
-                border-radius:16px; margin-bottom:20px; display:flex; align-items:center; justify-content:center;
-                box-shadow:0 4px 15px rgba(0,0,0,0.08); overflow:hidden;">
-        <div style="font-size:7.5em; font-weight:900; color:#1a1a1a; line-height:1;">
-            {_html.escape(c)}
-        </div>
-        <div style="position:absolute; top:14px; left:0; right:0; text-align:center; font-size:2.0em; font-weight:700;
-                    color:#d35400; text-shadow:0 2px 4px rgba(211,84,0,0.2); letter-spacing:1.8px;">
-            {_html.escape(pinyin)}
-        </div>
-    </div>
-    """).strip()
+    # Header (no leading indentation issues because we’re not using triple-quoted blocks)
+    large_header = (
+        "<div style='position:relative; height:160px; "
+        "background:linear-gradient(135deg,#f8fbff 0%,#eef4ff 100%); "
+        "border-radius:16px; margin-bottom:20px; display:flex; "
+        "align-items:center; justify-content:center; "
+        "box-shadow:0 4px 15px rgba(0,0,0,0.08); overflow:hidden;'>"
+        f"<div style='font-size:7.5em; font-weight:900; color:#1a1a1a; line-height:1;'>"
+        f"{html.escape(c)}</div>"
+        f"<div style='position:absolute; top:14px; left:0; right:0; text-align:center; "
+        f"font-size:2.0em; font-weight:700; color:#d35400; "
+        f"text-shadow:0 2px 4px rgba(211,84,0,0.2); letter-spacing:1.8px;'>"
+        f"{html.escape(pinyin)}</div>"
+        "</div>"
+    )
 
-    card_html = dedent(f"""
-    <div class="char-card">
-        {large_header}
-        <div class="meta-row">
-            {script_tag}
-            {f'<span class="meta-tag">Rad. {_html.escape(radical)}</span>' if radical else ''}
-            {f'<span class="meta-tag">{strokes} strokes</span>' if strokes is not None else ''}
-            {f'<span class="meta-tag">{_html.escape(usage_text)}</span>' if usage_text else ''}
-        </div>
-        <div class="def-row">{_html.escape(definition)}</div>
-    </div>
-    """).strip()
+    # Meta row
+    meta_bits = []
+    if script_tag:
+        meta_bits.append(script_tag)
+    if radical:
+        meta_bits.append(f"<span class='meta-tag'>Rad. {html.escape(str(radical))}</span>")
+    if strokes is not None:
+        meta_bits.append(f"<span class='meta-tag'>{int(strokes)} strokes</span>")
+    if usage_text:
+        meta_bits.append(f"<span class='meta-tag'>{html.escape(usage_text)}</span>")
+    meta_row = "".join(meta_bits)
+
+    card_html = (
+        "<div class='char-card'>"
+        f"{large_header}"
+        f"<div class='meta-row'>{meta_row}</div>"
+        f"<div class='def-row'>{html.escape(str(definition))}</div>"
+        f"{etymology_html}"
+        "</div>"
+    )
+
+    return card_html
+
 
     
 def render_stroke_order_sidebar(char: str, size: int = 110):
