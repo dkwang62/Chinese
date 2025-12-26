@@ -462,8 +462,6 @@ def render_ipad_safe_download(data_str, filename, label):
     Prevents Safari from navigating away to a 'dead-end' preview screen.
     """
     b64 = base64.b64encode(data_str.encode()).decode()
-    # Using 'application/octet-stream' forces the browser to download 
-    # rather than attempt to 'open' or 'preview' the JSON.
     href = f'data:application/octet-stream;base64,{b64}'
     
     html_button = f"""
@@ -483,7 +481,6 @@ def render_ipad_safe_download(data_str, filename, label):
         </a>
     </div>
     <script>
-        // Optional: Provide visual feedback that the download started
         const link = document.querySelector('a[download="{filename}"]');
         link.addEventListener('click', () => {{
             console.log('Download triggered');
@@ -640,6 +637,11 @@ if not st.session_state.favourites_list:
 # --- Callbacks ---
 def sync_stroke_range():
     st.session_state.stroke_range = st.session_state.w_stroke_range
+    st.session_state.page = 1
+
+
+def sync_radical():
+    st.session_state.radical = st.session_state.w_radical
     st.session_state.page = 1
 
 
@@ -1219,7 +1221,6 @@ def render_splash():
         unsafe_allow_html=True,
     )
 
-    # 2. Main Entry Point (Unified Hero Gate)
     st.markdown(
         """
         <div style="text-align:center; margin: 40px 0;">
@@ -1240,17 +1241,14 @@ def render_splash():
         unsafe_allow_html=True
     )
 
-    # Handle entry trigger
     if st.query_params.get("onboarding") == "done":
         st.session_state.onboarding_done = True
         st.query_params.clear() 
         st.rerun()
 
-    # 3. Quick Access & Management Section (Expander just above the boxes)
     demos = st.session_state.favourites_list
     if demos:
         st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
-        # Repositioned Expander
         lc1, lc2, lc3 = st.columns([1, 2, 1])
         with lc2:
             with st.expander("📂 Manage Favourites (Save/Load)", expanded=False):
@@ -1261,8 +1259,7 @@ def render_splash():
                 with c_ul:
                     st.file_uploader("Load", type=["json"], key="fav_uploader", on_change=handle_file_upload, label_visibility="collapsed")
         
-        # 4. Restored Colored Grid Logic
-        st.markdown("<div class='comp-grid'>", unsafe_allow_html=True) # Re-apply grid styling
+        st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
         
         unique_demos = []
         seen_in_list = set()
@@ -1290,6 +1287,8 @@ def render_splash():
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='height:30px;'></div>", unsafe_allow_html=True)
+
+
 def main():
     if not component_map:
         st.error("Component dataset not loaded. Ensure enhanced_component_map_with_etymology.json exists.")
@@ -1313,14 +1312,59 @@ def main():
 
         st.text_input("Shortcut: Paste/Type characters", key="sb_search", on_change=sync_sidebar_text)
 
-        current_char_for_sidebar = None
+        # === RESTORED FILTERS SECTION ===
+        st.markdown("---")
+        st.markdown("### Filters")
+        
+        # Stroke range slider
+        st.slider(
+            "Stroke count",
+            min_value=1,
+            max_value=max_s_val,
+            value=st.session_state.stroke_range,
+            key="w_stroke_range",
+            on_change=sync_stroke_range
+        )
 
-        # === COMMON SIDEBAR ELEMENTS FOR ALL DETAIL VIEWS ===
-        # This block handles breadcrumb + navigation for BOTH regular detail and stroke view
+        # Radical filter
+        all_radicals = sorted(set(
+            info.get("meta", {}).get("radical")
+            for info in component_map.values()
+            if info.get("meta", {}).get("radical")
+        ))
+        radical_options = ["none"] + all_radicals
+        st.selectbox(
+            "Radical",
+            options=radical_options,
+            index=radical_options.index(st.session_state.radical) if st.session_state.radical in radical_options else 0,
+            key="w_radical",
+            on_change=sync_radical
+        )
+
+        # IDC structure filter
+        idc_options = ["none"] + sorted(stats_cache.get("idc_counts", {}).keys())
+        st.selectbox(
+            "Structure (IDC)",
+            options=idc_options,
+            index=idc_options.index(st.session_state.component_idc) if st.session_state.component_idc in idc_options else 0,
+            key="w_idc",
+            on_change=sync_idc
+        )
+
+        # Component only checkbox
+        st.checkbox(
+            "Show only used components",
+            value=st.session_state.component_only,
+            key="w_component_only",
+            on_change=sync_component_only
+        )
+
+        st.markdown("---")
+
+        current_char_for_sidebar = None
 
         current_main_char = st.session_state.stroke_view_char if st.session_state.stroke_view_active else st.session_state.selected_comp
 
-        # Breadcrumb path — shown in ALL detail modes (including stroke view)
         if current_main_char:
             path_items = ["🏠 Root"] + st.session_state.history
             if st.session_state.stroke_view_active:
@@ -1333,7 +1377,6 @@ def main():
                 unsafe_allow_html=True,
             )
 
-        # Navigation buttons
         nav_col1, nav_col2 = st.columns(2)
         with nav_col1:
             if st.session_state.stroke_view_active:
@@ -1345,17 +1388,14 @@ def main():
 
         st.markdown("---")
 
-        # Current character for display (preview or selected, or stroke view char)
         current_char_for_sidebar = (
             st.session_state.stroke_view_char if st.session_state.stroke_view_active
             else (st.session_state.preview_comp or st.session_state.selected_comp)
         )
 
         if current_char_for_sidebar:
-            # Stroke order animation in sidebar
             render_stroke_order_sidebar(current_char_for_sidebar, size=140 if not st.session_state.stroke_view_active else 110)
 
-            # Favourite checkbox
             is_fav = current_char_for_sidebar in st.session_state.favourites_list
             st.checkbox(
                 "Show in Favourites",
@@ -1365,7 +1405,6 @@ def main():
                 args=(current_char_for_sidebar,),
             )
 
-            # Script filter (only in regular detail view, not stroke view)
             if not st.session_state.stroke_view_active:
                 st.radio(
                     "Filter Results",
@@ -1386,7 +1425,6 @@ def main():
                     unsafe_allow_html=True,
                 )
             else:
-                # In stroke view: show character info cards (simplified/traditional)
                 st.markdown("### Character Info")
                 st.markdown(
                     f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>",
@@ -1409,12 +1447,12 @@ def main():
                         unsafe_allow_html=True,
                     )
                     st.markdown(generate_clean_card_html(counterpart), unsafe_allow_html=True)
+    
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
         st.stop()
 
     if st.session_state.show_inputs:
-        # GRID VIEW
         filter_parts = []
         cur_min, cur_max = st.session_state.stroke_range
         if not (cur_min == 1 and cur_max == max_s_val):
@@ -1508,7 +1546,6 @@ def main():
             st.markdown("</div>", unsafe_allow_html=True)
 
     else:
-        # DETAIL LIST VIEW
         st.session_state.display_mode = "Single Character"
 
         st.markdown(
@@ -1526,12 +1563,10 @@ def main():
         final_chars_list = []
         seen_chars = set()
 
-        # 1. THE ANCHOR: Selected Character (Rank #1)
         if selected in component_map:
             final_chars_list.append(selected)
             seen_chars.add(selected)
 
-        # 2. THE EQUIVALENT: Traditional/Simplified (Rank #2)
         if cc_t2s and cc_s2t:
             s_cand = cc_t2s.convert(selected)
             t_cand = cc_s2t.convert(selected)
@@ -1541,7 +1576,6 @@ def main():
                 final_chars_list.append(variant)
                 seen_chars.add(variant)
 
-        # 3. COMPONENTS: Structural parts (Rank #3)
         decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
         components_list = [c for c in decomp_raw if c not in IDC_CHARS and c != "?" and c != "—"]
         
@@ -1550,7 +1584,6 @@ def main():
                 final_chars_list.append(c)
                 seen_chars.add(c)
 
-        # 4. CHILDREN: Containing characters (Rank #4)
         related_raw = component_map.get(selected, {}).get("related_characters", [])
         children_list = [c for c in related_raw if isinstance(c, str) and len(c) == 1]
         children_sorted = sorted(children_list, key=sort_key_usage_then_zipf)
@@ -1561,12 +1594,10 @@ def main():
                 seen_chars.add(c)
 
         chars = final_chars_list
-        # Hybrid render: 120 clickable, rest static
         LIMIT = 120
         clickable_chars = chars[:LIMIT]
         static_chars = chars[LIMIT:]
 
-        # Apply script filter
         clickable_chars = apply_script_filter(clickable_chars)
         static_chars = apply_script_filter(static_chars)
 
