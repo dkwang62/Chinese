@@ -236,35 +236,32 @@ def apply_dynamic_css():
     }
     .compound-item {
         display: flex;
-        align-items: flex-start;
-        margin-bottom: 15px;
-        padding: 15px;
-        border-bottom: 1px solid #e0e0e0;
+        align-items: flex-start; /* Prevents stretching */
+        margin-bottom: 12px;
+        padding: 12px 18px;
+        border-bottom: 1px solid #eef2f3;
         background: #ffffff;
-        border-radius: 8px;
-        font-weight: 400 !important;
+        border-radius: 10px;
     }
-
     .cp-word {
-        font-size: 1.6em; /* Larger for senior readability */
-        color: #111;
-        min-width: 120px; /* Fixed width prevents overlapping */
+        font-weight: 400 !important; /* No-bold requirement */
+        font-size: 1.7em;
+        color: #1a1a1a;
+        min-width: 100px; /* Forces characters into their own column */
         margin-right: 20px;
-        font-weight: 400 !important;
     }
-
     .cp-pinyin {
         color: #d35400;
-        font-size: 1.3em;
-        min-width: 180px; /* Allocated space for long pinyin strings */
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        min-width: 160px; /* Forces pinyin into its own column */
         margin-right: 20px;
         font-weight: 400 !important;
+        font-size: 1.4em;
     }
-
     .cp-mean {
         color: #444;
-        font-size: 1.2em;
-        flex: 1; /* Definition takes remaining space */
+        font-size: 1.15em;
+        flex: 1; /* Definition takes up all remaining space */
         line-height: 1.5;
         font-weight: 400 !important;
     }
@@ -675,7 +672,8 @@ def render_copy_to_clipboard(prompt_text: str, widget_id: str):
 
 
 def generate_clean_card_html(c, usage_count=None, is_sidebar=False):
-    if not c: return ""
+    if not c:
+        return ""
     info = component_map.get(c, {})
     meta = info.get("meta", {})
     pinyin = clean_field(meta.get("pinyin", ""))
@@ -684,13 +682,12 @@ def generate_clean_card_html(c, usage_count=None, is_sidebar=False):
     definition = clean_field(meta.get("definition", ""))
     etymology = get_etymology_text(meta)
 
-    # Scale down sizes slightly for sidebar to prevent overlap
-    subj_size = "2.5em" if is_sidebar else "4em"
+    # UI scaling for senior readability vs sidebar constraints
     pinyin_size = "1.5em" if is_sidebar else "2.2em"
-    card_padding = "10px" if is_sidebar else "20px"
+    subj_size = "2.8em" if is_sidebar else "4em"
     
     meta_items = []
-    # Restored script variants with original coloring
+    # Color-coded variant logic restored
     if cc_t2s:
         simplified = cc_t2s.convert(c)
         if simplified != c:
@@ -705,15 +702,20 @@ def generate_clean_card_html(c, usage_count=None, is_sidebar=False):
 
     pinyin_html = f"<div style='font-size: {pinyin_size}; color: #d35400; text-align: center; line-height: 1; font-weight:400;'>{pinyin}</div>" if pinyin and pinyin != '—' else ""
     
+    # Switch layout from flex-row to flex-column if in sidebar to prevent iPad overlap
+    flex_dir = "column" if is_sidebar else "row"
+    align_items = "center" if is_sidebar else "flex-start"
+    margin_right = "0" if is_sidebar else "25px"
+
     return f"""
-    <div class='char-card' style='display: flex; flex-direction: {"column" if is_sidebar else "row"}; padding: {card_padding};'>
-        <div style='display: flex; flex-direction: column; align-items: center; margin-bottom: 10px; margin-right: {"0" if is_sidebar else "25px"}; min-width: 100px;'>
+    <div class='char-card' style='display: flex; flex-direction: {flex_dir}; align-items: {align_items}; padding: 15px;'>
+        <div style='display: flex; flex-direction: column; align-items: center; margin-right: {margin_right}; min-width: 90px; margin-bottom: 10px;'>
             {pinyin_html}
             <div class='card-subject' style='font-size: {subj_size}; margin-top: 5px; font-weight:400;'>{c}</div>
         </div>
         <div style='flex: 1;'>
             <div class='meta-row' style='font-weight:400;'>{''.join(meta_items)}</div>
-            <div class='def-row' style='font-weight:400; font-size: {"1.1em" if is_sidebar else "1.4em"};'>{definition}</div>
+            <div class='def-row' style='font-weight:400;'>{definition}</div>
             {f"<div class='ety-row' style='font-weight:400;'>Origin: {etymology}</div>" if etymology and not is_sidebar else ""}
         </div>
     </div>
