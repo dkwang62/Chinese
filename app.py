@@ -127,11 +127,6 @@ def get_component_stats(_component_map):
 component_map = load_and_augment_map()
 stats_cache = get_component_stats(component_map) if component_map else {}
 
-
-In this update for Step 3, I have modified the CSS to remove all bold font weights (400 weight) while maintaining the large font sizes and high-contrast colors required for accessibility.
-
-Python
-
 def apply_dynamic_css():
     css = """
     <style>
