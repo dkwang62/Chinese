@@ -246,18 +246,18 @@ def apply_dynamic_css():
         box-shadow: 0 8px 24px rgba(59, 130, 246, 0.25) !important;
     }
     
-    /* Pen Button - STRETCH */
+    /* Pen Button - Slightly larger */
     .pen-btn-wrap .stButton > button {
         width: 100% !important;
-        font-size: 1.6em !important;
+        font-size: 1.9em !important;  /* Bigger pen icon */
         border: 2px solid #dee2e6 !important;
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
         margin-top: 8px !important;
-        height: 45px !important;
+        height: 52px !important;  /* Taller */
         line-height: 1 !important;
         color: #555 !important;
         font-weight: 600 !important;
-        border-radius: 12px !important;
+        border-radius: 14px !important;
         transition: all 0.2s ease !important;
     }
     .pen-btn-wrap .stButton > button:hover {
