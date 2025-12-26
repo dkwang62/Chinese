@@ -269,9 +269,71 @@ def apply_dynamic_css():
         margin: 25px 0 30px 0;
         font-weight: 600;
     }
+
+        CARD_CSS = """
+        <style>
+        .char-card{
+            background: linear-gradient(135deg,#ffffff 0%,#f8f9fa 100%);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
+        }
+        .meta-row{
+            font-size: 0.95em;
+            color: #555;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .meta-tag{
+            background: linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            color: #495057;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+        .meta-tag-trad{
+            background: linear-gradient(135deg,#fff8e1 0%,#ffecb3 100%);
+            color: #856404;
+            border: 1px solid #ffd54f;
+        }
+        .meta-tag-simp{
+            background: linear-gradient(135deg,#d1e7dd 0%,#a3cfbb 100%);
+            color: #0f5132;
+            border: 1px solid #81c784;
+        }
+        .def-row{
+            font-size: 1.15em;
+            line-height: 1.6;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        .ety-row{
+            font-size: 0.92em;
+            color: #666;
+            font-style: italic;
+            border-top: 2px solid #e9ecef;
+            padding-top: 12px;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+    
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
+    
+def render_card(c: str, usage_count: int | None = None, height: int = 260):
+    card_html = generate_clean_card_html(c, usage_count=usage_count)
+    # Render in a component iframe so Markdown can’t escape it.
+    st_html(CARD_CSS + card_html, height=height, scrolling=False)
+
 
 def render_ipad_safe_download(data_str, filename, label):
     b64 = base64.b64encode(data_str.encode()).decode()
@@ -561,25 +623,18 @@ def generate_clean_card_html(c: str, usage_count: int | None = None) -> str:
     info = component_map.get(c, {})
     meta = info.get("meta", {})
 
-    # Pinyin
     pinyin_list = meta.get("pinyin")
     pinyin = pinyin_list[0] if isinstance(pinyin_list, list) and pinyin_list else "?"
-
-    # Definition
     definition = meta.get("definition") or "No definition available."
 
-    # Etymology (optional)
     etymology_html = ""
     ety_raw = meta.get("etymology")
-    if isinstance(ety_raw, str):
-        cleaned = ety_raw.strip()
-        if cleaned:
-            etymology_html = f"<div class='ety-row'>{html.escape(cleaned)}</div>"
+    if isinstance(ety_raw, str) and ety_raw.strip():
+        etymology_html = f"<div class='ety-row'>{html.escape(ety_raw.strip())}</div>"
 
     strokes = info.get("stroke_count")
     radical = meta.get("radical", "")
 
-    # Script tag (optional)
     script_tag = ""
     if cc_t2s and cc_s2t:
         try:
@@ -594,23 +649,17 @@ def generate_clean_card_html(c: str, usage_count: int | None = None) -> str:
 
     usage_text = f"Used in {usage_count} chars" if usage_count is not None else ""
 
-    # Header (no leading indentation issues because we’re not using triple-quoted blocks)
     large_header = (
-        "<div style='position:relative; height:160px; "
-        "background:linear-gradient(135deg,#f8fbff 0%,#eef4ff 100%); "
-        "border-radius:16px; margin-bottom:20px; display:flex; "
-        "align-items:center; justify-content:center; "
+        "<div style='position:relative; height:160px; background:linear-gradient(135deg,#f8fbff 0%,#eef4ff 100%);"
+        "border-radius:16px; margin-bottom:20px; display:flex; align-items:center; justify-content:center;"
         "box-shadow:0 4px 15px rgba(0,0,0,0.08); overflow:hidden;'>"
-        f"<div style='font-size:7.5em; font-weight:900; color:#1a1a1a; line-height:1;'>"
-        f"{html.escape(c)}</div>"
-        f"<div style='position:absolute; top:14px; left:0; right:0; text-align:center; "
-        f"font-size:2.0em; font-weight:700; color:#d35400; "
-        f"text-shadow:0 2px 4px rgba(211,84,0,0.2); letter-spacing:1.8px;'>"
+        f"<div style='font-size:7.5em; font-weight:900; color:#1a1a1a; line-height:1;'>{html.escape(c)}</div>"
+        f"<div style='position:absolute; top:14px; left:0; right:0; text-align:center; font-size:2.0em; "
+        f"font-weight:700; color:#d35400; text-shadow:0 2px 4px rgba(211,84,0,0.2); letter-spacing:1.8px;'>"
         f"{html.escape(pinyin)}</div>"
         "</div>"
     )
 
-    # Meta row
     meta_bits = []
     if script_tag:
         meta_bits.append(script_tag)
@@ -622,7 +671,7 @@ def generate_clean_card_html(c: str, usage_count: int | None = None) -> str:
         meta_bits.append(f"<span class='meta-tag'>{html.escape(usage_text)}</span>")
     meta_row = "".join(meta_bits)
 
-    card_html = (
+    return (
         "<div class='char-card'>"
         f"{large_header}"
         f"<div class='meta-row'>{meta_row}</div>"
