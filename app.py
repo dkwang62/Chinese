@@ -131,159 +131,326 @@ def apply_dynamic_css():
     css = """
     <style>
     /* Global Layout */
-    .main .block-container {padding-top: 1rem; padding-bottom: 2rem;}
+    .main .block-container {padding-top: 1.5rem; padding-bottom: 2.5rem;}
     
-    /* Character Cards - High contrast, no bold, large text */
+    /* Character Cards - Large fonts, high contrast */
     .char-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        padding: 16px 20px;
+        padding: 20px 24px;
         border-radius: 16px;
         margin-bottom: 0px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         border: 2px solid #dee2e6;
         transition: all 0.3s ease;
     }
     
-    /* Character Subject inside Card - Large but not bold */
+    /* Character Subject - LARGER */
     .card-subject {
-        font-size: 4em; 
+        font-size: 4.5em !important; 
         font-weight: 400 !important;
         color: #2c3e50;
         line-height: 1;
-        display: flex;
-        align-items: center;
     }
 
     .meta-row {
-        font-size: 1.1em;
+        font-size: 1.2em;
         color: #444;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
         display: flex;
         align-items: center;
         flex-wrap: wrap;
         gap: 12px;
     }
+    
     .meta-pinyin {
-        font-weight: 400 !important;
+        font-weight: 600 !important;
         font-size: 2.8em;
         color: #d35400;
         text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1);
     }
+    
     .meta-tag {
         background: #f1f3f5;
         padding: 6px 14px;
         border-radius: 10px;
-        font-size: 1.0em;
+        font-size: 1.05em;
         color: #333;
-        font-weight: 400 !important;
+        font-weight: 500 !important;
         border: 1px solid #ced4da;
     }
     
-    /* Pure black high contrast definition, no bold */
+    .meta-tag-trad {
+        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+        color: #856404;
+        border: 1px solid #ffd54f;
+    }
+    
+    .meta-tag-simp {
+        background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%);
+        color: #0f5132;
+        border: 1px solid #81c784;
+    }
+    
+    /* Definition - Pure black, high contrast, LARGER */
     .def-row {
-        font-size: 1.4em;
-        line-height: 1.4;
+        font-size: 1.5em !important;
+        line-height: 1.5;
         color: #000000;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
         font-weight: 400 !important;
     }
     
     .ety-row {
-        font-size: 1.05em;
+        font-size: 1.1em;
         color: #333;
         font-style: italic;
         background: #fffbe6;
         border-top: 2px solid #e9ecef;
-        padding: 10px;
+        padding: 12px;
         border-radius: 8px;
         margin-top: 12px;
         line-height: 1.5;
         font-weight: 400 !important;
     }
     
-    /* Grid Buttons - No bold weight */
+    /* Grid Buttons - LARGER text */
     .comp-grid .stButton > button {
         width: 100% !important;
-        font-size: 2.4em !important;
-        height: 85px !important;
+        font-size: 2.6em !important;
+        height: 90px !important;
         background: linear-gradient(135deg, #006064 0%, #004d40 100%) !important;
         color: white !important;
         border: none !important;
         border-radius: 14px !important;
-        font-weight: 400 !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease !important;
     }
     
-    /* Detail View Buttons - Large font, no bold */
+    .comp-grid .stButton > button:hover {
+        background: linear-gradient(135deg, #00838f 0%, #00695c 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 16px rgba(0, 96, 100, 0.3) !important;
+    }
+    
+    /* Detail View Buttons - EXTRA LARGE */
     .char-btn-wrap .stButton > button {
         width: 100% !important;
-        font-size: 3.8em !important;
-        font-weight: 400 !important;
+        font-size: 4.2em !important;
+        font-weight: 500 !important;
         background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%) !important;
         border: 3px solid #dee2e6 !important;
         border-radius: 16px !important;
+        min-height: 95px !important;
+        transition: all 0.25s ease !important;
+    }
+    
+    .char-btn-wrap .stButton > button:hover {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        border-color: #3b82f6 !important;
+        transform: scale(1.02) !important;
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.2) !important;
+    }
+    
+    /* Pen Button - LARGER */
+    .pen-btn-wrap .stButton > button {
+        width: 100% !important;
+        font-size: 1.8em !important;
+        border: 2px solid #dee2e6 !important;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+        margin-top: 8px !important;
+        height: 50px !important;
+        color: #555 !important;
+        font-weight: 600 !important;
+        border-radius: 12px !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .pen-btn-wrap .stButton > button:hover {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        border-color: #64b5f6 !important;
+        color: #1565c0 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(100, 181, 246, 0.2) !important;
     }
 
-    /* Status Line - No bold */
+    /* Status Line - LARGER text */
     .status-line {
-        font-size: 1.2em;
-        font-weight: 400 !important;
+        font-size: 1.25em;
+        font-weight: 500 !important;
         color: #0f5132;
         background: #e8f5e9;
         border: 2px solid #81c784;
-        padding: 15px;
+        padding: 18px;
         border-radius: 12px;
-        margin: 15px 0 25px 0;
+        margin: 18px 0 28px 0;
     }
+    
+    .status-tag {
+        background: #ffffff;
+        color: #2c3e50;
+        padding: 7px 15px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 1em;
+        border: 2px solid #dee2e6;
+        display: inline-flex;
+        align-items: center;
+    }
+    
+    /* Compound Lists - LARGER fonts */
     .compound-item {
         display: flex;
-        align-items: flex-start; /* Prevents stretching */
-        margin-bottom: 12px;
-        padding: 12px 18px;
+        align-items: flex-start;
+        margin-bottom: 14px;
+        padding: 14px 20px;
         border-bottom: 1px solid #eef2f3;
         background: #ffffff;
         border-radius: 10px;
     }
+    
     .cp-word {
-        font-weight: 400 !important; /* No-bold requirement */
-        font-size: 1.7em;
+        font-weight: 500 !important;
+        font-size: 1.9em;
         color: #1a1a1a;
-        min-width: 100px; /* Forces characters into their own column */
-        margin-right: 20px;
+        min-width: 110px;
+        margin-right: 22px;
     }
+    
     .cp-pinyin {
         color: #d35400;
         font-family: 'Segoe UI', Tahoma, sans-serif;
-        min-width: 160px; /* Forces pinyin into its own column */
-        margin-right: 20px;
-        font-weight: 400 !important;
-        font-size: 1.4em;
+        min-width: 170px;
+        margin-right: 22px;
+        font-weight: 500 !important;
+        font-size: 1.5em;
     }
+    
     .cp-mean {
         color: #444;
-        font-size: 1.15em;
-        flex: 1; /* Definition takes up all remaining space */
+        font-size: 1.2em;
+        flex: 1;
         line-height: 1.5;
         font-weight: 400 !important;
     }
-        /* Sidebar specific card adjustments to prevent 'the mess' */
+    
+    /* Sidebar specific adjustments */
     [data-testid="stSidebar"] .char-card {
-        padding: 12px !important;
-        margin-bottom: 10px !important;
+        padding: 14px !important;
+        margin-bottom: 12px !important;
         border: 1px solid #ddd !important;
     }
 
     [data-testid="stSidebar"] .card-subject {
-        font-size: 2.8em !important;
-        margin-right: 0 !important;
+        font-size: 3.2em !important;
     }
 
     [data-testid="stSidebar"] .def-row {
-        font-size: 1.1em !important;
-        line-height: 1.3 !important;
+        font-size: 1.15em !important;
+        line-height: 1.4 !important;
+    }
+    
+    [data-testid="stSidebar"] .meta-pinyin {
+        font-size: 2em !important;
+    }
+    
+    /* Static Cards */
+    .char-static-box {
+        font-size: 4.2em;
+        font-weight: 500;
+        background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%);
+        color: #bbb;
+        border: 2px solid #e0e0e0;
+        border-radius: 16px;
+        padding: 10px;
+        min-height: 95px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+    }
+    
+    /* Preview Count */
+    .preview-count-line {
+        font-size: 1.5em;
+        text-align: center;
+        color: #2c3e50;
+        margin: 25px 0 30px 0;
+        font-weight: 600;
+    }
+    
+    .preview-count-line .char {
+        font-size: 1.6em;
+        font-weight: 700;
+        color: #e74c3c;
+    }
+    
+    /* Splash Screen - LARGER */
+    .splash-wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px 20px 20px;
+    }
+    
+    .splash-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 2px solid #dee2e6;
+        border-radius: 24px;
+        padding: 40px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    }
+    
+    .splash-title {
+        font-size: 3em;
+        font-weight: 900;
+        color: #111;
+        line-height: 1.2;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .splash-sub {
+        margin-top: 18px;
+        font-size: 1.4em;
+        color: #495057;
+        line-height: 1.6;
+    }
+    
+    /* Expander Buttons */
+    div[data-testid="stExpander"] .stButton > button {
+        width: 100% !important;
+        font-size: 1.3rem !important;
+        height: 45px !important;
+        padding: 0 !important;
+        line-height: 1.2 !important;
+        border-radius: 10px !important;
+        border: 2px solid #dee2e6 !important;
+        transition: all 0.2s ease !important;
+        font-weight: 600 !important;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
+    }
+    
+    .stroke-header {
+        font-size: 0.9em;
+        color: #6c757d;
+        border-bottom: 2px solid #dee2e6;
+        margin: 15px 0 8px 0;
+        padding-bottom: 4px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .jump-footer {
+        margin-top: 50px;
+        padding: 25px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-top: 3px solid #dee2e6;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 -3px 10px rgba(0,0,0,0.04);
     }
     </style>
     """
-    st.markdown(css, unsafe_allow_html=True)
+
 
 def render_ipad_safe_download(data_str, filename, label):
     """
