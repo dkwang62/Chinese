@@ -1359,19 +1359,18 @@ def main():
         # DETAIL LIST VIEW
         st.session_state.display_mode = "Single Character"
 
-        # 1. MOVED TO SIDEBAR: The map (path) is now handled in the sidebar logic below.
-        # Ensure any old 'path_str' or 'status-line' code in this 'else' block is removed.
+        # The path map is now handled in the Sidebar section below
 
         selected = st.session_state.selected_comp
         final_chars_list = []
         seen_chars = set()
 
-        # STEP A: THE ANCHOR - The Selected Character (Rank #1)
+        # 1. THE ANCHOR: Selected Character (Rank #1)
         if selected in component_map:
             final_chars_list.append(selected)
             seen_chars.add(selected)
 
-        # STEP B: THE EQUIVALENT - Traditional/Simplified Variant (Rank #2)
+        # 2. THE EQUIVALENT: Traditional/Simplified (Rank #2)
         if cc_t2s and cc_s2t:
             s_cand = cc_t2s.convert(selected)
             t_cand = cc_s2t.convert(selected)
@@ -1381,7 +1380,7 @@ def main():
                 final_chars_list.append(variant)
                 seen_chars.add(variant)
 
-        # STEP C: COMPONENTS - Structural parts (Rank #3)
+        # 3. COMPONENTS: Structural parts (Rank #3)
         decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
         components_list = [c for c in decomp_raw if c not in IDC_CHARS and c != "?" and c != "—"]
         for c in components_list:
@@ -1389,10 +1388,11 @@ def main():
                 final_chars_list.append(c)
                 seen_chars.add(c)
 
-        # STEP D: CHILDREN - Containing characters (Rank #4)
+        # 4. CHILDREN: Characters containing the selected character (Rank #4)
         related_raw = component_map.get(selected, {}).get("related_characters", [])
+        # FIX: Ensure variable names match
         children_list = sorted([c for c in related_raw if isinstance(c, str) and len(c) == 1], key=sort_key_usage_then_zipf)
-        for c in children_sorted:
+        for c in children_list:
             if c not in seen_chars and c in component_map:
                 final_chars_list.append(c)
                 seen_chars.add(c)
