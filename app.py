@@ -128,36 +128,39 @@ component_map = load_and_augment_map()
 stats_cache = get_component_stats(component_map) if component_map else {}
 
 
+In this update for Step 3, I have modified the CSS to remove all bold font weights (400 weight) while maintaining the large font sizes and high-contrast colors required for accessibility.
+
+Python
+
 def apply_dynamic_css():
     css = """
     <style>
     /* Global Layout */
     .main .block-container {padding-top: 1rem; padding-bottom: 2rem;}
     
-    /* Character Cards - Optimized for accessibility and older eyes */
+    /* Character Cards - High contrast, no bold, large text */
     .char-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        padding: 16px 20px; /* Tightened padding to prevent size bloat */
+        padding: 16px 20px;
         border-radius: 16px;
         margin-bottom: 0px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-        border: 2px solid #dee2e6; /* Thicker border for better visual separation */
+        border: 2px solid #dee2e6;
         transition: all 0.3s ease;
     }
     
-    /* Subject Character inside Card (Step 1 requirement) */
+    /* Character Subject inside Card - Large but not bold */
     .card-subject {
-        font-size: 3.5em; 
-        font-weight: 800;
+        font-size: 4em; 
+        font-weight: 400 !important;
         color: #2c3e50;
-        margin-right: 20px;
         line-height: 1;
         display: flex;
         align-items: center;
     }
 
     .meta-row {
-        font-size: 1.1em; /* Enlarged for readability */
+        font-size: 1.1em;
         color: #444;
         margin-bottom: 8px;
         display: flex;
@@ -166,8 +169,8 @@ def apply_dynamic_css():
         gap: 12px;
     }
     .meta-pinyin {
-        font-weight: 800;
-        font-size: 2.8em; /* Enlarged for older folks */
+        font-weight: 400 !important;
+        font-size: 2.8em;
         color: #d35400;
         text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1);
     }
@@ -175,33 +178,35 @@ def apply_dynamic_css():
         background: #f1f3f5;
         padding: 6px 14px;
         border-radius: 10px;
-        font-size: 1.0em; /* Enlarged from 0.85em */
+        font-size: 1.0em;
         color: #333;
-        font-weight: 700;
+        font-weight: 400 !important;
         border: 1px solid #ced4da;
     }
     
+    /* Pure black high contrast definition, no bold */
     .def-row {
-        font-size: 1.4em; /* Significantly enlarged for accessibility */
+        font-size: 1.4em;
         line-height: 1.4;
-        color: #000000; /* Maximum contrast black */
+        color: #000000;
         margin-bottom: 10px;
-        font-weight: 600;
+        font-weight: 400 !important;
     }
     
     .ety-row {
-        font-size: 1.05em; /* Enlarged for readability */
+        font-size: 1.05em;
         color: #333;
         font-style: italic;
-        background: #fffbe6; /* Light yellow background for visual distinction */
+        background: #fffbe6;
         border-top: 2px solid #e9ecef;
         padding: 10px;
         border-radius: 8px;
         margin-top: 12px;
         line-height: 1.5;
+        font-weight: 400 !important;
     }
     
-    /* Grid Buttons - Preserved Teal background from previous functional success */
+    /* Grid Buttons - No bold weight */
     .comp-grid .stButton > button {
         width: 100% !important;
         font-size: 2.4em !important;
@@ -210,23 +215,23 @@ def apply_dynamic_css():
         color: white !important;
         border: none !important;
         border-radius: 14px !important;
-        font-weight: 700 !important;
+        font-weight: 400 !important;
     }
     
-    /* Detail View Buttons */
+    /* Detail View Buttons - Large font, no bold */
     .char-btn-wrap .stButton > button {
         width: 100% !important;
         font-size: 3.8em !important;
-        font-weight: 700 !important;
+        font-weight: 400 !important;
         background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%) !important;
         border: 3px solid #dee2e6 !important;
         border-radius: 16px !important;
     }
 
-    /* Status Line Enhancement */
+    /* Status Line - No bold */
     .status-line {
         font-size: 1.2em;
-        font-weight: 700;
+        font-weight: 400 !important;
         color: #0f5132;
         background: #e8f5e9;
         border: 2px solid #81c784;
@@ -652,12 +657,7 @@ def generate_clean_card_html(c, usage_count=None):
 
     meta_items = []
     
-    # 1. Primary Pinyin (Rank #1 in metadata)
-    if pinyin and pinyin != "—":
-        meta_items.append(f"<span class='meta-pinyin'>{pinyin}</span>")
-    
-    # 2. RESTORED: Traditional <-> Simplified Conversion
-    # Checks both OpenCC converters to find the counterpart
+    # Script Variants
     if cc_t2s:
         simplified = cc_t2s.convert(c)
         if simplified != c:
@@ -667,7 +667,7 @@ def generate_clean_card_html(c, usage_count=None):
         if traditional != c:
             meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. ➔ {traditional}</span>")
 
-    # 3. Structural Metadata
+    # Metadata
     if strokes:
         meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
     if decomp and decomp != "—":
@@ -675,14 +675,19 @@ def generate_clean_card_html(c, usage_count=None):
     if usage_count is not None and usage_count > 0:
         meta_items.append(f"<span class='meta-tag'>In {usage_count} chars</span>")
 
-    # Final Layout: Large Subject + Enlarged Text
+    # Layout: Pinyin stacked on top of character
+    pinyin_html = f"<div style='font-size: 1.3em; color: #d35400; text-align: center; line-height: 1;'>{pinyin}</div>" if pinyin and pinyin != '—' else ""
+    
     html_content = f"""
     <div class='char-card' style='display: flex; align-items: flex-start;'>
-        <div class='card-subject'>{c}</div>
+        <div style='display: flex; flex-direction: column; align-items: center; margin-right: 25px; min-width: 80px;'>
+            {pinyin_html}
+            <div class='card-subject' style='margin-top: 5px;'>{c}</div>
+        </div>
         <div style='flex: 1;'>
             <div class='meta-row'>{''.join(meta_items)}</div>
             <div class='def-row'>{definition}</div>
-            {f"<div class='ety-row'><b>Origin:</b> {etymology}</div>" if etymology else ""}
+            {f"<div class='ety-row'>Origin: {etymology}</div>" if etymology else ""}
         </div>
     </div>
     """
@@ -1359,32 +1364,19 @@ def main():
         # DETAIL LIST VIEW
         st.session_state.display_mode = "Single Character"
 
-        path_items = ["🏠 Root"] + st.session_state.history + [f"<b>{st.session_state.selected_comp}</b>"]
-        path_str = " &nbsp;→&nbsp; ".join(path_items)
-
-        st.markdown(
-            f"""
-            <div class='status-line'>
-                <div style='margin-bottom:8px;'>
-                    <span class='status-tag'>Location</span> 
-                    <span class='map-path'>{path_str}</span>
-                </div>
-                <div class='status-text' style='font-size:0.85em; color:#666;'>Single-click previews. Double-click explores.</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        # 1. MOVED TO SIDEBAR: The map (path) is now handled in the sidebar logic below.
+        # Ensure any old 'path_str' or 'status-line' code in this 'else' block is removed.
 
         selected = st.session_state.selected_comp
         final_chars_list = []
         seen_chars = set()
 
-        # 1. THE ANCHOR: Selected Character (Rank #1)
+        # STEP A: THE ANCHOR - The Selected Character (Rank #1)
         if selected in component_map:
             final_chars_list.append(selected)
             seen_chars.add(selected)
 
-        # 2. THE EQUIVALENT: Traditional/Simplified (Rank #2)
+        # STEP B: THE EQUIVALENT - Traditional/Simplified Variant (Rank #2)
         if cc_t2s and cc_s2t:
             s_cand = cc_t2s.convert(selected)
             t_cand = cc_s2t.convert(selected)
@@ -1394,26 +1386,24 @@ def main():
                 final_chars_list.append(variant)
                 seen_chars.add(variant)
 
-        # 3. COMPONENTS: Structural parts (Rank #3)
+        # STEP C: COMPONENTS - Structural parts (Rank #3)
         decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
         components_list = [c for c in decomp_raw if c not in IDC_CHARS and c != "?" and c != "—"]
-        
         for c in components_list:
             if c not in seen_chars and c in component_map:
                 final_chars_list.append(c)
                 seen_chars.add(c)
 
-        # 4. CHILDREN: Containing characters (Rank #4)
+        # STEP D: CHILDREN - Containing characters (Rank #4)
         related_raw = component_map.get(selected, {}).get("related_characters", [])
-        children_list = [c for c in related_raw if isinstance(c, str) and len(c) == 1]
-        children_sorted = sorted(children_list, key=sort_key_usage_then_zipf)
-
+        children_list = sorted([c for c in related_raw if isinstance(c, str) and len(c) == 1], key=sort_key_usage_then_zipf)
         for c in children_sorted:
             if c not in seen_chars and c in component_map:
                 final_chars_list.append(c)
                 seen_chars.add(c)
 
         chars = final_chars_list
+        
         # Hybrid render: 120 clickable, rest static
         LIMIT = 120
         clickable_chars = chars[:LIMIT]
