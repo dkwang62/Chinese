@@ -25,6 +25,7 @@ st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 IDC_CHARS = {"⿰", "⿱", "⿲", "⿳", "⿴", "⿵", "⿶", "⿷", "⿸", "⿹", "⿺", "⿻"}
 SCRIPT_FILTERS = ["Any", "Simplified", "Traditional"]
 
+
 # --- MEMORY-OPTIMIZED DATA PIPELINE WITH ZIPF ---
 def zipf_commonness_raw(ch: str) -> float:
     if not ch or ZIPF is None:
@@ -42,6 +43,7 @@ def zipf_commonness_raw(ch: str) -> float:
             except: pass
     return z
 
+
 @st.cache_resource
 def get_zipf_frequency():
     try:
@@ -50,7 +52,9 @@ def get_zipf_frequency():
     except Exception:
         return None
 
+
 ZIPF = get_zipf_frequency()
+
 
 @st.cache_resource
 def load_and_augment_map():
@@ -60,14 +64,18 @@ def load_and_augment_map():
     except FileNotFoundError:
         return {}
 
+    # Augment in-place to minimize memory footprint
     for char, info in data.items():
         meta = info.get("meta", {})
         
+        # Pre-calculate usage count
         rel = info.get("related_characters", [])
         info['usage_count'] = len({c for c in rel if isinstance(c, str) and len(c) == 1})
         
+        # Pre-calculate Zipf value
         info['zipf_val'] = zipf_commonness_raw(char)
         
+        # Clean stroke count
         s = meta.get("strokes")
         try:
             if isinstance(s, (int, float)) and s > 0:
@@ -81,6 +89,7 @@ def load_and_augment_map():
     
     gc.collect()
     return data
+
 
 @st.cache_resource
 def get_component_stats(_component_map):
@@ -113,9 +122,11 @@ def get_component_stats(_component_map):
         "used_components": used_comps
     }
 
+
 # --- Load Data ---
 component_map = load_and_augment_map()
 stats_cache = get_component_stats(component_map) if component_map else {}
+
 
 def apply_dynamic_css():
     css = """
@@ -146,6 +157,12 @@ def apply_dynamic_css():
         align-items: center;
         flex-wrap: wrap;
         gap: 12px;
+    }
+    .meta-pinyin {
+        font-weight: 700;
+        font-size: 2.4em;
+        color: #d35400;
+        text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1);
     }
     .meta-tag {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -183,7 +200,7 @@ def apply_dynamic_css():
         line-height: 1.5;
     }
     
-    /* Grid Buttons */
+    /* Grid Buttons - STRETCH with better styling */
     .comp-grid .stButton > button {
         width: 100% !important;
         font-size: 2.2em !important;
@@ -197,41 +214,57 @@ def apply_dynamic_css():
         font-weight: 600 !important;
         transition: all 0.2s ease !important;
     }
+    .comp-grid .stButton > button:hover {
+        background: linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%) !important;
+        border-color: #f2c6c6 !important;
+        color: #c0392b !important;
+        transform: translateY(-3px) !important;
+        box-shadow: 0 6px 16px rgba(192, 57, 43, 0.15) !important;
+    }
     
-    /* Detail List View Buttons - Large */
+    /* Detail List View Buttons - STRETCH */
     .char-btn-wrap .stButton > button {
         width: 100% !important;
-        font-size: 5.2em !important;
-        font-weight: 800 !important;
+        font-size: 3.8em !important;
+        font-weight: 700 !important;
         background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%) !important;
         border: 3px solid #dee2e6 !important;
         padding: 10px !important;
-        min-height: 120px !important;
-        border-radius: 18px !important;
-        box-shadow: 0 6px 16px rgba(0,0,0,0.1) !important;
+        min-height: 90px !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
         transition: all 0.25s ease !important;
-        line-height: 1.1 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
+    }
+    .char-btn-wrap .stButton > button:hover {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        border-color: #3b82f6 !important;
+        transform: scale(1.02) !important;
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.2) !important;
     }
     
-    /* Pen Button */
+    /* Pen Button - STRETCH */
     .pen-btn-wrap .stButton > button {
         width: 100% !important;
-        font-size: 1.9em !important;
+        font-size: 1.6em !important;
         border: 2px solid #dee2e6 !important;
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
         margin-top: 8px !important;
-        height: 52px !important;
+        height: 45px !important;
         line-height: 1 !important;
         color: #555 !important;
         font-weight: 600 !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         transition: all 0.2s ease !important;
     }
-    
-    /* Static Box */
+    .pen-btn-wrap .stButton > button:hover {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        border-color: #64b5f6 !important;
+        color: #1565c0 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(100, 181, 246, 0.2) !important;
+    }
+
+    /* Static Cards */
     .char-static-box {
         font-size: 3.8em;
         font-weight: 700;
@@ -248,7 +281,7 @@ def apply_dynamic_css():
         cursor: default;
         box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
-    
+
     /* Status Line */
     .status-line {
         font-size: 1.1em;
@@ -261,7 +294,26 @@ def apply_dynamic_css():
         margin: 20px 0 30px 0;
         box-shadow: 0 3px 10px rgba(15, 81, 50, 0.08);
     }
+    .status-tag {
+        background: linear-gradient(135deg, #ffffff 0%, #f1f3f5 100%);
+        color: #2c3e50;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.9em;
+        border: 2px solid #dee2e6;
+        display: inline-flex;
+        align-items: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+    .map-path {
+        font-family: 'Monaco', 'Menlo', monospace;
+        color: #155724;
+        margin-left: 10px;
+        font-weight: 600;
+    }
     
+    /* Count Lines */
     .preview-count-line {
         font-size: 1.4em;
         text-align: center;
@@ -269,74 +321,149 @@ def apply_dynamic_css():
         margin: 25px 0 30px 0;
         font-weight: 600;
     }
-
-        CARD_CSS = """
-        <style>
-        .char-card{
-            background: linear-gradient(135deg,#ffffff 0%,#f8f9fa 100%);
-            padding: 24px;
-            border-radius: 16px;
-            border: 1px solid #e9ecef;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-            font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji";
-        }
-        .meta-row{
-            font-size: 0.95em;
-            color: #555;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-        .meta-tag{
-            background: linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);
-            padding: 4px 12px;
-            border-radius: 8px;
-            font-size: 0.85em;
-            color: #495057;
-            font-weight: 600;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-        }
-        .meta-tag-trad{
-            background: linear-gradient(135deg,#fff8e1 0%,#ffecb3 100%);
-            color: #856404;
-            border: 1px solid #ffd54f;
-        }
-        .meta-tag-simp{
-            background: linear-gradient(135deg,#d1e7dd 0%,#a3cfbb 100%);
-            color: #0f5132;
-            border: 1px solid #81c784;
-        }
-        .def-row{
-            font-size: 1.15em;
-            line-height: 1.6;
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-weight: 500;
-        }
-        .ety-row{
-            font-size: 0.92em;
-            color: #666;
-            font-style: italic;
-            border-top: 2px solid #e9ecef;
-            padding-top: 12px;
-            margin-top: 8px;
-            line-height: 1.5;
-        }
+    .preview-count-line .char {
+        font-size: 1.5em;
+        font-weight: 800;
+        color: #e74c3c;
+        text-shadow: 0 2px 4px rgba(231, 76, 60, 0.1);
+    }
+    
+    /* Footer */
+    .jump-footer {
+        margin-top: 50px;
+        padding: 25px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-top: 3px solid #dee2e6;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 -3px 10px rgba(0,0,0,0.04);
+    }
+    
+    /* Expander Buttons - STRETCH */
+    div[data-testid="stExpander"] .stButton > button {
+        width: 100% !important;
+        font-size: 1.3rem !important;
+        height: 45px !important;
+        padding: 0 !important;
+        line-height: 1.2 !important;
+        border-radius: 10px !important;
+        border: 2px solid #dee2e6 !important;
+        transition: all 0.2s ease !important;
+        font-weight: 600 !important;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
+    }
+    div[data-testid="stExpander"] .stButton > button:hover {
+        border-color: #adb5bd !important;
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    }
+    
+    .stroke-header {
+        font-size: 0.9em;
+        color: #6c757d;
+        border-bottom: 2px solid #dee2e6;
+        margin: 15px 0 8px 0;
+        padding-bottom: 4px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Compound Lists */
+    .compound-item {
+        display: flex;
+        align-items: baseline;
+        margin-bottom: 10px;
+        padding: 12px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #e9ecef;
+        border-radius: 8px;
+        background: #ffffff;
+        transition: all 0.2s ease;
+    }
+    .compound-item:hover {
+        background: #f8f9fa;
+        transform: translateX(4px);
+    }
+    .compound-item:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    .cp-word {
+        font-weight: 700;
+        font-size: 1.2em;
+        color: #2c3e50;
+        min-width: 85px;
+        margin-right: 15px;
+    }
+    .cp-pinyin {
+        color: #d35400;
+        font-family: 'Monaco', 'Menlo', monospace;
+        margin-right: 15px;
+        font-weight: 600;
+        font-size: 1.5em;
+    }
+    .cp-mean {
+        color: #495057;
+        font-size: 1em;
+        flex: 1;
+        line-height: 1.5;
+    }
+    
+    /* Splash Screen */
+    .splash-wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px 20px 20px;
+    }
+    .splash-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 2px solid #dee2e6;
+        border-radius: 24px;
+        padding: 40px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    }
+    .splash-title {
+        font-size: 2.6em;
+        font-weight: 900;
+        line-height: 1.2;
+        color: #111;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .splash-sub {
+        margin-top: 15px;
+        font-size: 1.2em;
+        color: #495057;
+        line-height: 1.6;
+    }
+    .splash-demo {
+        margin-top: 25px;
+        padding: 18px 20px;
+        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+        border: 2px solid #ffd54f;
+        border-radius: 16px;
+        box-shadow: 0 3px 10px rgba(255, 193, 7, 0.1);
+    }
+    .splash-demo-h {
+        font-weight: 800;
+        color: #856404;
+        margin-bottom: 10px;
+        font-size: 1.1em;
+    }
     
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
-    
-def render_card(c: str, usage_count: int | None = None, height: int = 260):
-    card_html = generate_clean_card_html(c, usage_count=usage_count)
-    # Render in a component iframe so Markdown can’t escape it.
-    st_html(CARD_CSS + card_html, height=height, scrolling=False)
-
 
 def render_ipad_safe_download(data_str, filename, label):
+    """
+    Triggers a background download on iPadOS. 
+    Prevents Safari from navigating away to a 'dead-end' preview screen.
+    """
     b64 = base64.b64encode(data_str.encode()).decode()
+    # Using 'application/octet-stream' forces the browser to download 
+    # rather than attempt to 'open' or 'preview' the JSON.
     href = f'data:application/octet-stream;base64,{b64}'
     
     html_button = f"""
@@ -355,9 +482,17 @@ def render_ipad_safe_download(data_str, filename, label):
             {label}
         </a>
     </div>
+    <script>
+        // Optional: Provide visual feedback that the download started
+        const link = document.querySelector('a[download="{filename}"]');
+        link.addEventListener('click', () => {{
+            console.log('Download triggered');
+        }});
+    </script>
     """
     st.markdown(html_button, unsafe_allow_html=True)
 
+# --- Database ---
 @st.cache_resource
 def get_db_connection():
     try:
@@ -366,7 +501,9 @@ def get_db_connection():
     except Exception:
         return None
 
+
 def batch_get_phrase_details(words, conn):
+    """Fetches details for a list of words in a SINGLE query."""
     if not conn or not words:
         return {}
     try:
@@ -379,13 +516,18 @@ def batch_get_phrase_details(words, conn):
     except Exception:
         return {}
 
+
+# --- Optimized Helpers ---
 def get_stroke_count(char):
     return component_map.get(char, {}).get("stroke_count")
+
 
 def component_usage_count(comp: str) -> int:
     return component_map.get(comp, {}).get("usage_count", 0)
 
+
 def sort_key_usage_then_zipf(ch: str):
+    """Smart sorting: high-usage components by frequency, low-usage by language commonness"""
     info = component_map.get(ch, {})
     use = info.get('usage_count', 0)
     z = info.get('zipf_val', float("-inf"))
@@ -395,6 +537,7 @@ def sort_key_usage_then_zipf(ch: str):
         return (group, -use, -z, strokes, ch)
     return (group, -z, strokes, ch)
 
+
 def apply_script_filter(chars: list[str]) -> list[str]:
     f = st.session_state.get("script_filter", "Any")
     if f == "Any":
@@ -403,12 +546,27 @@ def apply_script_filter(chars: list[str]) -> list[str]:
         return [c for c in chars if not cc_t2s or cc_t2s.convert(c) == c]
     return [c for c in chars if not cc_s2t or cc_s2t.convert(c) == c]
 
+
 def clean_field(field):
     return field[0] if isinstance(field, list) and field else field or "—"
+
+
+def get_etymology_text(meta):
+    etymology = meta.get("etymology", {})
+    hint = clean_field(etymology.get("hint", ""))
+    if not hint or hint.lower() == "no hint":
+        hint = ""
+    details = clean_field(etymology.get("details", ""))
+    if details == "—":
+        details = ""
+    parts = [p for p in [hint, details] if p]
+    return "; ".join(parts) if parts else None
+
 
 def format_decomposition(char):
     d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
     return "—" if not d or "?" in d else d
+
 
 def normalize_single_hanzi(raw: str) -> str:
     if not raw:
@@ -417,7 +575,9 @@ def normalize_single_hanzi(raw: str) -> str:
     chars = [ch for ch in s.strip() if not ch.isspace() and unicodedata.category(ch) != "Cf"]
     return chars[0] if len(chars) == 1 else ""
 
+
 def resolve_to_known_variant(ch: str) -> str:
+    """Try to find a known variant (simplified/traditional) if the exact char isn't in the map"""
     if not ch:
         return ""
     if ch in component_map:
@@ -432,9 +592,11 @@ def resolve_to_known_variant(ch: str) -> str:
             return s
     return ""
 
+
 def reset_script_filter_to_any():
     st.session_state.script_filter = "Any"
     st.session_state.pop("w_script_filter", None)
+
 
 # --- Session State ---
 defaults = {
@@ -458,10 +620,12 @@ defaults = {
     "fav_cursor": 0,
     "history": [],
 }
+
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+# Load favourites
 if not st.session_state.favourites_list:
     try:
         with open("favourites.json", "r", encoding="utf-8") as f:
@@ -472,21 +636,26 @@ if not st.session_state.favourites_list:
     except FileNotFoundError:
         pass
 
+
 # --- Callbacks ---
 def sync_stroke_range():
     st.session_state.stroke_range = st.session_state.w_stroke_range
     st.session_state.page = 1
 
+
 def sync_idc():
     st.session_state.component_idc = st.session_state.w_idc
     st.session_state.page = 1
+
 
 def sync_component_only():
     st.session_state.component_only = st.session_state.w_component_only
     st.session_state.page = 1
 
+
 def sync_script_filter():
     st.session_state.script_filter = st.session_state.w_script_filter
+
 
 def sync_text():
     raw = st.session_state.get("w_text", "")
@@ -509,6 +678,7 @@ def sync_text():
     st.session_state.stroke_view_active = False
     st.session_state.display_mode = "Single Character"
 
+
 def sync_sidebar_text():
     raw = st.session_state.get("sb_search", "")
     v = normalize_single_hanzi(raw)
@@ -530,6 +700,7 @@ def sync_sidebar_text():
     st.session_state.stroke_view_char = ""
     st.session_state.display_mode = "Single Character"
 
+
 def tile_click(c):
     if st.session_state.show_inputs:
         if st.session_state.preview_comp == c:
@@ -545,6 +716,7 @@ def tile_click(c):
         else:
             st.session_state.preview_comp = c
 
+
 def list_tile_click(c):
     if st.session_state.preview_comp == c:
         reset_script_filter_to_any()
@@ -559,6 +731,7 @@ def list_tile_click(c):
         st.session_state.display_mode = "Single Character"
     else:
         st.session_state.preview_comp = c
+
 
 def go_back():
     st.session_state.preview_comp = None
@@ -576,6 +749,7 @@ def go_back():
     else:
         st.session_state.show_inputs = True
 
+
 def go_to_root():
     st.session_state.history = []
     st.session_state.preview_comp = None
@@ -588,9 +762,11 @@ def go_to_root():
     reset_script_filter_to_any()
     st.session_state.display_mode = "Single Character"
 
+
 def end_stroke_view():
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
+
 
 def toggle_favourite(char):
     is_now_checked = st.session_state.get(f"fav_chk_{char}", False)
@@ -606,6 +782,7 @@ def toggle_favourite(char):
         if char in st.session_state.favourites_list:
             st.session_state.favourites_list.remove(char)
 
+
 def handle_file_upload():
     uploaded_file = st.session_state.get("fav_uploader")
     if uploaded_file is not None:
@@ -619,71 +796,106 @@ def handle_file_upload():
         except Exception as e:
             st.error(f"Error loading file: {e}")
 
-def generate_clean_card_html(c: str, usage_count: int | None = None) -> str:
+
+def build_chatgpt_prompt(char: str) -> str:
+    char = (char or "").strip()[:1]
+    meta = component_map.get(char, {}).get("meta", {})
+    def_en = clean_field(meta.get("definition", ""))
+    decomp = format_decomposition(char)
+
+    return f"""You are a bilingual Chinese dictionary editor.
+
+Task:
+For the single Hanzi below, give two example sentences that BEST illustrate the meaning (prefer everyday usage unless the character is primarily literary).
+
+For each example, provide:
+a) Traditional Chinese sentence
+b) Simplified Chinese sentence
+c) Natural English translation
+d) Target word/phrase (must include the character)
+e) Read-aloud pinyin of the full Chinese sentence (with tone marks, natural word grouping)
+
+Hanzi: {char}
+- English definition: {def_en}
+"""
+
+
+def render_copy_to_clipboard(prompt_text: str, widget_id: str):
+    safe_text = json.dumps(prompt_text, ensure_ascii=False)
+    st_html(
+        f"""
+        <div style="display:flex; justify-content:center; margin:10px 0 0 0;">
+          <button id="copy-btn-{widget_id}" style="
+              padding:10px 14px; border-radius:10px; border:1px solid #ddd;
+              background:#fff; cursor:pointer; font-weight:700;">
+            Copy Prompt to Clipboard
+          </button>
+        </div>
+        <div id="copy-msg-{widget_id}" style="text-align:center; margin-top:8px; color:#2e7d32; font-weight:600;"></div>
+        <script>
+          (function() {{
+            const text = {safe_text};
+            const btn = document.getElementById("copy-btn-{widget_id}");
+            const msg = document.getElementById("copy-msg-{widget_id}");
+            if (!btn) return;
+
+            async function copy() {{
+              try {{
+                await navigator.clipboard.writeText(text);
+                msg.textContent = "Copied. Paste into ChatGPT.";
+              }} catch (e) {{
+                msg.textContent = "Copy failed. Please manually select and copy from the textbox above.";
+              }}
+              setTimeout(() => {{ msg.textContent = ""; }}, 2500);
+            }}
+
+            btn.addEventListener("click", copy);
+          }})();
+        </script>
+        """,
+        height=90,
+    )
+
+
+def generate_clean_card_html(c, usage_count=None):
+    if not c:
+        return ""
     info = component_map.get(c, {})
     meta = info.get("meta", {})
+    pinyin = clean_field(meta.get("pinyin", ""))
+    strokes = info.get('stroke_count')
+    radical = clean_field(meta.get("radical", ""))
+    decomp = format_decomposition(c)
+    definition = clean_field(meta.get("definition", ""))
+    etymology = get_etymology_text(meta)
 
-    pinyin_list = meta.get("pinyin")
-    pinyin = pinyin_list[0] if isinstance(pinyin_list, list) and pinyin_list else "?"
-    definition = meta.get("definition") or "No definition available."
+    meta_items = []
+    if pinyin and pinyin != "—":
+        meta_items.append(f"<span class='meta-pinyin'>{pinyin}</span>")
+    if strokes:
+        meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
+    if radical and radical != "—":
+        meta_items.append(f"<span class='meta-tag'>Rad. {radical}</span>")
+    if decomp and decomp != "—":
+        meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
+    if usage_count is not None and usage_count > 0:
+        meta_items.append(f"<span class='meta-tag'>Used in {usage_count} chars</span>")
 
-    etymology_html = ""
-    ety_raw = meta.get("etymology")
-    if isinstance(ety_raw, str) and ety_raw.strip():
-        etymology_html = f"<div class='ety-row'>{html.escape(ety_raw.strip())}</div>"
+    if cc_t2s:
+        simplified = cc_t2s.convert(c)
+        if simplified != c:
+            meta_items.append(f"<span class='meta-tag meta-tag-trad'>Trad. → {simplified}</span>")
+    if cc_s2t:
+        traditional = cc_s2t.convert(c)
+        if traditional != c:
+            meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. → {traditional}</span>")
 
-    strokes = info.get("stroke_count")
-    radical = meta.get("radical", "")
-
-    script_tag = ""
-    if cc_t2s and cc_s2t:
-        try:
-            s = cc_t2s.convert(c)
-            t = cc_s2t.convert(c)
-            if c == s and t != c and t in component_map:
-                script_tag = "<span class='meta-tag meta-tag-simp'>Simplified</span>"
-            elif c == t and s != c and s in component_map:
-                script_tag = "<span class='meta-tag meta-tag-trad'>Traditional</span>"
-        except:
-            pass
-
-    usage_text = f"Used in {usage_count} chars" if usage_count is not None else ""
-
-    large_header = (
-        "<div style='position:relative; height:160px; background:linear-gradient(135deg,#f8fbff 0%,#eef4ff 100%);"
-        "border-radius:16px; margin-bottom:20px; display:flex; align-items:center; justify-content:center;"
-        "box-shadow:0 4px 15px rgba(0,0,0,0.08); overflow:hidden;'>"
-        f"<div style='font-size:7.5em; font-weight:900; color:#1a1a1a; line-height:1;'>{html.escape(c)}</div>"
-        f"<div style='position:absolute; top:14px; left:0; right:0; text-align:center; font-size:2.0em; "
-        f"font-weight:700; color:#d35400; text-shadow:0 2px 4px rgba(211,84,0,0.2); letter-spacing:1.8px;'>"
-        f"{html.escape(pinyin)}</div>"
-        "</div>"
-    )
-
-    meta_bits = []
-    if script_tag:
-        meta_bits.append(script_tag)
-    if radical:
-        meta_bits.append(f"<span class='meta-tag'>Rad. {html.escape(str(radical))}</span>")
-    if strokes is not None:
-        meta_bits.append(f"<span class='meta-tag'>{int(strokes)} strokes</span>")
-    if usage_text:
-        meta_bits.append(f"<span class='meta-tag'>{html.escape(usage_text)}</span>")
-    meta_row = "".join(meta_bits)
-
-    return (
-        "<div class='char-card'>"
-        f"{large_header}"
-        f"<div class='meta-row'>{meta_row}</div>"
-        f"<div class='def-row'>{html.escape(str(definition))}</div>"
-        f"{etymology_html}"
-        "</div>"
-    )
-
-    return card_html
+    meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
+    def_html = f"<div class='def-row'>{definition}</div>" if definition and definition != "—" else ""
+    ety_html = f"<div class='ety-row'>{etymology}</div>" if etymology else ""
+    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}</div>"
 
 
-    
 def render_stroke_order_sidebar(char: str, size: int = 110):
     char = (char or "").strip()[:1]
     if not char:
@@ -1078,7 +1290,6 @@ def render_splash():
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='height:30px;'></div>", unsafe_allow_html=True)
-    
 def main():
     if not component_map:
         st.error("Component dataset not loaded. Ensure enhanced_component_map_with_etymology.json exists.")
@@ -1104,58 +1315,156 @@ def main():
 
         current_char_for_sidebar = None
 
-        # === COMMON SIDEBAR ELEMENTS FOR ALL DETAIL VIEWS ===
-        # This block handles breadcrumb + navigation for BOTH regular detail and stroke view
+        if st.session_state.stroke_view_active:
+            current_char_for_sidebar = st.session_state.stroke_view_char
+            c1, c2 = st.columns(2)
+            with c1:
+                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+            with c2:
+                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
 
-        current_main_char = st.session_state.stroke_view_char if st.session_state.stroke_view_active else st.session_state.selected_comp
+            st.markdown("---")
+            st.markdown("### Character Info")
 
-        # Breadcrumb path — shown in ALL detail modes (including stroke view)
-        if current_main_char:
-            path_items = ["🏠 Root"] + st.session_state.history
-            if st.session_state.stroke_view_active:
-                path_items += [f"<i>{current_main_char}</i> (Stroke Order)"]
-            else:
-                path_items += [f"<b>{current_main_char}</b>"]
-            path_str = " → ".join(path_items)
             st.markdown(
-                f"<div style='font-size:0.95em; margin:18px 0; color:#444; text-align:center; font-weight:500;'>{path_str}</div>",
+                f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>",
                 unsafe_allow_html=True,
             )
+            st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
 
-        # Navigation buttons
-        nav_col1, nav_col2 = st.columns(2)
-        with nav_col1:
-            if st.session_state.stroke_view_active:
-                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
-            else:
-                st.button("← Back", on_click=go_back, use_container_width=True)
-        with nav_col2:
-            st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+            s_char = cc_t2s.convert(current_char_for_sidebar) if cc_t2s else current_char_for_sidebar
+            t_char = cc_s2t.convert(current_char_for_sidebar) if cc_s2t else current_char_for_sidebar
+            counterpart = None
+            if current_char_for_sidebar == s_char and t_char != current_char_for_sidebar:
+                counterpart = t_char
+            elif current_char_for_sidebar == t_char and s_char != current_char_for_sidebar:
+                counterpart = s_char
 
-        st.markdown("---")
+            if counterpart:
+                st.markdown("---")
+                st.markdown(
+                    f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px; color:#666;'>{counterpart}</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(generate_clean_card_html(counterpart), unsafe_allow_html=True)
 
-        # Current character for display (preview or selected, or stroke view char)
-        current_char_for_sidebar = (
-            st.session_state.stroke_view_char if st.session_state.stroke_view_active
-            else (st.session_state.preview_comp or st.session_state.selected_comp)
-        )
-
-        if current_char_for_sidebar:
-            # Stroke order animation in sidebar
-            render_stroke_order_sidebar(current_char_for_sidebar, size=140 if not st.session_state.stroke_view_active else 110)
-
-            # Favourite checkbox
-            is_fav = current_char_for_sidebar in st.session_state.favourites_list
+        elif st.session_state.show_inputs:
+            st.markdown("### Filters")
             st.checkbox(
-                "Show in Favourites",
-                value=is_fav,
-                key=f"fav_chk_{current_char_for_sidebar}",
-                on_change=toggle_favourite,
-                args=(current_char_for_sidebar,),
+                "Show Components Only",
+                key="w_component_only",
+                value=st.session_state.component_only,
+                on_change=sync_component_only,
             )
 
-            # Script filter (only in regular detail view, not stroke view)
-            if not st.session_state.stroke_view_active:
+            min_s, max_s = st.session_state.stroke_range
+            s_label = f"Strokes: {min_s} — {max_s}"
+            with st.expander(s_label, expanded=False):
+                st.slider(
+                    "Select Stroke Range",
+                    min_value=1,
+                    max_value=max_s_val,
+                    value=st.session_state.stroke_range,
+                    key="w_stroke_range",
+                    on_change=sync_stroke_range,
+                    label_visibility="collapsed",
+                )
+
+            r_label = f"Radical: {st.session_state.radical}" if st.session_state.radical != "none" else "Radical (Any)"
+            with st.expander(r_label, expanded=False):
+                for s in sorted(stats_cache["rad_groups"].keys()):
+                    st.markdown(f"<div class='stroke-header'>{s if s != 999 else '?'} Strokes</div>", unsafe_allow_html=True)
+                    rads = stats_cache["rad_groups"][s]
+                    cols = st.columns(5)
+                    for i, r in enumerate(rads):
+                        with cols[i % 5]:
+                            if st.button(r, key=f"rad_{r}", type="primary" if st.session_state.radical == r else "secondary"):
+                                st.session_state.radical = r
+                                st.session_state.page = 1
+                                st.rerun()
+
+            idc_label = (
+                f"Structure: {st.session_state.component_idc}"
+                if st.session_state.component_idc != "none"
+                else "Structure (Any)"
+            )
+            with st.expander(idc_label, expanded=False):
+                idc_keys = sorted(stats_cache["idc_counts"].keys())
+                idc_cols = st.columns(5)
+                for i, idc in enumerate(idc_keys):
+                    with idc_cols[i % 5]:
+                        if st.button(
+                            idc,
+                            key=f"idc_{idc}",
+                            type="primary" if st.session_state.component_idc == idc else "secondary",
+                            use_container_width=True,
+                        ):
+                            st.session_state.component_idc = idc
+                            st.session_state.page = 1
+                            st.rerun()
+
+            st.markdown("---")
+
+            if st.session_state.preview_comp:
+                current_char_for_sidebar = st.session_state.preview_comp
+                render_stroke_order_sidebar(current_char_for_sidebar, size=110)
+
+                is_fav = current_char_for_sidebar in st.session_state.favourites_list
+                st.checkbox(
+                    "Show in Favourites",
+                    value=is_fav,
+                    key=f"fav_chk_{current_char_for_sidebar}",
+                    on_change=toggle_favourite,
+                    args=(current_char_for_sidebar,),
+                )
+
+                if st.button(
+                    f"Explore {current_char_for_sidebar}",
+                    key="sb_select_btn",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    reset_script_filter_to_any()
+                    st.session_state.history = []
+                    st.session_state.selected_comp = current_char_for_sidebar
+                    st.session_state.last_valid_selected_comp = current_char_for_sidebar
+                    st.session_state.show_inputs = False
+                    st.session_state.preview_comp = None
+                    st.session_state.text_input_comp = current_char_for_sidebar
+                    st.session_state.display_mode = "Single Character"
+                    st.rerun()
+
+                related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
+                count = len(set([c for c in related if isinstance(c, str) and len(c) == 1]))
+                st.markdown(
+                    f"<div class='preview-count-line'>{count} characters contain <span class='char'>{current_char_for_sidebar}</span></div>",
+                    unsafe_allow_html=True,
+                )
+
+        else:
+            # DETAIL VIEW Sidebar
+            c1, c2 = st.columns(2)
+            with c1:
+                st.button("← Back", on_click=go_back, use_container_width=True)
+            with c2:
+                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+
+            current_char_for_sidebar = (
+                st.session_state.preview_comp if st.session_state.preview_comp else st.session_state.selected_comp
+            )
+
+            if current_char_for_sidebar:
+                render_stroke_order_sidebar(current_char_for_sidebar, size=140)
+
+                is_fav = current_char_for_sidebar in st.session_state.favourites_list
+                st.checkbox(
+                    "Show in Favourites",
+                    value=is_fav,
+                    key=f"fav_chk_{current_char_for_sidebar}",
+                    on_change=toggle_favourite,
+                    args=(current_char_for_sidebar,),
+                )
+
                 st.radio(
                     "Filter Results",
                     options=SCRIPT_FILTERS,
@@ -1174,32 +1483,6 @@ def main():
                     f"<div class='preview-count-line'>{count_filtered} characters contain <span class='char'>{current_char_for_sidebar}</span></div>",
                     unsafe_allow_html=True,
                 )
-            else:
-                # In stroke view: show character info cards (simplified/traditional)
-                st.markdown("### Character Info")
-                st.markdown(
-                    f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>",
-                    unsafe_allow_html=True,
-                )
-                # ← FIXED: Added unsafe_allow_html=True
-                st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
-                
-                s_char = cc_t2s.convert(current_char_for_sidebar) if cc_t2s else current_char_for_sidebar
-                t_char = cc_s2t.convert(current_char_for_sidebar) if cc_s2t else current_char_for_sidebar
-                counterpart = None
-                if current_char_for_sidebar == s_char and t_char != current_char_for_sidebar:
-                    counterpart = t_char
-                elif current_char_for_sidebar == t_char and s_char != current_char_for_sidebar:
-                    counterpart = s_char
-                
-                if counterpart:
-                    st.markdown("---")
-                    st.markdown(
-                        f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px; color:#666;'>{counterpart}</div>",
-                        unsafe_allow_html=True,
-                    )
-                    # ← FIXED: Added unsafe_allow_html=True
-                    st.markdown(generate_clean_card_html(counterpart), unsafe_allow_html=True)
 
     if st.session_state.stroke_view_active:
         render_stroke_order_view(st.session_state.stroke_view_char)
@@ -1303,12 +1586,17 @@ def main():
         # DETAIL LIST VIEW
         st.session_state.display_mode = "Single Character"
 
+        path_items = ["🏠 Root"] + st.session_state.history + [f"<b>{st.session_state.selected_comp}</b>"]
+        path_str = " &nbsp;→&nbsp; ".join(path_items)
+
         st.markdown(
-            """
+            f"""
             <div class='status-line'>
-                <div class='status-text' style='font-size:0.85em; color:#666;'>
-                    Single-click previews · Double-click explores
+                <div style='margin-bottom:8px;'>
+                    <span class='status-tag'>Location</span> 
+                    <span class='map-path'>{path_str}</span>
                 </div>
+                <div class='status-text' style='font-size:0.85em; color:#666;'>Single-click previews. Double-click explores.</div>
             </div>
             """,
             unsafe_allow_html=True,
