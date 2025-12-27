@@ -921,39 +921,6 @@ def main():
 
         phrase_char = st.session_state.preview_comp or st.session_state.selected_comp
 
-        if st.session_state.display_mode != "Single Character" and phrase_char:
-            n = {"2-Character Phrases": 2, "3-Character Phrases": 3, "4-Character Phrases": 4}.get(st.session_state.display_mode, 0)
-            meta_compounds = component_map.get(phrase_char, {}).get("meta", {}).get("compounds", [])
-            relevant = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
-            if relevant:
-                db_conn = get_db_connection()
-                if db_conn:
-                    phrases_map = batch_get_phrase_details(sorted(relevant), db_conn)
-                    items = []
-                    for word in sorted(relevant):
-                        entry = phrases_map.get(word)
-                        if entry:
-                            items.append(f"<div class='compound-item'>"
-                                         f"<span class='cp-word'>{word}</span>"
-                                         f"<span class='cp-pinyin'>{entry.get('pinyin', '')}</span>"
-                                         f"<span class='cp-mean'>{pyhtml.escape(entry.get('meanings', '')[:100] + ('...' if len(entry.get('meanings', '')) > 100 else ''))}</span>"
-                                         f"</div>")
-                        else:
-                            items.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
-                    st.markdown(f"""
-                        <div style='padding:15px; background:#f1f8e9; border-radius:8px; margin:10px auto; border:1px solid #dcedc8; max-width:900px; max-height:500px; overflow-y:auto;'>
-                          <div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; border-bottom:2px solid #a5d6a7; padding-bottom:5px; text-align:center;'>
-                            {st.session_state.display_mode} containing {phrase_char}
-                          </div>
-                          {''.join(items)}
-                        </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    st.warning("⚠️ 'phrases.db' not found.")
-            else:
-                st.info(f"No {st.session_state.display_mode} found for {phrase_char}.")
-            st.markdown("---")
-
         selected = st.session_state.selected_comp
         final_chars_list = []
         seen_chars = set()
@@ -990,13 +957,20 @@ def main():
         clickable_chars = apply_script_filter(chars[:LIMIT], st.session_state.script_filter)
         static_chars = apply_script_filter(chars[LIMIT:], st.session_state.script_filter)
 
+
+
+    
         for c in clickable_chars:
             col_char, col_details = st.columns([2, 10])
+            
+            # Logic to identify if this specific row is the "Active" focus
+            is_preview = st.session_state.preview_comp == c
+            is_active_focus = is_preview or (st.session_state.preview_comp is None and c == st.session_state.selected_comp)
+
             with col_char:
-                is_preview = st.session_state.preview_comp == c
                 st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
                 st.button(c, key=f"explore_char_{c}", type="primary" if is_preview else "secondary",
-                          on_click=list_tile_click, args=(c,), use_container_width=True)
+                        on_click=list_tile_click, args=(c,), use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
 
                 st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
@@ -1007,9 +981,48 @@ def main():
                 st.markdown("</div>", unsafe_allow_html=True)
 
             with col_details:
+                # 1. Generate character info card
                 usage_count = component_usage_count(c)
                 st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
-
+                
+                # 2. Performance: ONLY process phrases for the single character in focus
+                if is_active_focus and st.session_state.display_mode != "Single Character":
+                    n = {"2-Character Phrases": 2, "3-Character Phrases": 3, "4-Character Phrases": 4}.get(st.session_state.display_mode, 0)
+                    meta_compounds = component_map.get(c, {}).get("meta", {}).get("compounds", [])
+                    relevant = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
+                    
+                    if relevant:
+                        db_conn = get_db_connection()
+                        if db_conn:
+                            phrases_map = batch_get_phrase_details(sorted(relevant), db_conn)
+                            items_html_list = []
+                            for word in sorted(relevant):
+                                entry = phrases_map.get(word)
+                                if entry:
+                                    # FONT FIX: Reduced pinyin and meaning to 0.85rem for space
+                                    raw_mean = entry.get('meanings', '')
+                                    p_mean = pyhtml.escape(raw_mean[:130] + ('...' if len(raw_mean) > 130 else ''))
+                                    
+                                    # Use a clean single string for the item
+                                    items_html_list.append(
+                                        f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'>"
+                                        f"<span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span>"
+                                        f"<span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span>"
+                                        f"<span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span>"
+                                        f"</div>"
+                                    )
+                            
+                            # 3. RENDERING FIX: All HTML combined and rendered via ONE markdown call
+                            all_rows = "".join(items_html_list)
+                            st.markdown(f"""
+                                <div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>
+                                  <div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>
+                                    {st.session_state.display_mode} containing {c}
+                                  </div>
+                                  {all_rows}
+                                </div>
+                                """, unsafe_allow_html=True)
+            
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
         if static_chars:
