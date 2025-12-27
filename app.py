@@ -736,7 +736,7 @@ def main():
         if current_main_char:
             path_items = ["🏠 Root"] + st.session_state.history
             if st.session_state.stroke_view_active:
-                path_items += [f"<i>{current_main_char}</i> (Stroke Order)"]
+                path_items += [f"<i>{current_main_char}</i> (🧠)"]
             else:
                 path_items += [f"<b>{current_main_char}</b>"]
             path_str = " → ".join(path_items)
@@ -974,7 +974,7 @@ def main():
                 st.markdown("</div>", unsafe_allow_html=True)
 
                 st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-                if st.button("🖊️🧠AI", key=f"stroke_btn_{c}", help="Write AI prompt", use_container_width=True):
+                if st.button("🧠 link", key=f"stroke_btn_{c}", help="Write AI prompt", use_container_width=True):
                     st.session_state.stroke_view_char = c
                     st.session_state.stroke_view_active = True
                     st.rerun()
