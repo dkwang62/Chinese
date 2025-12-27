@@ -974,7 +974,7 @@ def main():
                 st.markdown("</div>", unsafe_allow_html=True)
 
                 st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-                if st.button("🖊️", key=f"stroke_btn_{c}", help="View stroke order", use_container_width=True):
+                if st.button("🖊️🧠AI", key=f"stroke_btn_{c}", help="Write AI prompt", use_container_width=True):
                     st.session_state.stroke_view_char = c
                     st.session_state.stroke_view_active = True
                     st.rerun()
