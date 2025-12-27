@@ -232,6 +232,7 @@ b) Simplified Chinese sentence
 c) Natural English translation
 d) Target word/phrase (must include the character)
 e) Read-aloud pinyin of the full Chinese sentence (with tone marks, natural word grouping)
+f) Show pictures if the character is a noun
 
 Hanzi: {char}
 - English definition: {def_en}
