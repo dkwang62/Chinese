@@ -404,7 +404,7 @@ defaults = {
     "stroke_range": (3, 8),
     "radical": "none",
     "component_idc": "none",
-    "display_mode": "Single Character",
+    "display_mode": "2-Character Phrases",
     "text_input_comp": "",
     "page": 1,
     "text_input_warning": None,
