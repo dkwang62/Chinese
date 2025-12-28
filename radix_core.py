@@ -169,21 +169,28 @@ def component_usage_count(comp: str) -> int:
     return component_map.get(comp, {}).get("usage_count", 0)
 
 
-def sort_key_usage_then_zipf(ch: str):
+def sort_key_usage_primary(ch: str):
+    """Current smart sort: usage first, then frequency"""
     info = component_map.get(ch, {})
     use = info.get('usage_count', 0)
-    freq = info.get('freq_per_million', 0.0)  # ← Now uses SUBTLEX-CH frequency
+    freq = info.get('freq_per_million', 0.0)
     strokes = info.get('stroke_count') or 999
 
-    # Primary: High component usage first (most useful as building blocks)
-    # Secondary: High standalone frequency (for low-usage but common chars)
-    # Tertiary: Fewer strokes
-    # Final: Alphabetical
     group = 0 if use >= 3 else 1
     if group == 0:
-        return (group, -use, -freq, strokes, ch)  # High usage → prioritize usage
+        return (group, -use, -freq, strokes, ch)
     else:
-        return (group, -freq, strokes, ch)       # Low usage → prioritize frequency
+        return (group, -freq, strokes, ch)
+
+
+def sort_key_frequency_primary(ch: str):
+    """Pure frequency sort: highest SUBTLEX-CH first"""
+    info = component_map.get(ch, {})
+    freq = info.get('freq_per_million', 0.0)
+    use = info.get('usage_count', 0)
+    strokes = info.get('stroke_count') or 999
+
+    return (-freq, -use, strokes, ch)  # Highest freq first, then usage as tiebreaker
 
 def apply_script_filter(chars: List[str], script_filter: str) -> List[str]:
     if script_filter == "Any":
@@ -413,6 +420,29 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
     </script>
     """
     return html_content, h
+
+def sort_key_usage_primary(ch: str):
+    """Sort: Prioritize high component usage, then SUBTLEX frequency"""
+    info = component_map.get(ch, {})
+    use = info.get('usage_count', 0)
+    freq = info.get('freq_per_million', 0.0)
+    strokes = info.get('stroke_count') or 999
+
+    group = 0 if use >= 3 else 1
+    if group == 0:
+        return (group, -use, -freq, strokes, ch)
+    else:
+        return (group, -freq, strokes, ch)
+
+
+def sort_key_frequency_primary(ch: str):
+    """Sort: Prioritize highest SUBTLEX frequency first, then usage"""
+    info = component_map.get(ch, {})
+    freq = info.get('freq_per_million', 0.0)
+    use = info.get('usage_count', 0)
+    strokes = info.get('stroke_count') or 999
+
+    return (-freq, -use, strokes, ch)
 
 
 # --- Full Stroke Order View HTML ---
