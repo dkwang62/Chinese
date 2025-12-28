@@ -144,6 +144,20 @@ def batch_get_phrase_details(words, conn):
         return {}
 
 
+def search_phrases_by_definition(search_term: str, conn, limit: int = 50):
+    """Search phrases by English definition/meaning"""
+    if not conn or not search_term:
+        return []
+    try:
+        cursor = conn.cursor()
+        query = "SELECT word, pinyin, meanings FROM phrases WHERE meanings LIKE ? LIMIT ?"
+        cursor.execute(query, (f"%{search_term}%", limit))
+        results = cursor.fetchall()
+        return [{"word": row[0], "pinyin": row[1], "meanings": row[2]} for row in results]
+    except Exception:
+        return []
+
+
 # --- Pure Helpers ---
 def get_stroke_count(char):
     return component_map.get(char, {}).get("stroke_count")
@@ -250,6 +264,7 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
     decomp = format_decomposition(c)
     definition = clean_field(meta.get("definition", ""))
     etymology = get_etymology_text(meta)
+    zipf_val = info.get('zipf_val', float('-inf'))
 
     meta_items = []
     if pinyin and pinyin != "—":
@@ -262,6 +277,25 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
         meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
     if usage_count is not None and usage_count > 0:
         meta_items.append(f"<span class='meta-tag'>Used in {usage_count} chars</span>")
+    
+    # Add Zipf frequency ranking if available
+    if zipf_val > 0:
+        # Zipf scale: 0-8, where higher = more common
+        # 6+ = very common, 4-6 = common, 2-4 = uncommon, <2 = rare
+        if zipf_val >= 6:
+            freq_label = "Very Common"
+            freq_color = "#2e7d32"  # green
+        elif zipf_val >= 4:
+            freq_label = "Common"
+            freq_color = "#558b2f"  # light green
+        elif zipf_val >= 2:
+            freq_label = "Uncommon"
+            freq_color = "#f57c00"  # orange
+        else:
+            freq_label = "Rare"
+            freq_color = "#c62828"  # red
+        
+        meta_items.append(f"<span class='meta-tag' style='background: linear-gradient(135deg, {freq_color}15 0%, {freq_color}25 100%); color: {freq_color}; border: 1px solid {freq_color}40;'>Usage: {freq_label} ({zipf_val:.1f})</span>")
 
     if cc_t2s:
         simplified = cc_t2s.convert(c)
@@ -408,7 +442,7 @@ def get_stroke_order_view_html(primary_char: str, display_mode: str) -> tuple[st
     # Phrases HTML — strictly 800px max-width
     phrases_html = None
     if display_mode != "Single Character" and primary_char:
-        n = {"2-Character Phrases": 2, "3-Character Phrases": 3, "4-Character Phrases": 4}.get(display_mode, 0)
+        n = {"2-Characters": 2, "3-Characters": 3, "4-Characters": 4}.get(display_mode, 0)
         meta_compounds = component_map.get(primary_char, {}).get("meta", {}).get("compounds", [])
         relevant = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
         if relevant:
