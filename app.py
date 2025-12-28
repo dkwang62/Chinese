@@ -267,6 +267,48 @@ def apply_dynamic_css():
         flex: 1;
         line-height: 1.5;
     }
+
+        /* Splash Screen */
+    .splash-wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px 20px 20px;
+    }
+    .splash-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 2px solid #dee2e6;
+        border-radius: 24px;
+        padding: 40px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    }
+    .splash-title {
+        font-size: 2.6em;
+        font-weight: 900;
+        line-height: 1.2;
+        color: #111;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .splash-sub {
+        margin-top: 15px;
+        font-size: 1.2em;
+        color: #495057;
+        line-height: 1.6;
+    }
+    .splash-demo {
+        margin-top: 25px;
+        padding: 18px 20px;
+        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+        border: 2px solid #ffd54f;
+        border-radius: 16px;
+        box-shadow: 0 3px 10px rgba(255, 193, 7, 0.1);
+    }
+    .splash-demo-h {
+        font-weight: 800;
+        color: #856404;
+        margin-bottom: 10px;
+        font-size: 1.1em;
+    }
+    
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
