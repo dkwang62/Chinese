@@ -404,7 +404,7 @@ defaults = {
     "stroke_range": (3, 8),
     "radical": "none",
     "component_idc": "none",
-    "display_mode": "2-Character Phrases",
+    "display_mode": "2-Characters",
     "text_input_comp": "",
     "page": 1,
     "text_input_warning": None,
@@ -476,7 +476,7 @@ def sync_text():
     st.session_state.show_inputs = False
     st.session_state.preview_comp = None
     st.session_state.stroke_view_active = False
-    st.session_state.display_mode = "Single Character"
+    st.session_state.display_mode = "2-Characters"
 
 def sync_sidebar_text():
     raw = st.session_state.get("sb_search", "")
@@ -497,7 +497,7 @@ def sync_sidebar_text():
     st.session_state.preview_comp = None
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
-    st.session_state.display_mode = "Single Character"
+    st.session_state.display_mode = "2-Characters"
 
 def tile_click(c):
     if st.session_state.show_inputs:
@@ -510,7 +510,7 @@ def tile_click(c):
             st.session_state.preview_comp = None
             st.session_state.text_input_comp = c
             st.session_state.stroke_view_active = False
-            st.session_state.display_mode = "Single Character"
+            st.session_state.display_mode = "2-Characters"
         else:
             st.session_state.preview_comp = c
 
@@ -525,7 +525,7 @@ def list_tile_click(c):
         st.session_state.preview_comp = None
         st.session_state.text_input_comp = c
         st.session_state.stroke_view_active = False
-        st.session_state.display_mode = "Single Character"
+        st.session_state.display_mode = "2-Characters"
     else:
         st.session_state.preview_comp = c
 
@@ -541,7 +541,7 @@ def go_back():
         st.session_state.selected_comp = prev
         st.session_state.last_valid_selected_comp = prev
         st.session_state.show_inputs = False
-        st.session_state.display_mode = "Single Character"
+        st.session_state.display_mode = "2-Characters"
     else:
         st.session_state.show_inputs = True
 
@@ -555,7 +555,7 @@ def go_to_root():
     st.session_state.selected_comp = ""
     st.session_state.show_inputs = True
     st.session_state.script_filter = "Any"
-    st.session_state.display_mode = "Single Character"
+    st.session_state.display_mode = "2-Characters"
 
 def end_stroke_view():
     st.session_state.stroke_view_active = False
@@ -600,7 +600,7 @@ def enter_component(comp: str):
     st.session_state.text_input_warning = None
     st.session_state.stroke_view_active = False
     st.session_state.stroke_view_char = ""
-    st.session_state.display_mode = "Single Character"
+    st.session_state.display_mode = "2-Characters"
 
 
 def render_splash():
@@ -683,6 +683,74 @@ def render_splash():
                             st.rerun()
                         st.caption(f"used in {count} characters")
         st.markdown("</div>", unsafe_allow_html=True)
+
+def render_radix_row(c):
+    """
+    Renders a standard row containing the character interaction buttons 
+    and the detailed information card.
+    """
+    col_char, col_details = st.columns([2, 10])
+    
+    # Identify if this character is currently being previewed
+    is_preview = st.session_state.preview_comp == c
+    is_active_focus = is_preview or (st.session_state.preview_comp is None and c == st.session_state.selected_comp)
+
+    with col_char:
+        # Large Character Explorer Button
+        st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
+        st.button(c, key=f"explore_char_{c}_{hash(c)}", type="primary" if is_preview else "secondary",
+                on_click=list_tile_click, args=(c,), use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # AI/Stroke Order Button
+        st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
+        if st.button("🧠 link", key=f"stroke_btn_{c}_{hash(c)}", help="Write AI prompt", use_container_width=True):
+            st.session_state.stroke_view_char = c
+            st.session_state.stroke_view_active = True
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_details:
+        # Generate the info card
+        usage_count = component_usage_count(c)
+        st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
+        
+        # Render phrases if this row is the active focus
+        if is_active_focus and st.session_state.display_mode != "Single Character":
+            # Map display mode to phrase length
+            n = {"2-Characters": 2, "3-Characters": 3, "4-Characters": 4}.get(st.session_state.display_mode, 0)
+            meta_compounds = component_map.get(c, {}).get("meta", {}).get("compounds", [])
+            relevant = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
+            
+            if relevant:
+                db_conn = get_db_connection()
+                if db_conn:
+                    phrases_map = batch_get_phrase_details(sorted(relevant), db_conn)
+                    items_html_list = []
+                    for word in sorted(relevant):
+                        entry = phrases_map.get(word)
+                        if entry:
+                            raw_mean = entry.get('meanings', '')
+                            p_mean = pyhtml.escape(raw_mean[:130] + ('...' if len(raw_mean) > 130 else ''))
+                            items_html_list.append(
+                                f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'>"
+                                f"<span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span>"
+                                f"<span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span>"
+                                f"<span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span>"
+                                f"</div>"
+                            )
+                    
+                    all_rows = "".join(items_html_list)
+                    st.markdown(f"""
+                        <div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>
+                          <div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>
+                            {st.session_state.display_mode} containing {c}
+                          </div>
+                          {all_rows}
+                        </div>
+                        """, unsafe_allow_html=True)
+    st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
+
 
 def main():
     """Main execution loop ensuring all filters and views are initialized."""
@@ -793,12 +861,25 @@ def main():
             st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{current_char_for_sidebar}",
                         on_change=toggle_favourite, args=(current_char_for_sidebar,))
 
+            # Inside the sidebar block
+            # Show phrase selector if we are NOT on the root screen (works for Detail AND Stroke view)
             if not st.session_state.show_inputs:
                 st.markdown("---")
-                st.markdown("### Display Mode")
-                modes = ["Single Character", "2-Character Phrases", "3-Character Phrases", "4-Character Phrases"]
-                current_idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 0
-                new_mode = st.radio("Select mode", options=modes, index=current_idx, key="sidebar_display_mode", label_visibility="collapsed")
+                st.markdown("### Display Phrases")
+                modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
+                
+                # Ensure current mode is valid
+                if st.session_state.display_mode not in modes:
+                    st.session_state.display_mode = "2-Characters"
+                    
+                current_idx = modes.index(st.session_state.display_mode)
+                new_mode = st.radio(
+                    "Select mode", 
+                    options=modes, 
+                    index=current_idx, 
+                    key="sidebar_display_mode", 
+                    label_visibility="collapsed"
+                )
                 if new_mode != st.session_state.display_mode:
                     st.session_state.display_mode = new_mode
                     st.rerun()
@@ -818,12 +899,21 @@ def main():
                 st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>", unsafe_allow_html=True)
                 st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
 
+    # Inside main()
     # --- Stroke Order Full View ---
     if st.session_state.stroke_view_active:
         st.markdown("### Stroke Order Animation")
-        main_html, phrases_html = get_stroke_order_view_html(st.session_state.stroke_view_char, st.session_state.display_mode)
+        
+        # Use the session state display mode to ensure it defaults to "2-Characters"
+        main_html, phrases_html = get_stroke_order_view_html(
+            st.session_state.stroke_view_char, 
+            st.session_state.display_mode
+        )
+        
         st_html(main_html, height=450)
+        
         if phrases_html:
+            # This will now render the 2-Character phrases in the Stroke View
             st.markdown(phrases_html, unsafe_allow_html=True)
             st.markdown("---")
 
@@ -831,7 +921,9 @@ def main():
         prompt_text = build_chatgpt_prompt(st.session_state.stroke_view_char)
         st.text_area("Copy this prompt into ChatGPT", value=prompt_text, height=320, key=f"prompt_area_{st.session_state.stroke_view_char}")
         render_copy_to_clipboard(prompt_text, widget_id=str(hash(st.session_state.stroke_view_char))[-6:])
-        st.stop()
+        
+        # Crucially, allow the app to continue or ensure the sidebar is processed
+        # st.stop()
 
     # --- Grid View (Root) ---
     if st.session_state.show_inputs:
@@ -909,7 +1001,7 @@ def main():
                 st.caption("Enter one Chinese character to jump directly to its details")
             st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- Detail View ---
+# --- Detail View (Consolidated Lineage Implementation) ---
     else:
         st.markdown("""
             <div class='status-line'>
@@ -919,109 +1011,54 @@ def main():
             </div>
             """, unsafe_allow_html=True)
 
-        phrase_char = st.session_state.preview_comp or st.session_state.selected_comp
-
         selected = st.session_state.selected_comp
-        final_chars_list = []
-        seen_chars = set()
 
-        if selected in component_map:
-            final_chars_list.append(selected)
-            seen_chars.add(selected)
+        # 1. PARENTS (Ingredients)
+        decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
+        parents = [p for p in decomp_raw if p in component_map and p not in IDC_CHARS and p not in ["?", "—"]]
+        
+        if parents:
+            st.markdown("<div class='lineage-header'>🧱 Components (How it's built)</div>", unsafe_allow_html=True)
+            for p in apply_script_filter(parents, st.session_state.script_filter):
+                render_radix_row(p)
 
+        # 2. CURRENT SELECTION (Focus)
+        st.markdown("<div class='lineage-header'>🎯 Current Selection</div>", unsafe_allow_html=True)
+        focus_group = [selected]
         if cc_t2s and cc_s2t:
             s_cand = cc_t2s.convert(selected)
             t_cand = cc_s2t.convert(selected)
             variant = s_cand if s_cand != selected else t_cand
             if variant != selected and variant in component_map:
-                final_chars_list.append(variant)
-                seen_chars.add(variant)
+                focus_group.append(variant)
+        
+        for f in apply_script_filter(focus_group, st.session_state.script_filter):
+            render_radix_row(f)
 
-        decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
-        components_list = [c for c in decomp_raw if c not in IDC_CHARS and c != "?" and c != "—"]
-        for c in components_list:
-            if c not in seen_chars and c in component_map:
-                final_chars_list.append(c)
-                seen_chars.add(c)
-
+        # 3. CHILDREN (The Family this character spawns)
         related_raw = component_map.get(selected, {}).get("related_characters", [])
-        children_list = [c for c in related_raw if isinstance(c, str) and len(c) == 1]
-        children_sorted = sorted(children_list, key=sort_key_usage_then_zipf)
-        for c in children_sorted:
-            if c not in seen_chars and c in component_map:
-                final_chars_list.append(c)
-                seen_chars.add(c)
-
-        chars = final_chars_list
-        LIMIT = 120
-        clickable_chars = apply_script_filter(chars[:LIMIT], st.session_state.script_filter)
-        static_chars = apply_script_filter(chars[LIMIT:], st.session_state.script_filter)
-
-
-
-    
-        for c in clickable_chars:
-            col_char, col_details = st.columns([2, 10])
+        children = [c for c in related_raw if isinstance(c, str) and len(c) == 1 and c in component_map and c != selected]
+        
+        if children:
+            st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {len(children)} characters)</div>", unsafe_allow_html=True)
+            children_sorted = sorted(children, key=sort_key_usage_then_zipf)
+            visible_children = apply_script_filter(children_sorted, st.session_state.script_filter)
             
-            # Logic to identify if this specific row is the "Active" focus
-            is_preview = st.session_state.preview_comp == c
-            is_active_focus = is_preview or (st.session_state.preview_comp is None and c == st.session_state.selected_comp)
+            # Show top clickable clickable derivatives
+            for child in visible_children[:50]:
+                render_radix_row(child)
 
-            with col_char:
-                st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
-                st.button(c, key=f"explore_char_{c}", type="primary" if is_preview else "secondary",
-                        on_click=list_tile_click, args=(c,), use_container_width=True)
-                st.markdown("</div>", unsafe_allow_html=True)
-
-                st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-                if st.button("🧠 link", key=f"stroke_btn_{c}", help="Write AI prompt", use_container_width=True):
-                    st.session_state.stroke_view_char = c
-                    st.session_state.stroke_view_active = True
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
-
-            with col_details:
-                # 1. Generate character info card
-                usage_count = component_usage_count(c)
-                st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
-                
-                # 2. Performance: ONLY process phrases for the single character in focus
-                if is_active_focus and st.session_state.display_mode != "Single Character":
-                    n = {"2-Character Phrases": 2, "3-Character Phrases": 3, "4-Character Phrases": 4}.get(st.session_state.display_mode, 0)
-                    meta_compounds = component_map.get(c, {}).get("meta", {}).get("compounds", [])
-                    relevant = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
-                    
-                    if relevant:
-                        db_conn = get_db_connection()
-                        if db_conn:
-                            phrases_map = batch_get_phrase_details(sorted(relevant), db_conn)
-                            items_html_list = []
-                            for word in sorted(relevant):
-                                entry = phrases_map.get(word)
-                                if entry:
-                                    # FONT FIX: Reduced pinyin and meaning to 0.85rem for space
-                                    raw_mean = entry.get('meanings', '')
-                                    p_mean = pyhtml.escape(raw_mean[:130] + ('...' if len(raw_mean) > 130 else ''))
-                                    
-                                    # Use a clean single string for the item
-                                    items_html_list.append(
-                                        f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'>"
-                                        f"<span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span>"
-                                        f"<span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span>"
-                                        f"<span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span>"
-                                        f"</div>"
-                                    )
-                            
-                            # 3. RENDERING FIX: All HTML combined and rendered via ONE markdown call
-                            all_rows = "".join(items_html_list)
-                            st.markdown(f"""
-                                <div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>
-                                  <div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>
-                                    {st.session_state.display_mode} containing {c}
-                                  </div>
-                                  {all_rows}
-                                </div>
-                                """, unsafe_allow_html=True)
+            # Handle deep derivatives as static cards to preserve performance
+            if len(visible_children) > 50:
+                st.markdown("---")
+                st.markdown(f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>⬇️ {len(visible_children)-50} More Derivatives ⬇️</div>", unsafe_allow_html=True)
+                for c in visible_children[50:120]:
+                    col_char, col_details = st.columns([2, 10])
+                    with col_char:
+                        st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
+                    with col_details:
+                        st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c)), unsafe_allow_html=True)
+                    st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
             
             st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
@@ -1035,7 +1072,7 @@ def main():
                 with col_details:
                     usage_count = component_usage_count(c)
                     st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
-                st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
+#                st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
