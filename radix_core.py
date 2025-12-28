@@ -36,27 +36,6 @@ def get_zipf_frequency():
 ZIPF = get_zipf_frequency()
 
 
-def zipf_commonness_raw(ch: str) -> float:
-    if not ch or ZIPF is None:
-        return float("-inf")
-    try:
-        z = float(ZIPF(ch, "zh"))
-    except:
-        z = float("-inf")
-    if z <= 0:
-        if cc_s2t:
-            try:
-                z = max(z, float(ZIPF(cc_s2t.convert(ch), "zh")))
-            except:
-                pass
-        if cc_t2s:
-            try:
-                z = max(z, float(ZIPF(cc_t2s.convert(ch), "zh")))
-            except:
-                pass
-    return z
-
-
 # --- Data Loading & Augmentation ---
 def load_and_augment_map():
     try:
@@ -69,7 +48,7 @@ def load_and_augment_map():
         meta = info.get("meta", {})
         rel = info.get("related_characters", [])
         info['usage_count'] = len({c for c in rel if isinstance(c, str) and len(c) == 1})
-        info['zipf_val'] = zipf_commonness_raw(char)
+        # Note: We no longer pre-compute single-char zipf here — it's unreliable
 
         s = meta.get("strokes")
         try:
@@ -170,12 +149,11 @@ def component_usage_count(comp: str) -> int:
 def sort_key_usage_then_zipf(ch: str):
     info = component_map.get(ch, {})
     use = info.get('usage_count', 0)
-    z = info.get('zipf_val', float("-inf"))
     strokes = info.get('stroke_count') or 999
     group = 0 if use >= 3 else 1
     if group == 0:
-        return (group, -use, -z, strokes, ch)
-    return (group, -z, strokes, ch)
+        return (group, -use, strokes, ch)
+    return (group, strokes, ch)  # fallback: no zipf needed for sorting
 
 
 def apply_script_filter(chars: List[str], script_filter: str) -> List[str]:
@@ -264,7 +242,6 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
     decomp = format_decomposition(c)
     definition = clean_field(meta.get("definition", ""))
     etymology = get_etymology_text(meta)
-    zipf_val = info.get('zipf_val', float('-inf'))
 
     meta_items = []
     if pinyin and pinyin != "—":
@@ -277,26 +254,44 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
         meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
     if usage_count is not None and usage_count > 0:
         meta_items.append(f"<span class='meta-tag'>Used in {usage_count} chars</span>")
-    
-    # Add Zipf frequency ranking if available
-    if zipf_val > 0:
-        # Zipf scale: 0-8, where higher = more common
-        # 6+ = very common, 4-6 = common, 2-4 = uncommon, <2 = rare
-        if zipf_val >= 6:
-            freq_label = "Very Common"
-            freq_color = "#2e7d32"  # green
-        elif zipf_val >= 4:
-            freq_label = "Common"
-            freq_color = "#558b2f"  # light green
-        elif zipf_val >= 2:
-            freq_label = "Uncommon"
-            freq_color = "#f57c00"  # orange
-        else:
-            freq_label = "Rare"
-            freq_color = "#c62828"  # red
-        
-        meta_items.append(f"<span class='meta-tag' style='background: linear-gradient(135deg, {freq_color}15 0%, {freq_color}25 100%); color: {freq_color}; border: 1px solid {freq_color}40;'>Usage: {freq_label} ({zipf_val:.1f})</span>")
 
+    # --- New: Phrase-based commonality badge ---
+    if ZIPF is not None:
+        phrase_zipf = float('-inf')
+        best_phrase = None
+        compounds = meta.get("compounds", [])
+        for compound in compounds:
+            if isinstance(compound, str) and len(compound) >= 2 and c in compound:
+                try:
+                    z = float(ZIPF(compound, "zh", wordlist='large'))  # 'large' for better coverage
+                    if z > phrase_zipf:
+                        phrase_zipf = z
+                        best_phrase = compound
+                except:
+                    continue
+
+        if phrase_zipf > float('-inf') and best_phrase:
+            if phrase_zipf >= 6:
+                freq_label = "Very Common"
+                freq_color = "#2e7d32"  # green
+            elif phrase_zipf >= 4:
+                freq_label = "Common"
+                freq_color = "#558b2f"  # light green
+            elif phrase_zipf >= 2:
+                freq_label = "Uncommon"
+                freq_color = "#f57c00"  # orange
+            else:
+                freq_label = "Rare"
+                freq_color = "#c62828"  # red
+
+            phrase_text = f" in “{best_phrase}”"
+            meta_items.append(
+                f"<span class='meta-tag' style='background: linear-gradient(135deg, {freq_color}15 0%, {freq_color}25 100%); color: {freq_color}; border: 1px solid {freq_color}40; font-weight:700;'>"
+                f"Phrase Usage: {freq_label} ({phrase_zipf:.1f}){phrase_text}"
+                f"</span>"
+            )
+
+    # Script variant tags
     if cc_t2s:
         simplified = cc_t2s.convert(c)
         if simplified != c:
