@@ -743,18 +743,18 @@ def render_radix_row(c):
     with col_char:
         # Large Character Explorer Button
         st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
-        st.button(c, key=f"explore_char_{c}_{hash(c)}", type="primary" if is_preview else "secondary",
+        st.button(c, key=f"explore_char_{c}_{ord(c)}", type="primary" if is_preview else "secondary",
                 on_click=list_tile_click, args=(c,), use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
         # AI/Stroke Order Button
         st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-        if st.button("🧠 link", key=f"stroke_btn_{c}_{hash(c)}", help="Write AI prompt", use_container_width=True):
+        if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}", help="Write AI prompt", use_container_width=True):
             st.session_state.stroke_view_char = c
             st.session_state.stroke_view_active = True
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
-
+        
     with col_details:
         # Generate the info card
         usage_count = component_usage_count(c)
