@@ -596,6 +596,7 @@ def render_splash():
         """, 
         unsafe_allow_html=True
     )
+    
     if st.query_params.get("onboarding") == "done":
         st.session_state.onboarding_done = True
         st.query_params.clear() 
