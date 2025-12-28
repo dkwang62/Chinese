@@ -296,22 +296,57 @@ def apply_dynamic_css():
         text-align: center;
         margin: 60px 0;
     }
-    .grand-torii {
-        font-size: 250px !important; /* Palace Scale */
+/* CHINESE PALACE ENTRANCE STYLING */
+    .chinese-gate-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0 auto;
+        width: 300px;
         cursor: pointer;
-        line-height: 1;
         transition: transform 0.4s ease;
-        filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));
     }
-    .grand-torii:hover {
-        transform: scale(1.1);
+    .chinese-gate-wrap:hover {
+        transform: scale(1.05);
+    }
+    .gate-roof {
+        background: #C0392B; /* Imperial Red */
+        border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        border-bottom: 8px solid #F1C40F; /* Gold detailing */
+    }
+    .tier-1 {
+        width: 220px;
+        height: 40px;
+        margin-bottom: -10px;
+        z-index: 3;
+    }
+    .tier-2 {
+        width: 300px;
+        height: 60px;
+        z-index: 2;
+    }
+    .gate-structure {
+        display: flex;
+        justify-content: space-between;
+        width: 200px;
+        height: 150px;
+        border-top: 15px solid #C0392B;
+        z-index: 1;
+    }
+    .gate-pillar {
+        width: 25px;
+        height: 100%;
+        background: linear-gradient(to right, #C0392B, #962d22);
+        border-bottom: 12px solid #333; /* Dark stone base */
     }
     .entrance-text {
-        color: #2c3e50;
-        font-size: 24px;
-        font-weight: 700;
-        margin-top: 20px;
+        color: #2c3e50 !important;
+        font-size: 24px !important;
+        font-weight: 800 !important;
+        margin-top: 30px;
         letter-spacing: 2px;
+        text-transform: uppercase;
     }
     
     </style>
@@ -610,8 +645,7 @@ def enter_component(comp: str):
     st.session_state.definition_search_results = None
 
 def render_splash():
-    """Renders the entry screen with a grand palace-style entrance."""
-    # 1. Main Title Card - Styled for a premium, palace feel
+    """Renders the entry screen with an authentic Chinese Pailou entrance."""
     st.markdown(
         """
         <div class="splash-wrap">
@@ -626,12 +660,19 @@ def render_splash():
         unsafe_allow_html=True,
     )
 
-    # 2. ENLARGED ENTRANCE: The Torii gate scaled to palace proportions
+    # REPLACEMENT: Traditional Chinese Palace Gate (Pailou) 
     st.markdown(
         """
         <div class="palace-entrance-container">
             <a href="/?onboarding=done" target="_self" style="text-decoration:none;">
-                <div class="grand-torii">⛩️</div>
+                <div class="chinese-gate-wrap">
+                    <div class="gate-roof tier-1"></div>
+                    <div class="gate-roof tier-2"></div>
+                    <div class="gate-structure">
+                        <div class="gate-pillar left"></div>
+                        <div class="gate-pillar right"></div>
+                    </div>
+                </div>
                 <div class="entrance-text">Enter the Grand Hall of Radix 🈑</div>
             </a>
         </div>
@@ -639,12 +680,6 @@ def render_splash():
         unsafe_allow_html=True
     )
 
-    # Handling the entrance logic via query parameters
-    if st.query_params.get("onboarding") == "done":
-        st.session_state.onboarding_done = True
-        st.query_params.clear() 
-        st.rerun()
-    
     if st.query_params.get("onboarding") == "done":
         st.session_state.onboarding_done = True
         st.query_params.clear() 
