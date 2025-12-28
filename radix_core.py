@@ -23,17 +23,34 @@ except ImportError:
 IDC_CHARS = {"⿰", "⿱", "⿲", "⿳", "⿴", "⿵", "⿶", "⿷", "⿸", "⿹", "⿺", "⿻"}
 SCRIPT_FILTERS = ["Any", "Simplified", "Traditional"]
 
+# --- Global SUBTLEX-CH frequency dict ---
+SUBTLEX_FREQ: Dict[str, float] = {}  # simplified char -> freq per million
 
-# --- Zipf Frequency ---
-def get_zipf_frequency():
+
+def load_subtlex_freq():
+    """Load SUBTLEX-CH character frequencies from subtlex_ch_freq.txt"""
+    global SUBTLEX_FREQ
     try:
-        from wordfreq import zipf_frequency
-        return zipf_frequency
-    except Exception:
-        return None
-
-
-ZIPF = get_zipf_frequency()
+        with open("subtlex_ch_freq.txt", "r", encoding="utf-8") as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if not line or line.startswith("Character") or line.startswith("Total"):
+                    continue  # Skip headers and summary lines
+                parts = line.split("\t")
+                if len(parts) < 3:
+                    continue
+                char = parts[0].strip()
+                try:
+                    freq_per_million = float(parts[2])  # CHR/million column
+                    if freq_per_million > 0:
+                        SUBTLEX_FREQ[char] = freq_per_million
+                except ValueError:
+                    continue
+        print(f"[Radix] Loaded {len(SUBTLEX_FREQ)} characters from SUBTLEX-CH frequency list")
+    except FileNotFoundError:
+        print("[Radix] subtlex_ch_freq.txt not found — frequency badges will be disabled")
+    except Exception as e:
+        print(f"[Radix] Error loading SUBTLEX-CH frequencies: {e}")
 
 
 # --- Data Loading & Augmentation ---
@@ -44,11 +61,13 @@ def load_and_augment_map():
     except FileNotFoundError:
         return {}
 
+    # Load SUBTLEX frequencies first
+    load_subtlex_freq()
+
     for char, info in data.items():
         meta = info.get("meta", {})
         rel = info.get("related_characters", [])
         info['usage_count'] = len({c for c in rel if isinstance(c, str) and len(c) == 1})
-        # Note: We no longer pre-compute single-char zipf here — it's unreliable
 
         s = meta.get("strokes")
         try:
@@ -60,6 +79,10 @@ def load_and_augment_map():
                 info['stroke_count'] = None
         except:
             info['stroke_count'] = None
+
+        # Add SUBTLEX frequency (map via simplified variant)
+        lookup_char = cc_t2s.convert(char) if cc_t2s else char
+        info['freq_per_million'] = SUBTLEX_FREQ.get(lookup_char, 0.0)
 
     gc.collect()
     return data
@@ -153,7 +176,7 @@ def sort_key_usage_then_zipf(ch: str):
     group = 0 if use >= 3 else 1
     if group == 0:
         return (group, -use, strokes, ch)
-    return (group, strokes, ch)  # fallback: no zipf needed for sorting
+    return (group, strokes, ch)
 
 
 def apply_script_filter(chars: List[str], script_filter: str) -> List[str]:
@@ -255,41 +278,27 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
     if usage_count is not None and usage_count > 0:
         meta_items.append(f"<span class='meta-tag'>Used in {usage_count} chars</span>")
 
-    # --- New: Phrase-based commonality badge ---
-    if ZIPF is not None:
-        phrase_zipf = float('-inf')
-        best_phrase = None
-        compounds = meta.get("compounds", [])
-        for compound in compounds:
-            if isinstance(compound, str) and len(compound) >= 2 and c in compound:
-                try:
-                    z = float(ZIPF(compound, "zh", wordlist='large'))  # 'large' for better coverage
-                    if z > phrase_zipf:
-                        phrase_zipf = z
-                        best_phrase = compound
-                except:
-                    continue
+    # --- SUBTLEX-CH Frequency Badge ---
+    freq = info.get('freq_per_million', 0.0)
+    if freq > 0:
+        if freq >= 10000:
+            label = "Very Common"
+            color = "#2e7d32"  # dark green
+        elif freq >= 5000:
+            label = "Common"
+            color = "#558b2f"  # light green
+        elif freq >= 1000:
+            label = "Uncommon"
+            color = "#f57c00"  # orange
+        else:
+            label = "Rare"
+            color = "#c62828"  # red
 
-        if phrase_zipf > float('-inf') and best_phrase:
-            if phrase_zipf >= 6:
-                freq_label = "Very Common"
-                freq_color = "#2e7d32"  # green
-            elif phrase_zipf >= 4:
-                freq_label = "Common"
-                freq_color = "#558b2f"  # light green
-            elif phrase_zipf >= 2:
-                freq_label = "Uncommon"
-                freq_color = "#f57c00"  # orange
-            else:
-                freq_label = "Rare"
-                freq_color = "#c62828"  # red
-
-            phrase_text = f" in “{best_phrase}”"
-            meta_items.append(
-                f"<span class='meta-tag' style='background: linear-gradient(135deg, {freq_color}15 0%, {freq_color}25 100%); color: {freq_color}; border: 1px solid {freq_color}40; font-weight:700;'>"
-                f"Phrase Usage: {freq_label} ({phrase_zipf:.1f}){phrase_text}"
-                f"</span>"
-            )
+        meta_items.append(
+            f"<span class='meta-tag' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); color: {color}; border: 1px solid {color}40; font-weight:700;'>"
+            f"Frequency: {label} ({freq:,.0f}/M)"
+            f"</span>"
+        )
 
     # Script variant tags
     if cc_t2s:
@@ -307,7 +316,7 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
     return f"<div class='char-card'>{meta_html}{def_html}{ety_html}</div>"
 
 
-# --- iPad-Safe Download HTML (exact original) ---
+# --- iPad-Safe Download HTML ---
 def render_ipad_safe_download_html(data_str: str, filename: str, label: str) -> str:
     b64 = base64.b64encode(data_str.encode()).decode()
     href = f'data:application/octet-stream;base64,{b64}'
@@ -327,14 +336,7 @@ def render_ipad_safe_download_html(data_str: str, filename: str, label: str) -> 
             {label}
         </a>
     </div>
-    <script>
-        const link = document.querySelector('a[download="{filename}"]');
-        link.addEventListener('click', () => {{
-            console.log('Download triggered');
-        }});
-    </script>
     """
-
 
 # --- Stroke Order Sidebar HTML ---
 def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]:
