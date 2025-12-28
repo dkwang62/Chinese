@@ -919,6 +919,8 @@ def main():
         st.text_area("Copy this prompt into ChatGPT", value=prompt_text, height=320)
         render_copy_to_clipboard(prompt_text, str(hash(st.session_state.stroke_view_char)))
 
+        st.stop()
+
     if st.session_state.show_inputs:
         cur_min, cur_max = st.session_state.stroke_range
 
