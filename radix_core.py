@@ -172,12 +172,18 @@ def component_usage_count(comp: str) -> int:
 def sort_key_usage_then_zipf(ch: str):
     info = component_map.get(ch, {})
     use = info.get('usage_count', 0)
+    freq = info.get('freq_per_million', 0.0)  # ← Now uses SUBTLEX-CH frequency
     strokes = info.get('stroke_count') or 999
+
+    # Primary: High component usage first (most useful as building blocks)
+    # Secondary: High standalone frequency (for low-usage but common chars)
+    # Tertiary: Fewer strokes
+    # Final: Alphabetical
     group = 0 if use >= 3 else 1
     if group == 0:
-        return (group, -use, strokes, ch)
-    return (group, strokes, ch)
-
+        return (group, -use, -freq, strokes, ch)  # High usage → prioritize usage
+    else:
+        return (group, -freq, strokes, ch)       # Low usage → prioritize frequency
 
 def apply_script_filter(chars: List[str], script_filter: str) -> List[str]:
     if script_filter == "Any":
