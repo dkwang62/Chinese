@@ -279,6 +279,21 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
     definition = clean_field(meta.get("definition", ""))
     etymology = get_etymology_text(meta)
 
+    discovery_html = ""
+    if usage_count and usage_count > 0:
+        discovery_html = (
+            f"<div class='discovery-tip' style='margin-top:12px; padding:8px; background:#f0fff4; "
+            f"border-top:1px dashed #c6f6d5; font-size:0.88em; color:#22543d; font-weight:600;'>"
+            f"✨ Tip: Click the large {c} on the left to explore the {usage_count} characters built using it."
+            f"</div>"
+        )
+
+    meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
+    def_html = f"<div class='def-row'>{definition}</div>" if definition and definition != "—" else ""
+    ety_html = f"<div class='ety-row'>{etymology}</div>" if etymology else ""
+    
+    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}{discovery_html}</div>"
+    
     meta_items = []
     if pinyin and pinyin != "—":
         meta_items.append(f"<span class='meta-pinyin'>{pinyin}</span>")
@@ -326,8 +341,7 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
     meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
     def_html = f"<div class='def-row'>{definition}</div>" if definition and definition != "—" else ""
     ety_html = f"<div class='ety-row'>{etymology}</div>" if etymology else ""
-    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}</div>"
-
+    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}{discovery_tip}</div>"
 
 # --- iPad-Safe Download HTML ---
 def render_ipad_safe_download_html(data_str: str, filename: str, label: str) -> str:
