@@ -660,10 +660,6 @@ def render_radix_row(c, context="detail"):
             st.session_state.stroke_view_active = True
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
-    
-    with col_details:
-        usage_count = component_usage_count(c)
-        st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
         
     with col_details:
         usage_count = component_usage_count(c)
@@ -1020,13 +1016,18 @@ def main():
 
             selected = st.session_state.selected_comp
 
+
+
+            # 1. PARENTS (Ingredients) - exclude self if present
             decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
-            parents = [p for p in decomp_raw if p in component_map and p not in IDC_CHARS and p not in ["?", "—"]]
+            parents = [p for p in decomp_raw if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != selected]
             
             if parents:
                 st.markdown("<div class='lineage-header'>🧱 Components (How it's built)</div>", unsafe_allow_html=True)
                 for p in apply_script_filter(parents, st.session_state.script_filter):
                     render_radix_row(p)
+
+                    
 
             st.markdown("<div class='lineage-header'>🎯 Current Selection</div>", unsafe_allow_html=True)
             focus_group = [selected]
@@ -1077,10 +1078,11 @@ def main():
                         with col_char:
                             st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
                         with col_details:
-                            st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c)), unsafe_allow_html=True)
+                            # Only show minimal info — no full card!
+                            usage = component_usage_count(c)
+                            st.markdown(f"<div style='font-size:1.4em; color:#666; text-align:center; padding:20px 0;'>"
+                                        f"{c}<br><small>Used in {usage} characters</small></div>", unsafe_allow_html=True)
                         st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
-                
-                st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
