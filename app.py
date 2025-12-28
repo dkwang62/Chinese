@@ -6,6 +6,7 @@ from streamlit.components.v1 import html as st_html
 import json
 import html as pyhtml
 import math
+import uuid
 
 from radix_core import (
     component_map,
@@ -17,7 +18,6 @@ from radix_core import (
     search_phrases_by_definition,
     get_stroke_count,
     component_usage_count,
-    sort_key_usage_then_zipf,
     apply_script_filter,
     normalize_single_hanzi,
     resolve_to_known_variant,
@@ -28,19 +28,18 @@ from radix_core import (
     get_stroke_order_view_html,
     SCRIPT_FILTERS,
     IDC_CHARS,
+    sort_key_usage_primary,
+    sort_key_frequency_primary,
 )
 
 st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 
 
-# --- Dynamic CSS (strict parity with original) ---
+# --- Dynamic CSS ---
 def apply_dynamic_css():
     css = """
     <style>
-    /* Global Layout */
     .main .block-container {padding-top: 2rem; padding-bottom: 3rem;}
-    
-    /* Character Cards */
     .char-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         padding: 24px;
@@ -54,7 +53,6 @@ def apply_dynamic_css():
         box-shadow: 0 6px 20px rgba(0,0,0,0.1);
         transform: translateY(-2px);
     }
-    
     .meta-row {
         font-size: 0.95em;
         color: #555;
@@ -70,7 +68,6 @@ def apply_dynamic_css():
         color: #d35400;
         text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1);
     }
-    
     .meta-tag {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         padding: 4px 12px;
@@ -106,8 +103,6 @@ def apply_dynamic_css():
         margin-top: 8px;
         line-height: 1.5;
     }
-    
-    /* Grid Buttons - STRETCH with better styling */
     .comp-grid .stButton > button {
         width: 100% !important;
         font-size: 2.2em !important;
@@ -128,8 +123,6 @@ def apply_dynamic_css():
         transform: translateY(-3px) !important;
         box-shadow: 0 6px 16px rgba(192, 57, 43, 0.15) !important;
     }
-    
-    /* Detail List View Buttons - STRETCH */
     .char-btn-wrap .stButton > button {
         width: 100% !important;
         font-size: 3.8em !important;
@@ -148,8 +141,6 @@ def apply_dynamic_css():
         transform: scale(1.02) !important;
         box-shadow: 0 6px 20px rgba(59, 130, 246, 0.2) !important;
     }
-    
-    /* Pen Button - STRETCH */
     .pen-btn-wrap .stButton > button {
         width: 100% !important;
         font-size: 1.6em !important;
@@ -170,8 +161,6 @@ def apply_dynamic_css():
         transform: translateY(-2px) !important;
         box-shadow: 0 4px 12px rgba(100, 181, 246, 0.2) !important;
     }
-
-    /* Static Cards */
     .char-static-box {
         font-size: 3.8em;
         font-weight: 700;
@@ -188,8 +177,6 @@ def apply_dynamic_css():
         cursor: default;
         box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
-
-    /* Status Line */
     .status-line {
         font-size: 1.1em;
         font-weight: 600;
@@ -213,8 +200,6 @@ def apply_dynamic_css():
         align-items: center;
         box-shadow: 0 2px 6px rgba(0,0,0,0.06);
     }
-    
-    /* Count Lines */
     .preview-count-line {
         font-size: 1.4em;
         text-align: center;
@@ -228,8 +213,6 @@ def apply_dynamic_css():
         color: #e74c3c;
         text-shadow: 0 2px 4px rgba(231, 76, 60, 0.1);
     }
-    
-    /* Footer */
     .jump-footer {
         margin-top: 50px;
         padding: 25px;
@@ -239,38 +222,6 @@ def apply_dynamic_css():
         text-align: center;
         box-shadow: 0 -3px 10px rgba(0,0,0,0.04);
     }
-    
-    /* Expander Buttons - STRETCH */
-    div[data-testid="stExpander"] .stButton > button {
-        width: 100% !important;
-        font-size: 1.3rem !important;
-        height: 45px !important;
-        padding: 0 !important;
-        line-height: 1.2 !important;
-        border-radius: 10px !important;
-        border: 2px solid #dee2e6 !important;
-        transition: all 0.2s ease !important;
-        font-weight: 600 !important;
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
-    }
-    div[data-testid="stExpander"] .stButton > button:hover {
-        border-color: #adb5bd !important;
-        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-    }
-    
-    .stroke-header {
-        font-size: 0.9em;
-        color: #6c757d;
-        border-bottom: 2px solid #dee2e6;
-        margin: 15px 0 8px 0;
-        padding-bottom: 4px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
     .lineage-header {
         font-size: 1.4em;
         font-weight: 800;
@@ -282,14 +233,11 @@ def apply_dynamic_css():
         border-radius: 8px;
         box-shadow: 0 2px 8px rgba(25, 118, 210, 0.1);
     }
-    
-    /* Compound Lists */
     .compound-item {
         display: flex;
         align-items: baseline;
         margin-bottom: 10px;
         padding: 12px;
-        padding-bottom: 12px;
         border-bottom: 2px solid #e9ecef;
         border-radius: 8px;
         background: #ffffff;
@@ -298,10 +246,6 @@ def apply_dynamic_css():
     .compound-item:hover {
         background: #f8f9fa;
         transform: translateX(4px);
-    }
-    .compound-item:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
     }
     .cp-word {
         font-weight: 700;
@@ -323,38 +267,9 @@ def apply_dynamic_css():
         flex: 1;
         line-height: 1.5;
     }
-    
-    /* Splash Screen */
-    .splash-wrap {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 40px 20px 20px 20px;
-    }
-    .splash-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        border: 2px solid #dee2e6;
-        border-radius: 24px;
-        padding: 40px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-    }
-    .splash-title {
-        font-size: 2.6em;
-        font-weight: 900;
-        line-height: 1.2;
-        color: #111;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    .splash-sub {
-        margin-top: 15px;
-        font-size: 1.2em;
-        color: #495057;
-        line-height: 1.6;
-    }
-    
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
-
 
 
 def render_copy_to_clipboard(prompt_text: str, widget_id: str):
@@ -394,8 +309,8 @@ def render_copy_to_clipboard(prompt_text: str, widget_id: str):
     )
 
 
-# --- Session State Defaults ---
-defaults = {
+# --- Session State Defaults (initialized at top) ---
+DEFAULTS = {
     "onboarding_done": False,
     "selected_comp": "",
     "stroke_range": (3, 8),
@@ -418,13 +333,16 @@ defaults = {
     "definition_search_mode": False,
     "definition_search_query": "",
     "definition_search_results": None,
+    "grid_sort_mode": "usage",
+    "grid_script_filter": "Any",
 }
 
-for k, v in defaults.items():
+for k, v in DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# Load favourites (optional file)
+
+# Load favourites
 if not st.session_state.favourites_list:
     try:
         with open("favourites.json", "r", encoding="utf-8") as f:
@@ -436,6 +354,7 @@ if not st.session_state.favourites_list:
         pass
     except Exception as e:
         st.error(f"Error loading favourites.json: {e}")
+
 
 # --- Callbacks ---
 def sync_stroke_range():
@@ -600,15 +519,12 @@ def handle_file_upload():
         except Exception as e:
             st.error(f"Error loading file: {e}")
 
-
 def search_by_definition():
-    """Handle definition search across characters and phrases"""
     query = st.session_state.get("w_def_search", "").strip()
     if not query or len(query) < 2:
         st.toast("Please enter at least 2 characters to search.")
         return
     
-    # Search characters by definition
     char_results = []
     query_lower = query.lower()
     for char, info in component_map.items():
@@ -616,22 +532,20 @@ def search_by_definition():
         if isinstance(definition, str) and query_lower in definition.lower():
             char_results.append(char)
     
-    # Search phrases by definition
     db_conn = get_db_connection()
     phrase_results = []
     if db_conn:
-        phrase_results = search_phrases_by_definition(query, db_conn)
+        phrase_results = search_phrases_by_definition(query, db_conn, limit=200)
     
     st.session_state.definition_search_mode = True
     st.session_state.definition_search_query = query
     st.session_state.definition_search_results = {
-        "characters": char_results[:50],  # Limit to 50
-        "phrases": phrase_results[:100]    # Limit to 100
+        "characters": char_results[:120],
+        "phrases": phrase_results[:200]
     }
     st.session_state.show_inputs = False
     st.session_state.selected_comp = ""
     st.session_state.preview_comp = None
-
 
 def enter_component(comp: str):
     st.session_state.script_filter = "Any"
@@ -648,9 +562,7 @@ def enter_component(comp: str):
     st.session_state.definition_search_mode = False
     st.session_state.definition_search_results = None
 
-
 def render_splash():
-    """Renders the entry screen with 100% parity to the original monolithic version."""
     st.markdown(
         """
         <div class="splash-wrap">
@@ -729,40 +641,35 @@ def render_splash():
                         st.caption(f"used in {count} characters")
         st.markdown("</div>", unsafe_allow_html=True)
 
-def render_radix_row(c):
-    """
-    Renders a standard row containing the character interaction buttons 
-    and the detailed information card.
-    """
+def render_radix_row(c, context="detail"):
     col_char, col_details = st.columns([2, 10])
-    
-    # Identify if this character is currently being previewed
     is_preview = st.session_state.preview_comp == c
     is_active_focus = is_preview or (st.session_state.preview_comp is None and c == st.session_state.selected_comp)
 
-    with col_char:
-        # Large Character Explorer Button
-        st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
-        st.button(c, key=f"explore_char_{c}_{ord(c)}", type="primary" if is_preview else "secondary",
-                on_click=list_tile_click, args=(c,), use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
-        # AI/Stroke Order Button
+    with col_char:
+        st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
+        unique_id = str(uuid.uuid4())[:8]
+
+        st.button(c, key=f"explore_char_{c}_{ord(c)}_{unique_id}", type="primary" if is_preview else "secondary",
+                  on_click=list_tile_click, args=(c,), use_container_width=True)
+
         st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-        if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}", help="Write AI prompt", use_container_width=True):
+        if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}_{unique_id}", help="Write AI prompt", use_container_width=True):
             st.session_state.stroke_view_char = c
             st.session_state.stroke_view_active = True
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
-        
+    
     with col_details:
-        # Generate the info card
         usage_count = component_usage_count(c)
         st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
         
-        # Render phrases if this row is the active focus
+    with col_details:
+        usage_count = component_usage_count(c)
+        st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
+        
         if is_active_focus and st.session_state.display_mode != "Single Character":
-            # Map display mode to phrase length
             n = {"2-Characters": 2, "3-Characters": 3, "4-Characters": 4}.get(st.session_state.display_mode, 0)
             meta_compounds = component_map.get(c, {}).get("meta", {}).get("compounds", [])
             relevant = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
@@ -798,7 +705,6 @@ def render_radix_row(c):
 
 
 def main():
-    """Main execution loop ensuring all filters and views are initialized."""
     if not component_map:
         st.error("Component dataset not loaded. Ensure enhanced_component_map_with_etymology.json exists.")
         st.stop()
@@ -809,7 +715,6 @@ def main():
         render_splash()
         st.stop()
 
-    # Dynamic Sidebar and Navigation
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
@@ -820,7 +725,6 @@ def main():
 
         st.text_input("Shortcut: Paste/Type characters", key="sb_search", on_change=sync_sidebar_text)
 
-        # Logic for showing filters only in Root view
         if st.session_state.show_inputs:
             st.markdown("---")
             max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
@@ -842,6 +746,45 @@ def main():
 
                 st.checkbox("Components only", value=st.session_state.component_only,
                             key="w_component_only", on_change=sync_component_only)
+
+            st.markdown("---")
+
+            st.markdown("### Sort Grid By")
+
+            def update_grid_sort_mode():
+                selected = st.session_state.grid_sort_mode_radio
+                if selected == "Most Useful Components First":
+                    st.session_state.grid_sort_mode = "usage"
+                    st.session_state.component_only = True
+                else:
+                    st.session_state.grid_sort_mode = "frequency"
+                    st.session_state.component_only = False
+                st.session_state.page = 1
+
+            st.radio(
+                "Choose sorting priority",
+                options=["Most Useful Components First", "Most Common in Language First"],
+                index=0 if st.session_state.get("grid_sort_mode", "usage") == "usage" else 1,
+                key="grid_sort_mode_radio",
+                on_change=update_grid_sort_mode,
+                help="• Useful Components: Shows building-block characters first (auto-filters to components only)\n"
+                     "• Common in Language: Shows everyday characters first (asks script preference)"
+            )
+
+            if st.session_state.grid_sort_mode == "frequency":
+                def update_grid_script():
+                    st.session_state.grid_script_filter = st.session_state.grid_script_radio
+                    st.session_state.page = 1
+
+                st.markdown("#### Script Preference (affects all views)")
+                st.radio(
+                    "Show characters in:",
+                    options=["Simplified", "Traditional", "Any"],
+                    index=["Simplified", "Traditional", "Any"].index(st.session_state.grid_script_filter),
+                    key="grid_script_radio",
+                    on_change=update_grid_script,
+                    horizontal=True
+                )
             st.markdown("---")
 
         current_main_char = st.session_state.stroke_view_char if st.session_state.stroke_view_active else st.session_state.selected_comp
@@ -872,97 +815,64 @@ def main():
         )
 
         if current_char_for_sidebar:
-            if st.session_state.stroke_view_active and cc_t2s and cc_s2t:
-                s_char = cc_t2s.convert(current_char_for_sidebar)
-                t_char = cc_s2t.convert(current_char_for_sidebar)
-                if s_char != t_char:
-                    st.markdown("### Script Variant")
-                    options = [("Simplified", s_char), ("Traditional", t_char)] if current_char_for_sidebar == t_char else [("Traditional", t_char), ("Simplified", s_char)]
-                    current_idx = 0 if current_char_for_sidebar == options[0][1] else 1
-                    selected = st.radio("Switch variant", options=[v[0] for v in options], index=current_idx, key="variant_switcher", label_visibility="collapsed")
-                    new_char = options[0][1] if selected == options[0][0] else options[1][1]
-                    if new_char != current_char_for_sidebar:
-                        st.session_state.stroke_view_char = new_char
-                        st.rerun()
-                    current_char_for_sidebar = new_char
-                    st.markdown("---")
-
-            sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140 if not st.session_state.stroke_view_active else 110)
+            sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
             if sidebar_html:
                 st_html(sidebar_html, height=sidebar_height)
 
-            if current_char_for_sidebar:
-                related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
-                chars_all = [c for c in related if isinstance(c, str) and len(c) == 1 and c in component_map]
-                chars_filtered = apply_script_filter(chars_all, st.session_state.script_filter)
-                count = len(chars_filtered)
-                if count > 0:
-                    st.markdown(
-                        f"<div class='preview-count-line'>{count} characters contain <span class='char'>{current_char_for_sidebar}</span></div>",
-                        unsafe_allow_html=True,
-                    )
+            related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
+            chars_all = [c for c in related if isinstance(c, str) and len(c) == 1 and c in component_map]
+            chars_filtered = apply_script_filter(chars_all, st.session_state.script_filter)
+            count = len(chars_filtered)
+            if count > 0:
+                st.markdown(
+                    f"<div class='preview-count-line'>{count} characters contain <span class='char'>{current_char_for_sidebar}</span></div>",
+                    unsafe_allow_html=True,
+                )
 
             is_fav = current_char_for_sidebar in st.session_state.favourites_list
             st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{current_char_for_sidebar}",
                         on_change=toggle_favourite, args=(current_char_for_sidebar,))
 
-            # Show phrase selector if we are NOT on the root screen
             if not st.session_state.show_inputs:
                 st.markdown("---")
                 st.markdown("### Display Phrases")
                 modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
-                
-                if st.session_state.display_mode not in modes:
-                    st.session_state.display_mode = "2-Characters"
-                    
-                current_idx = modes.index(st.session_state.display_mode)
-                new_mode = st.radio(
-                    "Select mode", 
-                    options=modes, 
-                    index=current_idx, 
-                    key="sidebar_display_mode", 
-                    label_visibility="collapsed"
-                )
+                current_idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 1
+                new_mode = st.radio("Select mode", options=modes, index=current_idx, key="sidebar_display_mode", label_visibility="collapsed")
                 if new_mode != st.session_state.display_mode:
                     st.session_state.display_mode = new_mode
                     st.rerun()
 
             if not st.session_state.stroke_view_active and not st.session_state.show_inputs:
                 st.markdown("---")
-                st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(st.session_state.script_filter),
+                current_script = st.session_state.get("script_filter", st.session_state.grid_script_filter)
+                st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(current_script),
                          key="w_script_filter", on_change=sync_script_filter)
-                
+
             if st.session_state.stroke_view_active:
                 st.markdown("---")
                 st.markdown("### Character Info")
                 st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>", unsafe_allow_html=True)
                 st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
 
-    # --- Stroke Order Full View ---
     if st.session_state.stroke_view_active:
         st.markdown("### Stroke Order Animation")
-        
-        main_html, phrases_html = get_stroke_order_view_html(
-            st.session_state.stroke_view_char, 
-            st.session_state.display_mode
-        )
-        
+        main_html, phrases_html = get_stroke_order_view_html(st.session_state.stroke_view_char, st.session_state.display_mode)
         st_html(main_html, height=450)
-        
         if phrases_html:
             st.markdown(phrases_html, unsafe_allow_html=True)
-            st.markdown("---")
 
-        st.markdown("### ChatGPT Prompt (Chinese definition + bilingual examples)")
+        st.markdown("### ChatGPT Prompt")
         prompt_text = build_chatgpt_prompt(st.session_state.stroke_view_char)
-        st.text_area("Copy this prompt into ChatGPT", value=prompt_text, height=320, key=f"prompt_area_{st.session_state.stroke_view_char}")
-        render_copy_to_clipboard(prompt_text, widget_id=str(hash(st.session_state.stroke_view_char))[-6:])
+        st.text_area("Copy this prompt into ChatGPT", value=prompt_text, height=320)
+        render_copy_to_clipboard(prompt_text, str(hash(st.session_state.stroke_view_char)))
 
-    # --- Grid View (Root) ---
-    elif st.session_state.show_inputs:
-        filter_parts = []
+    if st.session_state.show_inputs:
         cur_min, cur_max = st.session_state.stroke_range
+
+        filter_parts = []
         max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
+
         if not (cur_min == 1 and cur_max == max_s_val):
             if cur_min == cur_max:
                 filter_parts.append(f"<span class='status-tag'>{cur_min} strokes</span>")
@@ -972,25 +882,39 @@ def main():
                 filter_parts.append(f"<span class='status-tag'>≥ {cur_min} strokes</span>")
             else:
                 filter_parts.append(f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>")
+
         if st.session_state.radical != "none":
             filter_parts.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
         if st.session_state.component_idc != "none":
             filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
-        if st.session_state.component_only:
-            filter_parts.append("<span class='status-tag'>Components Only</span>")
-        filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
 
+        force_components_only = (st.session_state.grid_sort_mode == "usage")
+        if force_components_only or st.session_state.component_only:
+            filter_parts.append("<span class='status-tag'>Components Only</span>")
+
+        if st.session_state.grid_sort_mode == "frequency":
+            filter_parts.append(f"<span class='status-tag'>Script: {st.session_state.grid_script_filter}</span>")
+
+        filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
         st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· Single-click previews. Double-click explores.</span></div>", unsafe_allow_html=True)
+
+        use_component_only = force_components_only or st.session_state.component_only
 
         filtered = [
             c for c in component_map
             if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max
             and (st.session_state.radical == "none" or component_map[c]["meta"].get("radical") == st.session_state.radical)
             and (st.session_state.component_idc == "none" or component_map[c]["meta"].get("decomposition", "").startswith(st.session_state.component_idc))
-            and (not st.session_state.component_only or c in stats_cache["used_components"])
+            and (not use_component_only or c in stats_cache["used_components"])
         ]
 
-        sorted_comps = sorted(filtered, key=sort_key_usage_then_zipf)
+        if st.session_state.grid_sort_mode == "frequency":
+            filtered = apply_script_filter(filtered, st.session_state.grid_script_filter)
+
+        if st.session_state.grid_sort_mode == "frequency":
+            sorted_comps = sorted(filtered, key=sort_key_frequency_primary)
+        else:
+            sorted_comps = sorted(filtered, key=sort_key_usage_primary)
 
         if not sorted_comps:
             st.info("No components match current filters.")
@@ -1009,7 +933,7 @@ def main():
             with p2:
                 start = (st.session_state.page - 1) * PAGE_SIZE + 1
                 end = min(st.session_state.page * PAGE_SIZE, total)
-                st.markdown(f"""<div style='text-align:center; padding:10px 0; color:#555;'><div style='font-size:1.1em; font-weight:bold;'>{start}–{end} of {total}</div><div style='font-size:0.85em; color:#e74c3c;'>Sorted by component-usage; low-usage uses language commonness</div></div>""", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align:center; padding:10px 0; color:#555;'><div style='font-size:1.1em; font-weight:bold;'>{start}–{end} of {total}</div></div>", unsafe_allow_html=True)
             with p3:
                 if st.button("Next ▶", disabled=st.session_state.page >= max_page, use_container_width=True):
                     st.session_state.page += 1
@@ -1034,23 +958,19 @@ def main():
                               on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
                 st.caption("Enter one Chinese character to jump directly to its details")
             st.markdown("</div>", unsafe_allow_html=True)
-            
-            # Definition Search Section
+
             st.markdown("<div class='jump-footer' style='margin-top:20px;'>", unsafe_allow_html=True)
             st.markdown("<h4 style='text-align:center; color:#2c3e50; margin-bottom:15px;'>🔍 Search by English Definition</h4>", unsafe_allow_html=True)
             col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
             with col_s2:
-                st.text_input("Search definitions", key="w_def_search", 
-                            placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
+                st.text_input("Search definitions", key="w_def_search", placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
                 if st.button("Search Definitions", use_container_width=True, type="primary"):
                     search_by_definition()
                     st.rerun()
                 st.caption("Search across character definitions and phrase meanings")
             st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- Detail View (Consolidated Lineage Implementation) ---
     else:
-        # Check if we're in definition search mode
         if st.session_state.definition_search_mode and st.session_state.definition_search_results:
             results = st.session_state.definition_search_results
             query = st.session_state.definition_search_query
@@ -1066,13 +986,11 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Character Results
             if results['characters']:
                 st.markdown("<div class='lineage-header'>📝 Characters</div>", unsafe_allow_html=True)
-                for char in results['characters'][:30]:  # Show first 30
+                for char in results['characters'][:30]:
                     render_radix_row(char)
             
-            # Phrase Results
             if results['phrases']:
                 st.markdown("<div class='lineage-header'>💬 Phrases</div>", unsafe_allow_html=True)
                 st.markdown("<div style='max-width:900px; margin:0 auto;'>", unsafe_allow_html=True)
@@ -1080,7 +998,6 @@ def main():
                     word = phrase_data['word']
                     pinyin = phrase_data['pinyin']
                     meanings = pyhtml.escape(phrase_data['meanings'][:200] + ('...' if len(phrase_data['meanings']) > 200 else ''))
-                    
                     st.markdown(f"""
                         <div class='compound-item' style='margin-bottom:15px;'>
                             <span class='cp-word' style='font-size:1.4em;'>{word}</span>
@@ -1092,9 +1009,7 @@ def main():
             
             if not results['characters'] and not results['phrases']:
                 st.info(f"No results found for '{query}'. Try different search terms.")
-        
         else:
-            # Normal detail view
             st.markdown("""
                 <div class='status-line'>
                     <div class='status-text' style='font-size:0.85em; color:#666;'>
@@ -1105,7 +1020,6 @@ def main():
 
             selected = st.session_state.selected_comp
 
-            # 1. PARENTS (Ingredients)
             decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
             parents = [p for p in decomp_raw if p in component_map and p not in IDC_CHARS and p not in ["?", "—"]]
             
@@ -1114,7 +1028,6 @@ def main():
                 for p in apply_script_filter(parents, st.session_state.script_filter):
                     render_radix_row(p)
 
-            # 2. CURRENT SELECTION (Focus)
             st.markdown("<div class='lineage-header'>🎯 Current Selection</div>", unsafe_allow_html=True)
             focus_group = [selected]
             if cc_t2s and cc_s2t:
@@ -1127,24 +1040,39 @@ def main():
             for f in apply_script_filter(focus_group, st.session_state.script_filter):
                 render_radix_row(f)
 
-            # 3. CHILDREN (The Family this character spawns)
             related_raw = component_map.get(selected, {}).get("related_characters", [])
             children = [c for c in related_raw if isinstance(c, str) and len(c) == 1 and c in component_map and c != selected]
             
             if children:
-                st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {len(children)} characters)</div>", unsafe_allow_html=True)
-                children_sorted = sorted(children, key=sort_key_usage_then_zipf)
-                visible_children = apply_script_filter(children_sorted, st.session_state.script_filter)
+                children_sorted = sorted(children, key=sort_key_usage_primary)
+                visible_children = apply_script_filter(children_sorted, st.session_state.script_filter)    
                 
-                # Show top clickable derivatives
-                for child in visible_children[:50]:
-                    render_radix_row(child)
+                # Remove duplicates while preserving order
+                seen = set()
+                unique_visible = []
+                for child in visible_children:
+                    if child not in seen:
+                        unique_visible.append(child)
+                        seen.add(child)
+                visible_children = unique_visible
 
-                # Handle deep derivatives as static cards
-                if len(visible_children) > 50:
+                # Now use the deduplicated count in the header
+                st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {len(visible_children)} characters)</div>", unsafe_allow_html=True)
+                
+                # First 120: Fully interactive
+                for child in visible_children[:120]:
+                    render_radix_row(child)
+                
+                # Remaining: Static cards (unlimited)
+                if len(visible_children) > 120:
+                    remaining = len(visible_children) - 120
                     st.markdown("---")
-                    st.markdown(f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>⬇️ {len(visible_children)-50} More Derivatives ⬇️</div>", unsafe_allow_html=True)
-                    for c in visible_children[50:120]:
+                    st.markdown(
+                        f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>"
+                        f"⬇️ {remaining} More Derivatives ⬇️</div>",
+                        unsafe_allow_html=True
+                    )
+                    for c in visible_children[120:]:
                         col_char, col_details = st.columns([2, 10])
                         with col_char:
                             st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
@@ -1153,7 +1081,6 @@ def main():
                         st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
                 
                 st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
-
 
 if __name__ == "__main__":
     main()
