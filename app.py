@@ -268,45 +268,50 @@ def apply_dynamic_css():
         line-height: 1.5;
     }
 
-        /* Splash Screen */
+/* PALACE ENTRANCE STYLING */
     .splash-wrap {
-        max-width: 1200px;
+        max-width: 850px;
         margin: 0 auto;
-        padding: 40px 20px 20px 20px;
+        padding: 60px 20px 20px 20px;
     }
     .splash-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        border: 2px solid #dee2e6;
-        border-radius: 24px;
-        padding: 40px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+        background: #ffffff;
+        border: 1px solid #e0e0e0;
+        border-radius: 40px;
+        padding: 60px;
+        box-shadow: 0 15px 50px rgba(0,0,0,0.05);
+        text-align: center;
     }
     .splash-title {
-        font-size: 2.6em;
-        font-weight: 900;
-        line-height: 1.2;
-        color: #111;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        font-size: 3.0em;
+        font-weight: 800;
+        color: #1a1a1a;
+        margin-bottom: 10px;
     }
     .splash-sub {
-        margin-top: 15px;
-        font-size: 1.2em;
-        color: #495057;
-        line-height: 1.6;
+        font-size: 1.3em;
+        color: #666;
     }
-    .splash-demo {
-        margin-top: 25px;
-        padding: 18px 20px;
-        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
-        border: 2px solid #ffd54f;
-        border-radius: 16px;
-        box-shadow: 0 3px 10px rgba(255, 193, 7, 0.1);
+    .palace-entrance-container {
+        text-align: center;
+        margin: 60px 0;
     }
-    .splash-demo-h {
-        font-weight: 800;
-        color: #856404;
-        margin-bottom: 10px;
-        font-size: 1.1em;
+    .grand-torii {
+        font-size: 250px !important; /* Palace Scale */
+        cursor: pointer;
+        line-height: 1;
+        transition: transform 0.4s ease;
+        filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));
+    }
+    .grand-torii:hover {
+        transform: scale(1.1);
+    }
+    .entrance-text {
+        color: #2c3e50;
+        font-size: 24px;
+        font-weight: 700;
+        margin-top: 20px;
+        letter-spacing: 2px;
     }
     
     </style>
@@ -483,18 +488,18 @@ def tile_click(c):
 
 def list_tile_click(c):
     if st.session_state.preview_comp == c:
-        st.session_state.script_filter = "Any"
+        # Trigger the feature alert toast
+        if not st.session_state.get("has_drilled_down", False):
+            st.toast("Feature Discovered: You have entered the Character Lineage view!", icon="🌳")
+            st.session_state.has_drilled_down = True
+            
+        # Standard navigation logic
         if st.session_state.selected_comp:
             st.session_state.history.append(st.session_state.selected_comp)
         st.session_state.selected_comp = c
-        st.session_state.last_valid_selected_comp = c
         st.session_state.show_inputs = False
         st.session_state.preview_comp = None
-        st.session_state.text_input_comp = c
-        st.session_state.stroke_view_active = False
-        st.session_state.display_mode = "2-Characters"
-        st.session_state.definition_search_mode = False
-        st.session_state.definition_search_results = None
+        st.session_state.display_mode = "2-Characters" # Ensure default
     else:
         st.session_state.preview_comp = c
 
@@ -605,10 +610,12 @@ def enter_component(comp: str):
     st.session_state.definition_search_results = None
 
 def render_splash():
+    """Renders the entry screen with a grand palace-style entrance."""
+    # 1. Main Title Card - Styled for a premium, palace feel
     st.markdown(
         """
         <div class="splash-wrap">
-          <div class="splash-card" style="text-align:center;">
+          <div class="splash-card">
             <div class="splash-title">Radix 🈑 Chinese Characters</div>
             <div class="splash-sub">
               Spot the COMPONENTS (字部件). Read and write HANZI (汉字 / 漢字).
@@ -619,25 +626,24 @@ def render_splash():
         unsafe_allow_html=True,
     )
 
+    # 2. ENLARGED ENTRANCE: The Torii gate scaled to palace proportions
     st.markdown(
         """
-        <div style="text-align:center; margin: 40px 0;">
-            <a href="/?onboarding=done" target="_self" style="text-decoration:none; display:inline-block;">
-                <div style="font-size: 100px; cursor:pointer; line-height:1; transition: transform 0.3s ease;" 
-                     onmouseover="this.style.transform='scale(1.15)';" 
-                     onmouseout="this.style.transform='scale(1)';" >
-                     ⛩️
-                </div>
-                <div style="color: #C0392B !important; font-size: 26px !important; 
-                             font-weight: 900 !important; margin-top: 15px; 
-                             font-family: 'Segoe UI', sans-serif; letter-spacing: 2px;">
-                    Enter Radix 🈑
-                </div>
+        <div class="palace-entrance-container">
+            <a href="/?onboarding=done" target="_self" style="text-decoration:none;">
+                <div class="grand-torii">⛩️</div>
+                <div class="entrance-text">Enter the Grand Hall of Radix 🈑</div>
             </a>
         </div>
         """, 
         unsafe_allow_html=True
     )
+
+    # Handling the entrance logic via query parameters
+    if st.query_params.get("onboarding") == "done":
+        st.session_state.onboarding_done = True
+        st.query_params.clear() 
+        st.rerun()
     
     if st.query_params.get("onboarding") == "done":
         st.session_state.onboarding_done = True
