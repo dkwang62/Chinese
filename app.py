@@ -565,63 +565,37 @@ def enter_component(comp: str):
 def render_splash():
     st.markdown(
         """
-        <div style="text-align: center; margin-top: 80px;">
-            <div style="
-                display: inline-block;
-                background: white;
-                padding: 40px 60px;
-                border-radius: 24px;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-                border: 1px solid #eee;
-                max-width: 600px;
-            ">
-                <h1 style="
-                    font-size: 2.8rem;
-                    font-weight: 900;
-                    margin: 0 0 16px 0;
-                    color: #1a1a1a;
-                ">
-                    Radix 🈑 Chinese Characters
-                </h1>
-                <p style="
-                    font-size: 1.3rem;
-                    color: #555;
-                    margin: 0 0 40px 0;
-                    line-height: 1.6;
-                ">
-                    Spot the COMPONENTS (字部件). Read and write HANZI (汉字 / 漢字).
-                </p>
-                
-                <div style="font-size: 120px; margin: 40px 0;">
-                    ⛩️
-                </div>
-                
-                <div style="margin-top: 30px;">
-                    <a href="/?onboarding=done" target="_self" style="text-decoration: none;">
-                        <div style="
-                            display: inline-block;
-                            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
-                            color: white;
-                            padding: 16px 32px;
-                            border-radius: 16px;
-                            font-size: 1.6rem;
-                            font-weight: 800;
-                            box-shadow: 0 8px 20px rgba(238, 90, 82, 0.3);
-                            transition: all 0.3s ease;
-                            cursor: pointer;
-                        "
-                        onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 12px 28px rgba(238,90,82,0.4)'"
-                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 8px 20px rgba(238,90,82,0.3)'">
-                            Enter Radix 🈑
-                        </div>
-                    </a>
-                </div>
+        <div class="splash-wrap">
+          <div class="splash-card" style="text-align:center;">
+            <div class="splash-title">Radix 🈑 Chinese Characters</div>
+            <div class="splash-sub">
+              Spot the COMPONENTS (字部件). Read and write HANZI (汉字 / 漢字).
             </div>
+          </div>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
+    st.markdown(
+        """
+        <div style="text-align:center; margin: 40px 0;">
+            <a href="/?onboarding=done" target="_self" style="text-decoration:none; display:inline-block;">
+                <div style="font-size: 100px; cursor:pointer; line-height:1; transition: transform 0.3s ease;" 
+                     onmouseover="this.style.transform='scale(1.15)';" 
+                     onmouseout="this.style.transform='scale(1)';" >
+                     ⛩️
+                </div>
+                <div style="color: #C0392B !important; font-size: 26px !important; 
+                             font-weight: 900 !important; margin-top: 15px; 
+                             font-family: 'Segoe UI', sans-serif; letter-spacing: 2px;">
+                    Enter Radix 🈑
+                </div>
+            </a>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
     if st.query_params.get("onboarding") == "done":
         st.session_state.onboarding_done = True
         st.query_params.clear() 
