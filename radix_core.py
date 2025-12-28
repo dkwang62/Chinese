@@ -28,27 +28,27 @@ SUBTLEX_FREQ: Dict[str, float] = {}  # simplified char -> freq per million
 
 
 def load_subtlex_freq():
-    """Load SUBTLEX-CH character frequencies from subtlex_ch_freq.txt"""
+    """Load SUBTLEX-CH character frequencies from SUBTLEX-CH-CHR.txt (GBK encoded)"""
     global SUBTLEX_FREQ
     try:
-        with open("subtlex_ch_freq.txt", "r", encoding="utf-8") as f:
+        with open("SUBTLEX-CH-CHR.txt", "r", encoding="gbk") as f:  # ← Change to gbk
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line or line.startswith("Character") or line.startswith("Total"):
-                    continue  # Skip headers and summary lines
+                    continue
                 parts = line.split("\t")
                 if len(parts) < 3:
                     continue
                 char = parts[0].strip()
                 try:
-                    freq_per_million = float(parts[2])  # CHR/million column
+                    freq_per_million = float(parts[2])
                     if freq_per_million > 0:
                         SUBTLEX_FREQ[char] = freq_per_million
                 except ValueError:
                     continue
         print(f"[Radix] Loaded {len(SUBTLEX_FREQ)} characters from SUBTLEX-CH frequency list")
     except FileNotFoundError:
-        print("[Radix] subtlex_ch_freq.txt not found — frequency badges will be disabled")
+        print("[Radix] SUBTLEX-CH-CHR.txt not found — frequency badges disabled")
     except Exception as e:
         print(f"[Radix] Error loading SUBTLEX-CH frequencies: {e}")
 
