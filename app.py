@@ -690,7 +690,6 @@ def render_radix_row(c, context="detail"):
     is_preview = st.session_state.preview_comp == c
     is_active_focus = is_preview or (st.session_state.preview_comp is None and c == st.session_state.selected_comp)
 
-
     with col_char:
         st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
         unique_id = str(uuid.uuid4())[:8]
@@ -699,10 +698,23 @@ def render_radix_row(c, context="detail"):
                   on_click=list_tile_click, args=(c,), use_container_width=True)
 
         st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-        if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}_{unique_id}", help="Write AI prompt", use_container_width=True):
-            st.session_state.stroke_view_char = c
+        
+        # Create a callback function for the stroke button
+        def activate_stroke_view(char):
+            st.session_state.stroke_view_char = char
             st.session_state.stroke_view_active = True
-            st.rerun()
+            st.session_state.show_inputs = False
+            # Ensure the character is set as selected if not already
+            if not st.session_state.selected_comp:
+                st.session_state.selected_comp = char
+                st.session_state.last_valid_selected_comp = char
+        
+        if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}_{unique_id}", 
+                     help="Write AI prompt", use_container_width=True,
+                     on_click=activate_stroke_view, args=(c,)):
+            pass  # The callback handles everything
+        
+        st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
         
     with col_details:
