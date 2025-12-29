@@ -314,7 +314,40 @@ def apply_dynamic_css():
         letter-spacing: 2px;
     }
     
-    </style>
+    
+    /* --- List View Interaction Banner + Button Hints --- */
+    .interaction-banner {
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid #e9ecef;
+        background: #f8f9fa;
+        margin: 10px 0 18px 0;
+        color: #2c3e50;
+        font-weight: 600;
+        line-height: 1.25;
+    }
+    .interaction-banner .k {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid #dee2e6;
+        background: #ffffff;
+        font-weight: 800;
+        margin: 0 6px 0 0;
+        font-size: 0.92em;
+    }
+    .interaction-banner .muted { color: #6c757d; font-weight: 600; }
+    .char-btn-hint {
+        margin-top: 6px;
+        text-align: center;
+        font-size: 0.86em;
+        color: #6c757d;
+        font-weight: 700;
+    }
+    .char-btn-hint.previewing {
+        color: #c0392b;
+    }
+</style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
@@ -694,8 +727,25 @@ def render_radix_row(c, context="detail"):
         st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
         unique_id = str(uuid.uuid4())[:8]
 
-        st.button(c, key=f"explore_char_{c}_{ord(c)}_{unique_id}", type="primary" if is_preview else "secondary",
-                  on_click=list_tile_click, args=(c,), use_container_width=True)
+        btn_help = (
+            "Previewing in the sidebar. Click again to drill down into this character family."
+            if is_preview
+            else "Click once to preview in the sidebar; click the same button again to drill down."
+        )
+
+        st.button(
+            c,
+            key=f"explore_char_{context}_{c}_{ord(c)}_{unique_id}",
+            type="primary" if is_preview else "secondary",
+            help=btn_help,
+            on_click=list_tile_click,
+            args=(c,),
+            use_container_width=True,
+        )
+
+        hint_text = "Click again to drill down" if is_preview else "Click once to preview"
+        hint_class = "char-btn-hint previewing" if is_preview else "char-btn-hint"
+        st.markdown(f"<div class='{hint_class}'>{hint_text}</div>", unsafe_allow_html=True)
 
         st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
         
@@ -1074,6 +1124,18 @@ def main():
 
             selected = st.session_state.selected_comp
 
+            st.markdown(
+                "<div class='interaction-banner'>"
+                "<span class='k'>1×</span>Preview in sidebar "
+                "<span class='muted'>·</span> "
+                "<span class='k'>2×</span>Drill down into this family "
+                "<span class='muted'>·</span> "
+                "Sidebar breadcrumb tracks your path"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+
 
 
             # 1. PARENTS (Ingredients) - exclude self if present
@@ -1136,11 +1198,10 @@ def main():
                         with col_char:
                             st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
                         with col_details:
-                            # Only show minimal info — no full card!
                             usage = component_usage_count(c)
-                            st.markdown(f"<div style='font-size:1.4em; color:#666; text-align:center; padding:20px 0;'>"
-                                        f"{c}<br><small>Used in {usage} characters</small></div>", unsafe_allow_html=True)
+                            st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c)), unsafe_allow_html=True)
                         st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
     main()
