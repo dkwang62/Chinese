@@ -952,17 +952,18 @@ def main():
             path_str = " → ".join(path_items)
             st.markdown(f"<div style='font-size:0.95em; margin:18px 0; color:#444; text-align:center; font-weight:500;'>{path_str}</div>", unsafe_allow_html=True)
 
-        nav_col1, nav_col2 = st.columns(2)
-        with nav_col1:
-            if st.session_state.stroke_view_active:
-                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
-            else:
-                st.button("← Back", on_click=go_back, use_container_width=True)
-        with nav_col2:
-            st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+        # Only show navigation buttons when not in grid/root view
+        if not st.session_state.show_inputs:
+            nav_col1, nav_col2 = st.columns(2)
+            with nav_col1:
+                if st.session_state.stroke_view_active:
+                    st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+                else:
+                    st.button("← Back", on_click=go_back, use_container_width=True)
+            with nav_col2:
+                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
 
-        st.markdown("---")
-
+            st.markdown("---")
 
     if st.session_state.stroke_view_active:
         st.markdown("### Stroke Order Animation")
