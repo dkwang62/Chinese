@@ -266,8 +266,7 @@ Hanzi: {char}
 - English definition: {def_en}
 """
 
-
-def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
+def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_static: bool = False) -> str:
     """Generate clean HTML card for a character with metadata."""
     if not c:
         return ""
@@ -326,21 +325,34 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
         if traditional != c:
             meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. → {traditional}</span>")
 
-    # Discovery tip
+
+    # Discovery tip - conditional based on card type
     discovery_tip = ""
     if usage_count and usage_count > 0:
-        discovery_tip = (
-            f"<div class='discovery-tip' style='margin-top:12px; padding:8px; background:#f0fff4; "
-            f"border-top:1px dashed #c6f6d5; font-size:0.88em; color:#22543d; font-weight:600;'>"
-            f"✨ Tip: Click {c} once to preview it in the sidebar, then click {c} again to drill down into the {usage_count} related characters."
-            f"</div>"
-        )
-
+        if is_static:
+            # For static cards (non-interactive): instruct to use search
+            discovery_tip = (
+                f"<div class='discovery-tip' style='margin-top:12px; padding:8px; background:#fff3e0; "
+                f"border-top:1px dashed #ffb74d; font-size:0.88em; color:#e65100; font-weight:600;'>"
+                f"💡 Tip: Copy and paste {c} into the search box at the top to drill down on this character."
+                f"</div>"
+            )
+        else:
+            # For interactive cards: show the two-step click instruction
+            discovery_tip = (
+                f"<div class='discovery-tip' style='margin-top:12px; padding:8px; background:#f0fff4; "
+                f"border-top:1px dashed #c6f6d5; font-size:0.88em; color:#22543d; font-weight:600;'>"
+                f"✨ Tip: Click {c} once to preview it in the sidebar, then click {c} again to drill down into the {usage_count} related characters."
+                f"</div>"
+            )
     meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
     def_html = f"<div class='def-row'>{definition}</div>" if definition and definition != "—" else ""
     ety_html = f"<div class='ety-row'>{etymology}</div>" if etymology else ""
     
     return f"<div class='char-card'>{meta_html}{def_html}{ety_html}{discovery_tip}</div>"
+
+
+
 # --- iPad-Safe Download HTML ---
 def render_ipad_safe_download_html(data_str: str, filename: str, label: str) -> str:
     b64 = base64.b64encode(data_str.encode()).decode()
