@@ -1160,11 +1160,11 @@ def main():
                         <div>
                             <div style='font-weight: 800; font-size: 1.2em;'> {sel}</div>
                             <div style='margin-top:4px; font-size:0.85em;'>
-                                <b>Components:</b> {p_html if parents else "Basic Root"}
+                                <b>Components</b> {p_html if parents else "Basic Root"}
                             </div>
                         </div>
-                        <div style='text-align: left; font-size: 1.2em; opacity: 0.7;'>
-                            <b>Derivatives:</b><br/>{c_html}{"..." if len(children) > 50 else ""}
+                        <div style='text-align: left; font-size: 1.0em; opacity: 0.7;'>
+                            <b>Derivatives</b><br/>{c_html}{"..." if len(children) > 50 else ""}
                         </div>
                     </div>
                     <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.85em; display: flex; align-items: center; gap: 10px;'>
