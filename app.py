@@ -1174,45 +1174,6 @@ def main():
                 """, unsafe_allow_html=True)
             # --- END DYNAMIC BANNER ---
 
-
-            # --- MAIN CONTENT AREA ---
-            
-            # A. Display the Current Character Header
-            st.markdown(f"<div class='lineage-header'>🎯 Selected Character: {sel}</div>", unsafe_allow_html=True)
-            render_radix_row(sel)
-
-            # B. Display Derivatives Only
-            if children:
-                children_sorted = sorted(children, key=sort_key_usage_primary)
-                visible_children = apply_script_filter(children_sorted, st.session_state.script_filter)    
-                
-                # Deduplicate
-                seen = set()
-                unique_visible = []
-                for child in visible_children:
-                    if child not in seen:
-                        unique_visible.append(child)
-                        seen.add(child)
-                
-                st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Characters containing {sel})</div>", unsafe_allow_html=True)
-                
-                for child in unique_visible[:50]:
-                    render_radix_row(child)
-                
-                if len(unique_visible) > 50:
-                    st.markdown("---")
-                    st.markdown(f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>⬇️ {len(unique_visible)-120} More Derivatives ⬇️</div>", unsafe_allow_html=True)
-                    for c in unique_visible[120:]:
-                        render_radix_row(c, context="static_derivative", is_static=True)
-
-
-
-
-
-
-
-
-
             selected = st.session_state.selected_comp
 
             # 1. PARENTS (Ingredients) - exclude self if present
