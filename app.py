@@ -1015,11 +1015,6 @@ def main():
                     </div>
                     <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>ROOT</div>
                 </div>
-                <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.85em;'>
-                    <span class='k'>1×</span> Preview in sidebar 
-                    <span style='margin: 0 8px; opacity: 0.5;'>|</span>
-                    <span class='k'>2×</span> Drill down into family
-                </div>
             </div>
             """, 
             unsafe_allow_html=True
@@ -1166,9 +1161,6 @@ def main():
                         <div style='text-align: left; font-size: 1.0em; opacity: 0.7;'>
                             <b>Derivatives</b><br/>{c_html}{"..." if len(children) > 50 else ""}
                         </div>
-                    </div>
-                    <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.85em; display: flex; align-items: center; gap: 10px;'>
-                        <span class='k'>1×</span> Preview | <span class='k'>2×</span> Drill down | <span style='opacity: 0.7;'>Path: {" → ".join(st.session_state.history + [sel])}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
