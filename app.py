@@ -1023,7 +1023,7 @@ def main():
                     <div style='display: flex; flex-wrap: wrap; gap: 8px;'>
                         <span style='font-weight: 800; margin-right: 5px;'>🔍 Filters:</span> {filter_summary}
                     </div>
-                    <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>GRID MODE</div>
+                    <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>ROOT</div>
                 </div>
                 <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.85em;'>
                     <span class='k'>1×</span> Preview in sidebar 
