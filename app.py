@@ -827,7 +827,6 @@ def main():
         st.stop()
 
     with st.sidebar:
-        st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
         current_char_for_sidebar = (
             st.session_state.stroke_view_char if st.session_state.stroke_view_active
