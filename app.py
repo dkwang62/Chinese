@@ -1006,6 +1006,7 @@ def main():
             filter_parts.append(f"<span class='status-tag'>Script: {st.session_state.grid_script_filter}</span>")
 
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
+        st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· Single-click previews. Double-click explores.</span></div>", unsafe_allow_html=True)
 
         use_component_only = force_components_only or st.session_state.component_only
 
