@@ -1013,7 +1013,7 @@ def main():
                     <div style='display: flex; flex-wrap: wrap; gap: 8px;'>
                         <span style='font-weight: 800; margin-right: 5px;'>🔍 Filters:</span> {filter_summary}
                     </div>
-                    <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>ROOT</div>
+                    <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>Click once to preview in the sidebar; click the same button again to drill down. </div>
                 </div>
             </div>
             """, 
