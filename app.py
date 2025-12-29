@@ -708,6 +708,18 @@ def render_splash():
                 unique_demos.append(d)
                 seen.add(d)
 
+
+
+
+
+
+
+
+
+
+
+
+
         COLS = 5
         rows = (len(unique_demos) + COLS - 1) // COLS
         for r in range(rows):
@@ -1148,29 +1160,22 @@ def main():
             if not results['characters'] and not results['phrases']:
                 st.info(f"No results found for '{query}'. Try different search terms.")
         else:
-            st.markdown("""
+            st.markdown(
+                """
                 <div class='status-line'>
-                    <div class='status-text' style='font-size:0.85em; color:#666;'>
-                        Single-click previews · Double-click explores
+                    <div style='font-weight: 700; margin-bottom: 8px;'>✅ Status Summary: Results Ready</div>
+                    <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.9em; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;'>
+                        <span class='k'>1×</span> Preview in sidebar
+                        <span style='opacity: 0.4;'>|</span>
+                        <span class='k'>2×</span> Drill down into family
+                        <span style='opacity: 0.4;'>|</span>
+                        <span>Breadcrumb tracks your path</span>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-
-            selected = st.session_state.selected_comp
-
-            st.markdown(
-                "<div class='interaction-banner'>"
-                "<span class='k'>1×</span>Preview in sidebar "
-                "<span class='muted'>·</span> "
-                "<span class='k'>2×</span>Drill down into this family "
-                "<span class='muted'>·</span> "
-                "Sidebar breadcrumb tracks your path"
-                "</div>",
+                """,
                 unsafe_allow_html=True,
             )
-
-
-
+            selected = st.session_state.selected_comp
 
             # 1. PARENTS (Ingredients) - exclude self if present
             decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
