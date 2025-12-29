@@ -1160,7 +1160,7 @@ def main():
                         <div>
                             <div style='font-weight: 800; font-size: 1.2em;'> {sel}</div>
                             <div style='margin-top:4px; font-size:0.85em;'>
-                                <b>Built from:</b> {p_html if parents else "Basic Root"}
+                                <b>Components:</b> {p_html if parents else "Basic Root"}
                             </div>
                         </div>
                         <div style='text-align: left; font-size: 1.2em; opacity: 0.7;'>
