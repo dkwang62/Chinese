@@ -1158,6 +1158,7 @@ def main():
                 <div class='status-line'>
                     <div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'>
                         <div>
+                            <div style='font-weight: 800; font-size: 1.2em;'>: {sel}</div>
                             <div style='margin-top:4px; font-size:0.85em;'>
                                 <b>Built from:</b> {p_html if parents else "Basic Root"}
                             </div>
