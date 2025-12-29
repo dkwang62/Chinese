@@ -347,6 +347,13 @@ def apply_dynamic_css():
     .char-btn-hint.previewing {
         color: #c0392b;
     }
+    .status-line {
+        line-height: 1.4;
+    }
+    .status-line span {
+        color: #0f5132; /* Ensure the text inside remains the dark green */
+    }
+
 </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -1006,7 +1013,28 @@ def main():
             filter_parts.append(f"<span class='status-tag'>Script: {st.session_state.grid_script_filter}</span>")
 
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
-        st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· Single-click previews. Double-click explores.</span></div>", unsafe_allow_html=True)
+#        st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· Single-click previews. Double-click explores.</span></div>", unsafe_allow_html=True)
+
+        st.markdown(
+            """
+            <div class='status-line' style='display: flex; flex-direction: column; gap: 8px;'>
+                <div style='display: flex; justify-content: space-between; align-items: center;'>
+                    <div class='status-text' style='font-size: 0.9em; font-weight: 700;'>
+                        ✅ Status Summary: Results Ready
+                    </div>
+                    <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7);'>
+                        Single-click previews · Double-click explores
+                    </div>
+                </div>
+                <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.85em;'>
+                    <span style='background: white; padding: 2px 6px; border-radius: 4px; font-weight: 800; margin-right: 5px;'>1×</span> Preview in sidebar 
+                    <span style='margin: 0 8px; opacity: 0.5;'>|</span>
+                    <span style='background: white; padding: 2px 6px; border-radius: 4px; font-weight: 800; margin-right: 5px;'>2×</span> Drill down into family
+                </div>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
 
         use_component_only = force_components_only or st.session_state.component_only
 
