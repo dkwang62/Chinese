@@ -1142,13 +1142,13 @@ def main():
             sel = st.session_state.selected_comp
             info = component_map.get(sel, {})
             
-            # 1. Get Parents (Components)
-#            decomp = info.get("meta", {}).get("decomposition", "")
-#            parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
-#            parents = apply_script_filter(parents, st.session_state.script_filter)
-#            p_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px;'>{p}</span>" for p in parents])
+            # 1. Get Parents (for the banner only)
+            decomp = info.get("meta", {}).get("decomposition", "")
+            parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
+            parents = apply_script_filter(parents, st.session_state.script_filter)
+            p_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px;'>{p}</span>" for p in parents])
             
-            # 2. Get Derivatives (Children) - Preview the first 50
+            # 2. Get Derivatives
             rel = info.get("related_characters", [])
             children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
             children_preview = apply_script_filter(children, st.session_state.script_filter)[:50]
@@ -1156,27 +1156,62 @@ def main():
 
             st.markdown(f"""
                 <div class='status-line'>
-#                    <div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'>
-#                        <div>
-#                            <div style='font-weight: 800; font-size: 1.2em;'>🌳 Lineage: {sel}</div>
-#                            <div style='margin-top:4px; font-size:0.85em;'>
-#                                <b>Built from:</b> {p_html if parents else "Basic Root"}
-#                            </div>
-#                        </div>
+                    <div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'>
+                        <div>
+                            <div style='font-weight: 800; font-size: 1.2em;'>🌳 Lineage: {sel}</div>
+                            <div style='margin-top:4px; font-size:0.85em;'>
+                                <b>Built from:</b> {p_html if parents else "Basic Root"}
+                            </div>
+                        </div>
                         <div style='text-align: left; font-size: 1.2em; opacity: 0.7;'>
                             <b>Derivatives:</b><br/>{c_html}{"..." if len(children) > 50 else ""}
                         </div>
                     </div>
                     <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.85em; display: flex; align-items: center; gap: 10px;'>
-                        <span class='k'>1×</span> Preview 
-                        <span style='opacity: 0.4;'>|</span>
-                        <span class='k'>2×</span> Drill down
-                        <span style='opacity: 0.4;'>|</span>
-                        <span style='opacity: 0.7;'>Path: {" → ".join(st.session_state.history + [sel])}</span>
+                        <span class='k'>1×</span> Preview | <span class='k'>2×</span> Drill down | <span style='opacity: 0.7;'>Path: {" → ".join(st.session_state.history + [sel])}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             # --- END DYNAMIC BANNER ---
+
+
+            # --- MAIN CONTENT AREA ---
+            
+            # A. Display the Current Character Header
+            st.markdown(f"<div class='lineage-header'>🎯 Selected Character: {sel}</div>", unsafe_allow_html=True)
+            render_radix_row(sel)
+
+            # B. Display Derivatives Only
+            if children:
+                children_sorted = sorted(children, key=sort_key_usage_primary)
+                visible_children = apply_script_filter(children_sorted, st.session_state.script_filter)    
+                
+                # Deduplicate
+                seen = set()
+                unique_visible = []
+                for child in visible_children:
+                    if child not in seen:
+                        unique_visible.append(child)
+                        seen.add(child)
+                
+                st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Characters containing {sel})</div>", unsafe_allow_html=True)
+                
+                for child in unique_visible[:120]:
+                    render_radix_row(child)
+                
+                if len(unique_visible) > 120:
+                    st.markdown("---")
+                    st.markdown(f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>⬇️ {len(unique_visible)-120} More Derivatives ⬇️</div>", unsafe_allow_html=True)
+                    for c in unique_visible[120:]:
+                        render_radix_row(c, context="static_derivative", is_static=True)
+
+
+
+
+
+
+
+
 
             selected = st.session_state.selected_comp
 
