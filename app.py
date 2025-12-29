@@ -1158,7 +1158,6 @@ def main():
                 <div class='status-line'>
                     <div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'>
                         <div>
-#                            <div style='font-weight: 800; font-size: 1.2em;'>🌳: {sel}</div>
                             <div style='margin-top:4px; font-size:0.85em;'>
                                 <b>Built from:</b> {p_html if parents else "Basic Root"}
                             </div>
@@ -1196,10 +1195,10 @@ def main():
                 
                 st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Characters containing {sel})</div>", unsafe_allow_html=True)
                 
-                for child in unique_visible[:120]:
+                for child in unique_visible[:125]:
                     render_radix_row(child)
                 
-                if len(unique_visible) > 120:
+                if len(unique_visible) > 125:
                     st.markdown("---")
                     st.markdown(f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>⬇️ {len(unique_visible)-120} More Derivatives ⬇️</div>", unsafe_allow_html=True)
                     for c in unique_visible[120:]:
