@@ -829,6 +829,32 @@ def main():
     with st.sidebar:
         st.markdown("<h1 style='text-align:center; margin-bottom:30px;'>🈑 Radix</h1>", unsafe_allow_html=True)
 
+        current_char_for_sidebar = (
+            st.session_state.stroke_view_char if st.session_state.stroke_view_active
+            else (st.session_state.preview_comp or st.session_state.selected_comp)
+        )
+
+        if current_char_for_sidebar:
+            sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
+            if sidebar_html:
+                st_html(sidebar_html, height=sidebar_height)
+
+            related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
+            chars_all = [c for c in related if isinstance(c, str) and len(c) == 1 and c in component_map]
+            chars_filtered = apply_script_filter(chars_all, st.session_state.script_filter)
+            count = len(chars_filtered)
+            if count > 0:
+                st.markdown(
+                    f"<div class='preview-count-line'>{count} characters contain <span class='char'>{current_char_for_sidebar}</span></div>",
+                    unsafe_allow_html=True,
+                )
+
+            is_fav = current_char_for_sidebar in st.session_state.favourites_list
+            st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{current_char_for_sidebar}",
+                        on_change=toggle_favourite, args=(current_char_for_sidebar,))
+
+
+        
         if st.button("Show Favourites", use_container_width=True):
             go_to_root()
             st.session_state.onboarding_done = False
@@ -915,29 +941,7 @@ def main():
 
         st.markdown("---")
 
-        current_char_for_sidebar = (
-            st.session_state.stroke_view_char if st.session_state.stroke_view_active
-            else (st.session_state.preview_comp or st.session_state.selected_comp)
-        )
 
-        if current_char_for_sidebar:
-            sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
-            if sidebar_html:
-                st_html(sidebar_html, height=sidebar_height)
-
-            related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
-            chars_all = [c for c in related if isinstance(c, str) and len(c) == 1 and c in component_map]
-            chars_filtered = apply_script_filter(chars_all, st.session_state.script_filter)
-            count = len(chars_filtered)
-            if count > 0:
-                st.markdown(
-                    f"<div class='preview-count-line'>{count} characters contain <span class='char'>{current_char_for_sidebar}</span></div>",
-                    unsafe_allow_html=True,
-                )
-
-            is_fav = current_char_for_sidebar in st.session_state.favourites_list
-            st.checkbox("Show in Favourites", value=is_fav, key=f"fav_chk_{current_char_for_sidebar}",
-                        on_change=toggle_favourite, args=(current_char_for_sidebar,))
 
             if not st.session_state.show_inputs:
                 st.markdown("---")
