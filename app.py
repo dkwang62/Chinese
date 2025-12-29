@@ -1162,7 +1162,7 @@ def main():
                         <div style='display: flex; flex-wrap: wrap; gap: 8px;'>
                             <span style='font-weight: 800; margin-right: 5px;'>🌳 Lineage:</span> {f_sum}
                         </div>
-                        <div style='font-weight: 700; color: #0f5132; opacity: 0.6; font-size: 0.8em;'>RESULTS READY</div>
+                        <div style='font-weight: 700; color: #0f5132; opacity: 0.6; font-size: 0.8em;'>SHORTLIST</div>
                     </div>
                     <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 10px; font-size: 0.9em; display: flex; align-items: center; gap: 10px;'>
                         <span class='k'>1×</span> Preview in sidebar
