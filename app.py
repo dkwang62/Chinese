@@ -854,6 +854,29 @@ def main():
                         on_change=toggle_favourite, args=(current_char_for_sidebar,))
 
 
+
+            if not st.session_state.show_inputs:
+                st.markdown("---")
+                st.markdown("### Display Phrases")
+                modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
+                current_idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 1
+                new_mode = st.radio("Select mode", options=modes, index=current_idx, key="sidebar_display_mode", label_visibility="collapsed")
+                if new_mode != st.session_state.display_mode:
+                    st.session_state.display_mode = new_mode
+                    st.rerun()
+
+            if not st.session_state.stroke_view_active and not st.session_state.show_inputs:
+                st.markdown("---")
+                current_script = st.session_state.get("script_filter", st.session_state.grid_script_filter)
+                st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(current_script),
+                         key="w_script_filter", on_change=sync_script_filter)
+
+            if st.session_state.stroke_view_active:
+                st.markdown("---")
+                st.markdown("### Character Info")
+                st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>", unsafe_allow_html=True)
+                st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
+
         
         if st.button("Show Favourites", use_container_width=True):
             go_to_root()
@@ -941,29 +964,6 @@ def main():
 
         st.markdown("---")
 
-
-
-            if not st.session_state.show_inputs:
-                st.markdown("---")
-                st.markdown("### Display Phrases")
-                modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
-                current_idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 1
-                new_mode = st.radio("Select mode", options=modes, index=current_idx, key="sidebar_display_mode", label_visibility="collapsed")
-                if new_mode != st.session_state.display_mode:
-                    st.session_state.display_mode = new_mode
-                    st.rerun()
-
-            if not st.session_state.stroke_view_active and not st.session_state.show_inputs:
-                st.markdown("---")
-                current_script = st.session_state.get("script_filter", st.session_state.grid_script_filter)
-                st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(current_script),
-                         key="w_script_filter", on_change=sync_script_filter)
-
-            if st.session_state.stroke_view_active:
-                st.markdown("---")
-                st.markdown("### Character Info")
-                st.markdown(f"<div style='font-size:2em; font-weight:bold; text-align:center; margin-bottom:10px;'>{current_char_for_sidebar}</div>", unsafe_allow_html=True)
-                st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
 
     if st.session_state.stroke_view_active:
         st.markdown("### Stroke Order Animation")
