@@ -413,7 +413,7 @@ DEFAULTS = {
     "stroke_view_active": False,
     "stroke_view_char": "",
     "script_filter": "Any",
-    "component_only": True,
+#   "component_only": True,
     "favourites_list": [],
     "fav_cursor": 0,
     "history": [],
@@ -456,9 +456,9 @@ def sync_idc():
     st.session_state.component_idc = st.session_state.w_idc
     st.session_state.page = 1
 
-def sync_component_only():
-    st.session_state.component_only = st.session_state.w_component_only
-    st.session_state.page = 1
+# def sync_component_only():
+#    st.session_state.component_only = st.session_state.w_component_only
+#    st.session_state.page = 1
 
 def sync_script_filter():
     st.session_state.script_filter = st.session_state.w_script_filter
@@ -859,8 +859,8 @@ def main():
                              index=idc_options.index(st.session_state.component_idc) if st.session_state.component_idc in idc_options else 0,
                              key="w_idc", on_change=sync_idc)
 
-                st.checkbox("Components only", value=st.session_state.component_only,
-                            key="w_component_only", on_change=sync_component_only)
+#                st.checkbox("Components only", value=st.session_state.component_only,
+#                            key="w_component_only", on_change=sync_component_only)
 
             st.markdown("---")
 
@@ -870,10 +870,10 @@ def main():
                 selected = st.session_state.grid_sort_mode_radio
                 if selected == "Most Useful Components First":
                     st.session_state.grid_sort_mode = "usage"
-                    st.session_state.component_only = True
+#                    st.session_state.component_only = True
                 else:
                     st.session_state.grid_sort_mode = "frequency"
-                    st.session_state.component_only = False
+#                    st.session_state.component_only = False
                 st.session_state.page = 1
 
             st.radio(
@@ -1006,7 +1006,8 @@ def main():
             filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
 
         force_components_only = (st.session_state.grid_sort_mode == "usage")
-        if force_components_only or st.session_state.component_only:
+#        if force_components_only or st.session_state.component_only:
+        if force_components_only:
             filter_parts.append("<span class='status-tag'>Components Only</span>")
 
         if st.session_state.grid_sort_mode == "frequency":
@@ -1034,7 +1035,8 @@ def main():
             unsafe_allow_html=True
         )
 
-        use_component_only = force_components_only or st.session_state.component_only
+#        use_component_only = force_components_only or st.session_state.component_only
+        use_component_only = force_components_only
 
         filtered = [
             c for c in component_map
