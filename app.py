@@ -1143,10 +1143,10 @@ def main():
             info = component_map.get(sel, {})
             
             # 1. Get Parents (Components)
-            decomp = info.get("meta", {}).get("decomposition", "")
-            parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
-            parents = apply_script_filter(parents, st.session_state.script_filter)
-            p_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px;'>{p}</span>" for p in parents])
+#            decomp = info.get("meta", {}).get("decomposition", "")
+#            parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
+#            parents = apply_script_filter(parents, st.session_state.script_filter)
+#            p_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px;'>{p}</span>" for p in parents])
             
             # 2. Get Derivatives (Children) - Preview the first 50
             rel = info.get("related_characters", [])
@@ -1156,14 +1156,14 @@ def main():
 
             st.markdown(f"""
                 <div class='status-line'>
-                    <div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'>
-                        <div>
-                            <div style='font-weight: 800; font-size: 1.2em;'>🌳 Lineage: {sel}</div>
-                            <div style='margin-top:4px; font-size:0.85em;'>
-                                <b>Built from:</b> {p_html if parents else "Basic Root"}
-                            </div>
-                        </div>
-                        <div style='text-align: right; font-size: 1.2em; opacity: 0.7;'>
+#                    <div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'>
+#                        <div>
+#                            <div style='font-weight: 800; font-size: 1.2em;'>🌳 Lineage: {sel}</div>
+#                            <div style='margin-top:4px; font-size:0.85em;'>
+#                                <b>Built from:</b> {p_html if parents else "Basic Root"}
+#                            </div>
+#                        </div>
+                        <div style='text-align: left; font-size: 1.2em; opacity: 0.7;'>
                             <b>Derivatives:</b><br/>{c_html}{"..." if len(children) > 50 else ""}
                         </div>
                     </div>
