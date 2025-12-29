@@ -456,10 +456,6 @@ def sync_idc():
     st.session_state.component_idc = st.session_state.w_idc
     st.session_state.page = 1
 
-# def sync_component_only():
-#    st.session_state.component_only = st.session_state.w_component_only
-#    st.session_state.page = 1
-
 def sync_script_filter():
     st.session_state.script_filter = st.session_state.w_script_filter
 
@@ -859,9 +855,6 @@ def main():
                              index=idc_options.index(st.session_state.component_idc) if st.session_state.component_idc in idc_options else 0,
                              key="w_idc", on_change=sync_idc)
 
-#                st.checkbox("Components only", value=st.session_state.component_only,
-#                            key="w_component_only", on_change=sync_component_only)
-
             st.markdown("---")
 
             st.markdown("### Sort Grid By")
@@ -870,10 +863,8 @@ def main():
                 selected = st.session_state.grid_sort_mode_radio
                 if selected == "Most Useful Components First":
                     st.session_state.grid_sort_mode = "usage"
-#                    st.session_state.component_only = True
                 else:
                     st.session_state.grid_sort_mode = "frequency"
-#                    st.session_state.component_only = False
                 st.session_state.page = 1
 
             st.radio(
@@ -1006,7 +997,6 @@ def main():
             filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
 
         force_components_only = (st.session_state.grid_sort_mode == "usage")
-#        if force_components_only or st.session_state.component_only:
         if force_components_only:
             filter_parts.append("<span class='status-tag'>Components Only</span>")
 
@@ -1035,7 +1025,6 @@ def main():
             unsafe_allow_html=True
         )
 
-#        use_component_only = force_components_only or st.session_state.component_only
         use_component_only = force_components_only
 
         filtered = [
@@ -1148,31 +1137,47 @@ def main():
             if not results['characters'] and not results['phrases']:
                 st.info(f"No results found for '{query}'. Try different search terms.")
         else:
-            # --- Re-calculate filter tags for this view ---
-            cur_min, cur_max = st.session_state.stroke_range
-            f_tags = [f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>"]
-            if st.session_state.radical != "none":
-                f_tags.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
-            f_sum = "".join(f_tags)
 
-            st.markdown(
-                f"""
+            # --- NEW DYNAMIC LINEAGE BANNER ---
+            sel = st.session_state.selected_comp
+            info = component_map.get(sel, {})
+            
+            # 1. Get Parents (Components)
+            decomp = info.get("meta", {}).get("decomposition", "")
+            parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
+            parents = apply_script_filter(parents, st.session_state.script_filter)
+            p_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px;'>{p}</span>" for p in parents])
+            
+            # 2. Get Derivatives (Children) - Preview the first 10
+            rel = info.get("related_characters", [])
+            children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
+            children_preview = apply_script_filter(children, st.session_state.script_filter)[:10]
+            c_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px; opacity: 0.8;'>{c}</span>" for c in children_preview])
+
+            st.markdown(f"""
                 <div class='status-line'>
-                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'>
-                        <div style='display: flex; flex-wrap: wrap; gap: 8px;'>
-                            <span style='font-weight: 800; margin-right: 5px;'>🌳 Lineage:</span> {f_sum}
+                    <div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'>
+                        <div>
+                            <div style='font-weight: 800; font-size: 1.2em;'>🌳 Lineage: {sel}</div>
+                            <div style='margin-top:4px; font-size:0.85em;'>
+                                <b>Built from:</b> {p_html if parents else "Basic Root"}
+                            </div>
                         </div>
-                        <div style='font-weight: 700; color: #0f5132; opacity: 0.6; font-size: 0.8em;'>SHORTLIST</div>
+                        <div style='text-align: right; font-size: 0.8em; opacity: 0.7;'>
+                            <b>Family Preview:</b><br/>{c_html}{"..." if len(children) > 10 else ""}
+                        </div>
                     </div>
-                    <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 10px; font-size: 0.9em; display: flex; align-items: center; gap: 10px;'>
-                        <span class='k'>1×</span> Preview in sidebar
+                    <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.85em; display: flex; align-items: center; gap: 10px;'>
+                        <span class='k'>1×</span> Preview 
                         <span style='opacity: 0.4;'>|</span>
-                        <span class='k'>2×</span> Drill down into family
+                        <span class='k'>2×</span> Drill down
+                        <span style='opacity: 0.4;'>|</span>
+                        <span style='opacity: 0.7;'>Path: {" → ".join(st.session_state.history + [sel])}</span>
                     </div>
                 </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                """, unsafe_allow_html=True)
+            # --- END DYNAMIC BANNER ---
+
             selected = st.session_state.selected_comp
 
             # 1. PARENTS (Ingredients) - exclude self if present
