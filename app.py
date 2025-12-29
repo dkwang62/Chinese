@@ -708,18 +708,6 @@ def render_splash():
                 unique_demos.append(d)
                 seen.add(d)
 
-
-
-
-
-
-
-
-
-
-
-
-
         COLS = 5
         rows = (len(unique_demos) + COLS - 1) // COLS
         for r in range(rows):
@@ -1025,23 +1013,21 @@ def main():
             filter_parts.append(f"<span class='status-tag'>Script: {st.session_state.grid_script_filter}</span>")
 
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
-#        st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· Single-click previews. Double-click explores.</span></div>", unsafe_allow_html=True)
+
 
         st.markdown(
-            """
+            f"""
             <div class='status-line' style='display: flex; flex-direction: column; gap: 8px;'>
                 <div style='display: flex; justify-content: space-between; align-items: center;'>
-                    <div class='status-text' style='font-size: 0.9em; font-weight: 700;'>
-                        ✅ Status Summary: Results Ready
+                    <div style='display: flex; flex-wrap: wrap; gap: 8px;'>
+                        <span style='font-weight: 800; margin-right: 5px;'>🔍 Filters:</span> {filter_summary}
                     </div>
-                    <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7);'>
-                        Single-click previews · Double-click explores
-                    </div>
+                    <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>GRID MODE</div>
                 </div>
                 <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.85em;'>
-                    <span style='background: white; padding: 2px 6px; border-radius: 4px; font-weight: 800; margin-right: 5px;'>1×</span> Preview in sidebar 
+                    <span class='k'>1×</span> Preview in sidebar 
                     <span style='margin: 0 8px; opacity: 0.5;'>|</span>
-                    <span style='background: white; padding: 2px 6px; border-radius: 4px; font-weight: 800; margin-right: 5px;'>2×</span> Drill down into family
+                    <span class='k'>2×</span> Drill down into family
                 </div>
             </div>
             """, 
@@ -1160,16 +1146,26 @@ def main():
             if not results['characters'] and not results['phrases']:
                 st.info(f"No results found for '{query}'. Try different search terms.")
         else:
+            # --- Re-calculate filter tags for this view ---
+            cur_min, cur_max = st.session_state.stroke_range
+            f_tags = [f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>"]
+            if st.session_state.radical != "none":
+                f_tags.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
+            f_sum = "".join(f_tags)
+
             st.markdown(
-                """
+                f"""
                 <div class='status-line'>
-                    <div style='font-weight: 700; margin-bottom: 8px;'>✅ Status Summary: Results Ready</div>
-                    <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.9em; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;'>
+                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;'>
+                        <div style='display: flex; flex-wrap: wrap; gap: 8px;'>
+                            <span style='font-weight: 800; margin-right: 5px;'>🌳 Lineage:</span> {f_sum}
+                        </div>
+                        <div style='font-weight: 700; color: #0f5132; opacity: 0.6; font-size: 0.8em;'>RESULTS READY</div>
+                    </div>
+                    <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 10px; font-size: 0.9em; display: flex; align-items: center; gap: 10px;'>
                         <span class='k'>1×</span> Preview in sidebar
                         <span style='opacity: 0.4;'>|</span>
                         <span class='k'>2×</span> Drill down into family
-                        <span style='opacity: 0.4;'>|</span>
-                        <span>Breadcrumb tracks your path</span>
                     </div>
                 </div>
                 """,
