@@ -718,60 +718,67 @@ def render_splash():
                         st.caption(f"used in {count} characters")
         st.markdown("</div>", unsafe_allow_html=True)
 
-def render_radix_row(c, context="detail"):
+def render_radix_row(c, context="detail", is_static=False):
     col_char, col_details = st.columns([2, 10])
     is_preview = st.session_state.preview_comp == c
     is_active_focus = is_preview or (st.session_state.preview_comp is None and c == st.session_state.selected_comp)
 
     with col_char:
-        st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
-        unique_id = str(uuid.uuid4())[:8]
+        if is_static:
+            # Static display for non-interactive cards
+            st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
+        else:
+            # Interactive button with preview/drill-down functionality
+            st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
+            unique_id = str(uuid.uuid4())[:8]
 
-        btn_help = (
-            "Previewing in the sidebar. Click again to drill down into this character family."
-            if is_preview
-            else "Click once to preview in the sidebar; click the same button again to drill down."
-        )
+            btn_help = (
+                "Previewing in the sidebar. Click again to drill down into this character family."
+                if is_preview
+                else "Click once to preview in the sidebar; click the same button again to drill down."
+            )
 
-        st.button(
-            c,
-            key=f"explore_char_{context}_{c}_{ord(c)}_{unique_id}",
-            type="primary" if is_preview else "secondary",
-            help=btn_help,
-            on_click=list_tile_click,
-            args=(c,),
-            use_container_width=True,
-        )
+            st.button(
+                c,
+                key=f"explore_char_{context}_{c}_{ord(c)}_{unique_id}",
+                type="primary" if is_preview else "secondary",
+                help=btn_help,
+                on_click=list_tile_click,
+                args=(c,),
+                use_container_width=True,
+            )
 
-        hint_text = "Click again to drill down" if is_preview else "Click once to preview"
-        hint_class = "char-btn-hint previewing" if is_preview else "char-btn-hint"
-        st.markdown(f"<div class='{hint_class}'>{hint_text}</div>", unsafe_allow_html=True)
+            hint_text = "Click again to drill down" if is_preview else "Click once to preview"
+            hint_class = "char-btn-hint previewing" if is_preview else "char-btn-hint"
+            st.markdown(f"<div class='{hint_class}'>{hint_text}</div>", unsafe_allow_html=True)
 
-        st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-        
-        # Create a callback function for the stroke button
-        def activate_stroke_view(char):
-            st.session_state.stroke_view_char = char
-            st.session_state.stroke_view_active = True
-            st.session_state.show_inputs = False
-            # Ensure the character is set as selected if not already
-            if not st.session_state.selected_comp:
-                st.session_state.selected_comp = char
-                st.session_state.last_valid_selected_comp = char
-        
-        if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}_{unique_id}", 
-                     help="Write AI prompt", use_container_width=True,
-                     on_click=activate_stroke_view, args=(c,)):
-            pass  # The callback handles everything
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
+            
+            def activate_stroke_view(char):
+                st.session_state.stroke_view_char = char
+                st.session_state.stroke_view_active = True
+                st.session_state.show_inputs = False
+                if not st.session_state.selected_comp:
+                    st.session_state.selected_comp = char
+                    st.session_state.last_valid_selected_comp = char
+            
+            if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}_{unique_id}", 
+                         help="Write AI prompt", use_container_width=True,
+                         on_click=activate_stroke_view, args=(c,)):
+                pass
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         
     with col_details:
         usage_count = component_usage_count(c)
-        st.markdown(generate_clean_card_html(c, usage_count=usage_count), unsafe_allow_html=True)
+        # Pass the is_static flag to control the tip text
+        st.markdown(
+            generate_clean_card_html(c, usage_count=usage_count, is_static=is_static), 
+            unsafe_allow_html=True
+        )
         
-        if is_active_focus and st.session_state.display_mode != "Single Character":
+        if not is_static and is_active_focus and st.session_state.display_mode != "Single Character":
             n = {"2-Characters": 2, "3-Characters": 3, "4-Characters": 4}.get(st.session_state.display_mode, 0)
             meta_compounds = component_map.get(c, {}).get("meta", {}).get("compounds", [])
             relevant = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
@@ -804,7 +811,6 @@ def render_radix_row(c, context="detail"):
                         </div>
                         """, unsafe_allow_html=True)
     st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
-
 
 def main():
     if not component_map:
@@ -1000,7 +1006,6 @@ def main():
             filter_parts.append(f"<span class='status-tag'>Script: {st.session_state.grid_script_filter}</span>")
 
         filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
-        st.markdown(f"<div class='status-line'>{filter_summary} <span class='status-text'>· Single-click previews. Double-click explores.</span></div>", unsafe_allow_html=True)
 
         use_component_only = force_components_only or st.session_state.component_only
 
@@ -1194,13 +1199,8 @@ def main():
                         unsafe_allow_html=True
                     )
                     for c in visible_children[120:]:
-                        col_char, col_details = st.columns([2, 10])
-                        with col_char:
-                            st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
-                        with col_details:
-                            usage = component_usage_count(c)
-                            st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c)), unsafe_allow_html=True)
-                        st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
+                        # Render with is_static=True to show appropriate tip
+                        render_radix_row(c, context="static_derivative", is_static=True)
 
 
 if __name__ == "__main__":
