@@ -332,7 +332,7 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None) -> str:
         discovery_tip = (
             f"<div class='discovery-tip' style='margin-top:12px; padding:8px; background:#f0fff4; "
             f"border-top:1px dashed #c6f6d5; font-size:0.88em; color:#22543d; font-weight:600;'>"
-            f"✨ Tip: Click the large {c} on the left to explore the {usage_count} characters built using it."
+            f"✨ Tip: Click {c} once to preview it in the sidebar, then click {c} again to drill down into the {usage_count} related characters."
             f"</div>"
         )
 
