@@ -1151,20 +1151,20 @@ def main():
             # 2. Get Derivatives
             rel = info.get("related_characters", [])
             children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
-            children_preview = apply_script_filter(children, st.session_state.script_filter)[:50]
+            children_preview = apply_script_filter(children, st.session_state.script_filter)[:150]
             c_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px; opacity: 0.8;'>{c}</span>" for c in children_preview])
 
             st.markdown(f"""
                 <div class='status-line'>
                     <div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'>
                         <div>
-                            <div style='font-weight: 800; font-size: 1.2em;'>🌳 Lineage: {sel}</div>
+#                            <div style='font-weight: 800; font-size: 1.2em;'>🌳: {sel}</div>
                             <div style='margin-top:4px; font-size:0.85em;'>
                                 <b>Built from:</b> {p_html if parents else "Basic Root"}
                             </div>
                         </div>
                         <div style='text-align: left; font-size: 1.2em; opacity: 0.7;'>
-                            <b>Derivatives:</b><br/>{c_html}{"..." if len(children) > 50 else ""}
+                            <b>Derivatives:</b><br/>{c_html}{"..." if len(children) > 150 else ""}
                         </div>
                     </div>
                     <div style='border-top: 1px solid rgba(15, 81, 50, 0.15); padding-top: 8px; font-size: 0.85em; display: flex; align-items: center; gap: 10px;'>
