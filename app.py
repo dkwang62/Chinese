@@ -895,6 +895,25 @@ def main():
 
         current_main_char = st.session_state.stroke_view_char if st.session_state.stroke_view_active else st.session_state.selected_comp
 
+        if current_main_char:
+            path_items = ["🏠 Root"] + st.session_state.history
+            if st.session_state.stroke_view_active:
+                path_items += [f"<i>{current_main_char}</i> (🧠)"]
+            else:
+                path_items += [f"<b>{current_main_char}</b>"]
+            path_str = " → ".join(path_items)
+            st.markdown(f"<div style='font-size:0.95em; margin:18px 0; color:#444; text-align:center; font-weight:500;'>{path_str}</div>", unsafe_allow_html=True)
+
+        nav_col1, nav_col2 = st.columns(2)
+        with nav_col1:
+            if st.session_state.stroke_view_active:
+                st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+            else:
+                st.button("← Back", on_click=go_back, use_container_width=True)
+        with nav_col2:
+            st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+
+        st.markdown("---")
 
         current_char_for_sidebar = (
             st.session_state.stroke_view_char if st.session_state.stroke_view_active
