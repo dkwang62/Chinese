@@ -1006,6 +1006,32 @@ def main():
                 args=(current_char_for_sidebar,),
             )
 
+            # 3) Display phrases does not filter, so keep it outside the filter expander
+            if not st.session_state.show_inputs:
+                with st.expander("Display Phrases", expanded=False):
+                    modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
+                    current_idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 1
+                    new_mode = st.radio(
+                        "Select mode",
+                        options=modes,
+                        index=current_idx,
+                        key="sidebar_display_mode",
+                        label_visibility="collapsed",
+                    )
+                    if new_mode != st.session_state.display_mode:
+                        st.session_state.display_mode = new_mode
+                        st.rerun()
+
+            # Character info in stroke view (kept compact)
+            if st.session_state.stroke_view_active:
+                st.markdown("### Character Info")
+                st.markdown(
+                    f"""<div style='font-size:2em; font-weight:600; text-align:center; margin:6px 0 10px;'>
+                    {current_char_for_sidebar}
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
 
         # 2) Navigation, breadcrumb, and Show Favourites must stay together
         if not st.session_state.show_inputs:
@@ -1042,34 +1068,6 @@ def main():
             )
 
         st.text_input("Shortcut: Paste/Type characters", key="sb_search", on_change=sync_sidebar_text)
-
-        # 3) Display phrases does not filter, so keep it outside the filter expander
-        if not st.session_state.show_inputs:
-            with st.expander("Display Phrases", expanded=False):
-                modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
-                current_idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 1
-                new_mode = st.radio(
-                    "Select mode",
-                    options=modes,
-                    index=current_idx,
-                    key="sidebar_display_mode",
-                    label_visibility="collapsed",
-                )
-                if new_mode != st.session_state.display_mode:
-                    st.session_state.display_mode = new_mode
-                    st.rerun()
-
-        # Character info in stroke view (kept compact)
-        if st.session_state.stroke_view_active:
-            st.markdown("### Character Info")
-            st.markdown(
-                f"""<div style='font-size:2em; font-weight:600; text-align:center; margin:6px 0 10px;'>
-                {current_char_for_sidebar}
-                </div>""",
-                unsafe_allow_html=True,
-            )
-            st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
-
 
         # 2) All filtering / hiding / showing controls live under one expander
         with st.expander("🔎 Filters", expanded=False):
