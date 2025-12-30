@@ -245,99 +245,106 @@ def resolve_to_known_variant(ch: str) -> str:
             return s
     return ""
 
-
-# -----------------------------
-# Prompt tasks (user-editable)
-# -----------------------------
-PROMPT_CONFIG_DEFAULT = {
-    "version": 1,
-    "preamble": (
-        "You are a bilingual Chinese dictionary editor and teacher. Explain a single Chinese character in depth for language learners. "
-        "Focus on modern usage, and if the character is rare, show its more widely used modern equivalent while noting the original character.\n\n"
-        "⸻\n\n"
-    ),
-    "tasks": [
-        {
-            "id": "task1",
-            "title": "Task 1 — Character Analysis",
-            "template": (
-                "Task 1 — Character Analysis\n\n"
-                "For the Hanzi below, provide:\n"
-                "\t1.\tOriginal meaning — briefly note the ancient form or origin only if it helps understand modern usage.\n"
-                "\t2.\tCore semantic concept — summarize the main idea in modern context.\n"
-                "\t3.\tWhy it is used in compound characters — explain how it contributes meaning to words in everyday or contemporary Chinese.\n"
-                "\t4.\tThree example words — include pinyin and natural English meanings, using modern common usage.\n"
-                "\t5.\tOne modern usage sentence — show the character in real-life context; if the character is rare, use the modern equivalent and note it.\n\n"
-                "⸻\n\n"
-            ),
-        },
-        {
-            "id": "task2",
-            "title": "Task 2 — Example Sentences and Images",
-            "template": (
-                "Task 2 — Example Sentences and Images\n\n"
-                "Provide two example sentences that best illustrate modern, everyday usage of the character (or its modern equivalent if the original is rare). For each sentence, include:\n"
-                "a) Traditional Chinese\n"
-                "b) Simplified Chinese\n"
-                "c) Natural English translation\n"
-                "d) Target word/phrase (must include the character or its modern equivalent)\n"
-                "e) Read-aloud pinyin of the full sentence (with tone marks and natural word grouping)\n\n"
-                "Images:\n"
-                "\t•\tIf the character represents a concrete object, generate a realistic image showing its material, context, and typical use.\n"
-                "\t•\tIf the character represents an abstract concept, quality, or person, do not generate an image.\n\n"
-                "Note: Only generate images in Task 2 to avoid overlap with analysis or conceptual comparisons.\n\n"
-                "⸻\n\n"
-            ),
-        },
-        {
-            "id": "task3",
-            "title": "Task 3 — Conceptual Contrast",
-            "template": (
-                "Task 3 — Conceptual Contrast\n\n"
-                "Compare this character with 2–3 other characters of similar meaning or usage, including pinyin. Explain:\n"
-                "\t•\tHow Chinese divides this concept into different semantic or conceptual systems in modern language usage.\n"
-                "\t•\tHow the characters differ in real-life usage, highlighting subtle distinctions learners should know.\n"
-                "\t•\tDo not repeat example sentences from Task 2; only discuss relationships and usage distinctions.\n\n"
-                "⸻\n\n"
-            ),
-        },
-    ],
-    "epilogue": "Hanzi: {char}\n- English definition: {def_en}\n",
-}
-
 def get_default_prompt_config() -> dict:
-    # Return a deep-ish copy to avoid accidental mutation of the module constant.
-    return json.loads(json.dumps(PROMPT_CONFIG_DEFAULT, ensure_ascii=False))
+    # Inline defaults (Option B): radix_core.py does not depend on PROMPT_CONFIG_DEFAULT.
+    return {
+        "version": 1,
+        "preamble": (
+            "You are a bilingual Chinese dictionary editor and teacher.\n\n"
+            "Explain a single Chinese character in depth for language learners. "
+            "Focus on modern usage, and if the character is rare, show its more widely used modern equivalent while noting the original character.\n\n"
+            "⸻\n\n"
+        ),
+        "tasks": [
+            {
+                "id": "task1",
+                "title": "Task ONE — Character Analysis",
+                "template": (
+                    "Task 1 — Character Analysis\n\n"
+                    "For the Hanzi below, provide:\n"
+                    "\t1.\tOriginal meaning — briefly note the ancient form or origin only if it helps understand modern usage.\n"
+                    "\t2.\tCore semantic concept — summarize the main idea in modern context.\n"
+                    "\t3.\tWhy it is used in compound characters — explain how it contributes meaning to words in everyday or contemporary Chinese.\n"
+                    "\t4.\tThree example words — include pinyin and natural English meanings, using modern common usage.\n"
+                    "\t5.\tOne modern usage sentence — show the character in real-life context; if the character is rare, use the modern equivalent and note it.\n\n"
+                    "⸻\n\n"
+                ),
+            },
+            {
+                "id": "task2",
+                "title": "Task TWO — Example Sentences and Images",
+                "template": (
+                    "Task 2 — Example Sentences and Images\n\n"
+                    "Provide two example sentences that best illustrate modern, everyday usage of the character (or its modern equivalent if the original is rare). For each sentence, include:\n"
+                    "a) Traditional Chinese\n"
+                    "b) Simplified Chinese\n"
+                    "c) Natural English translation\n"
+                    "d) Target word/phrase (must include the character or its modern equivalent)\n"
+                    "e) Read-aloud pinyin of the full sentence (with tone marks and natural word grouping)\n\n"
+                    "Images:\n"
+                    "\t•\tIf the character represents a concrete object, generate a realistic image showing its material, context, and typical use.\n"
+                    "\t•\tIf the character represents an abstract concept, quality, or person, do not generate an image.\n\n"
+                    "Note: Only generate images in Task 2 to avoid overlap with analysis or conceptual comparisons.\n\n"
+                    "⸻\n\n"
+                ),
+            },
+            {
+                "id": "task3",
+                "title": "Task THREE — Conceptual Contrast",
+                "template": (
+                    "Task 3 — Conceptual Contrast\n\n"
+                    "Compare this character with 2–3 other characters of similar meaning or usage, including pinyin. Explain:\n"
+                    "\t•\tHow Chinese divides this concept into different semantic or conceptual systems in modern language usage.\n"
+                    "\t•\tHow the characters differ in real-life usage, highlighting subtle distinctions learners should know.\n"
+                    "\t•\tDo not repeat example sentences from Task 2; only discuss relationships and usage distinctions.\n\n"
+                    "⸻\n\n"
+                ),
+            },
+        ],
+        "epilogue": "Hanzi: {char}\n- English definition: {def_en}\n",
+    }
 
 
 def normalize_prompt_config(cfg: dict | None) -> dict:
-    base = PROMPT_CONFIG_DEFAULT
+    base = get_default_prompt_config()
     if not isinstance(cfg, dict):
         return base
 
     out = {
         "version": base.get("version", 1),
-        "preamble": cfg.get("preamble", base.get("preamble", "")),
-        "epilogue": cfg.get("epilogue", base.get("epilogue", "")),
-        "tasks": cfg.get("tasks", base.get("tasks", [])),
+        "preamble": base.get("preamble", ""),
+        "epilogue": base.get("epilogue", ""),
+        "tasks": list(base.get("tasks", [])),
     }
 
-    # Ensure tasks are well-formed
-    fixed_tasks = []
-    for t in out["tasks"]:
-        if not isinstance(t, dict):
-            continue
-        tid = str(t.get("id", "")).strip()
-        title = str(t.get("title", tid)).strip()
-        template = str(t.get("template", "")).strip()
-        if tid and title and template:
-            fixed_tasks.append({"id": tid, "title": title, "template": template})
-    out["tasks"] = fixed_tasks if fixed_tasks else base.get("tasks", [])
+    # preamble/epilogue overrides
+    if isinstance(cfg.get("preamble"), str):
+        out["preamble"] = cfg["preamble"]
+    if isinstance(cfg.get("epilogue"), str):
+        out["epilogue"] = cfg["epilogue"]
+
+    # tasks overrides (validated + cleaned)
+    tasks = cfg.get("tasks")
+    if isinstance(tasks, list):
+        cleaned = []
+        seen = set()
+        for t in tasks:
+            if not isinstance(t, dict):
+                continue
+            tid = str(t.get("id", "")).strip()
+            if not tid or tid in seen:
+                continue
+            title = str(t.get("title", tid)).strip() or tid
+            template = t.get("template", "")
+            if not isinstance(template, str) or not template.strip():
+                continue
+            cleaned.append({"id": tid, "title": title, "template": template})
+            seen.add(tid)
+
+        if cleaned:
+            out["tasks"] = cleaned
 
     return out
-
-
-
 
 
 def get_char_definition_en(char: str) -> str:
