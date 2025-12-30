@@ -24,7 +24,7 @@
   ],
   "prompt_config": {
     "version": 1,
-    "preamble": "You are a bilingual Chinese dictionary editor.\n\nYou are a bilingual Chinese dictionary editor and teacher. Explain a single Chinese character in depth for language learners. Focus on modern usage, and if the character is rare, show its more widely used modern equivalent while noting the original character.\n\n⸻\n\n",
+    "preamble": "You are a bilingual Chinese dictionary editor and teacher.\n\nExplain a single Chinese character in depth for language learners. Focus on modern usage, and if the character is rare, show its more widely used modern equivalent while noting the original character.\n\n⸻\n\n",
     "tasks": [
       {
         "id": "task1",
