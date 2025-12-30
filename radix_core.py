@@ -177,7 +177,7 @@ def sort_key_usage_primary(ch: str):
     freq = info.get('freq_per_million', 0.0)
     strokes = info.get('stroke_count') or 999
 
-    group = 0 if use >= 3 else 1
+    group = 0 if use >= 5 else 1
     if group == 0:
         return (group, -use, -freq, strokes, ch)
     else:
@@ -252,7 +252,6 @@ def resolve_to_known_variant(ch: str) -> str:
 PROMPT_CONFIG_DEFAULT = {
     "version": 1,
     "preamble": (
-        "You are a bilingual Chinese dictionary editor.\n\n"
         "You are a bilingual Chinese dictionary editor and teacher. Explain a single Chinese character in depth for language learners. "
         "Focus on modern usage, and if the character is rare, show its more widely used modern equivalent while noting the original character.\n\n"
         "⸻\n\n"
@@ -556,28 +555,6 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
     """
     return html_content, h
 
-def sort_key_usage_primary(ch: str):
-    """Sort: Prioritize high component usage, then SUBTLEX frequency"""
-    info = component_map.get(ch, {})
-    use = info.get('usage_count', 0)
-    freq = info.get('freq_per_million', 0.0)
-    strokes = info.get('stroke_count') or 999
-
-    group = 0 if use >= 3 else 1
-    if group == 0:
-        return (group, -use, -freq, strokes, ch)
-    else:
-        return (group, -freq, strokes, ch)
-
-
-def sort_key_frequency_primary(ch: str):
-    """Sort: Prioritize highest SUBTLEX frequency first, then usage"""
-    info = component_map.get(ch, {})
-    freq = info.get('freq_per_million', 0.0)
-    use = info.get('usage_count', 0)
-    strokes = info.get('stroke_count') or 999
-
-    return (-freq, -use, strokes, ch)
 
 
 # --- Full Stroke Order View HTML ---
