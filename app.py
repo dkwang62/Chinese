@@ -1006,21 +1006,10 @@ def main():
                 args=(current_char_for_sidebar,),
             )
 
-            # 3) Display phrases does not filter, so keep it outside the filter expander
-            if not st.session_state.show_inputs:
-                with st.expander("Display Phrases", expanded=False):
-                    modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
-                    current_idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 1
-                    new_mode = st.radio(
-                        "Select mode",
-                        options=modes,
-                        index=current_idx,
-                        key="sidebar_display_mode",
-                        label_visibility="collapsed",
-                    )
-                    if new_mode != st.session_state.display_mode:
-                        st.session_state.display_mode = new_mode
-                        st.rerun()
+            if st.button("Show Favourites", use_container_width=True):
+                go_to_root()
+                st.session_state.onboarding_done = False
+                st.rerun()
 
             # Character info in stroke view (kept compact)
             if st.session_state.stroke_view_active:
@@ -1044,10 +1033,21 @@ def main():
             with nav_col2:
                 st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
 
-        if st.button("Show Favourites", use_container_width=True):
-            go_to_root()
-            st.session_state.onboarding_done = False
-            st.rerun()
+        # 3) Display phrases does not filter, so keep it outside the filter expander
+        if not st.session_state.show_inputs:
+            with st.expander("Display Phrases", expanded=False):
+                modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
+                current_idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 1
+                new_mode = st.radio(
+                    "Select mode",
+                    options=modes,
+                    index=current_idx,
+                    key="sidebar_display_mode",
+                    label_visibility="collapsed",
+                )
+                if new_mode != st.session_state.display_mode:
+                    st.session_state.display_mode = new_mode
+                    st.rerun()
 
         current_main_char = (
             st.session_state.stroke_view_char if st.session_state.stroke_view_active
