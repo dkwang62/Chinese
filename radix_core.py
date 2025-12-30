@@ -10,6 +10,7 @@ import gc
 import base64
 import json as json_module  # for dumps in HTML
 from typing import List, Dict, Optional
+import copy
 
 # --- Optional: OpenCC for Traditional/Simplified Conversion ---
 try:
@@ -245,26 +246,136 @@ def resolve_to_known_variant(ch: str) -> str:
     return ""
 
 
-def build_chatgpt_prompt(char: str) -> str:
+# -----------------------------
+# Prompt tasks (user-editable)
+# -----------------------------
+PROMPT_CONFIG_DEFAULT = {
+    "version": 1,
+    "preamble": (
+        "You are a bilingual Chinese dictionary editor.\n\n"
+        "You are a bilingual Chinese dictionary editor and teacher. Explain a single Chinese character in depth for language learners. "
+        "Focus on modern usage, and if the character is rare, show its more widely used modern equivalent while noting the original character.\n\n"
+        "⸻\n\n"
+    ),
+    "tasks": [
+        {
+            "id": "task1",
+            "title": "Task 1 — Character Analysis",
+            "template": (
+                "Task 1 — Character Analysis\n\n"
+                "For the Hanzi below, provide:\n"
+                "\t1.\tOriginal meaning — briefly note the ancient form or origin only if it helps understand modern usage.\n"
+                "\t2.\tCore semantic concept — summarize the main idea in modern context.\n"
+                "\t3.\tWhy it is used in compound characters — explain how it contributes meaning to words in everyday or contemporary Chinese.\n"
+                "\t4.\tThree example words — include pinyin and natural English meanings, using modern common usage.\n"
+                "\t5.\tOne modern usage sentence — show the character in real-life context; if the character is rare, use the modern equivalent and note it.\n\n"
+                "⸻\n\n"
+            ),
+        },
+        {
+            "id": "task2",
+            "title": "Task 2 — Example Sentences and Images",
+            "template": (
+                "Task 2 — Example Sentences and Images\n\n"
+                "Provide two example sentences that best illustrate modern, everyday usage of the character (or its modern equivalent if the original is rare). For each sentence, include:\n"
+                "a) Traditional Chinese\n"
+                "b) Simplified Chinese\n"
+                "c) Natural English translation\n"
+                "d) Target word/phrase (must include the character or its modern equivalent)\n"
+                "e) Read-aloud pinyin of the full sentence (with tone marks and natural word grouping)\n\n"
+                "Images:\n"
+                "\t•\tIf the character represents a concrete object, generate a realistic image showing its material, context, and typical use.\n"
+                "\t•\tIf the character represents an abstract concept, quality, or person, do not generate an image.\n\n"
+                "Note: Only generate images in Task 2 to avoid overlap with analysis or conceptual comparisons.\n\n"
+                "⸻\n\n"
+            ),
+        },
+        {
+            "id": "task3",
+            "title": "Task 3 — Conceptual Contrast",
+            "template": (
+                "Task 3 — Conceptual Contrast\n\n"
+                "Compare this character with 2–3 other characters of similar meaning or usage, including pinyin. Explain:\n"
+                "\t•\tHow Chinese divides this concept into different semantic or conceptual systems in modern language usage.\n"
+                "\t•\tHow the characters differ in real-life usage, highlighting subtle distinctions learners should know.\n"
+                "\t•\tDo not repeat example sentences from Task 2; only discuss relationships and usage distinctions.\n\n"
+                "⸻\n\n"
+            ),
+        },
+    ],
+    "epilogue": "Hanzi: {char}\n- English definition: {def_en}\n",
+}
+
+def get_default_prompt_config() -> dict:
+    # Return a deep-ish copy to avoid accidental mutation of the module constant.
+    return json.loads(json.dumps(PROMPT_CONFIG_DEFAULT, ensure_ascii=False))
+
+
+def normalize_prompt_config(cfg: dict | None) -> dict:
+    base = PROMPT_CONFIG_DEFAULT
+    if not isinstance(cfg, dict):
+        return base
+
+    out = {
+        "version": base.get("version", 1),
+        "preamble": cfg.get("preamble", base.get("preamble", "")),
+        "epilogue": cfg.get("epilogue", base.get("epilogue", "")),
+        "tasks": cfg.get("tasks", base.get("tasks", [])),
+    }
+
+    # Ensure tasks are well-formed
+    fixed_tasks = []
+    for t in out["tasks"]:
+        if not isinstance(t, dict):
+            continue
+        tid = str(t.get("id", "")).strip()
+        title = str(t.get("title", tid)).strip()
+        template = str(t.get("template", "")).strip()
+        if tid and title and template:
+            fixed_tasks.append({"id": tid, "title": title, "template": template})
+    out["tasks"] = fixed_tasks if fixed_tasks else base.get("tasks", [])
+
+    return out
+
+
+
+
+
+def get_char_definition_en(char: str) -> str:
     char = (char or "").strip()[:1]
     meta = component_map.get(char, {}).get("meta", {})
-    def_en = clean_field(meta.get("definition", ""))
-    return f"""You are a bilingual Chinese dictionary editor.
+    return clean_field(meta.get("definition", ""))
 
-Task:
-For the single Hanzi below, give two example sentences that BEST illustrate the meaning (prefer everyday usage unless the character is primarily literary).
+def render_combined_prompt(
+    char: str,
+    prompt_config: dict | None,
+    selected_task_ids: list[str] | None,
+    definition_en: str = "",
+) -> str:
+    cfg = normalize_prompt_config(prompt_config)
+    char = (char or "").strip()[:1]
+    preamble = cfg.get("preamble", "")
+    epilogue = cfg.get("epilogue", "")
+    tasks = cfg.get("tasks", []) or []
 
-For each example, provide:
-a) Traditional Chinese sentence
-b) Simplified Chinese sentence
-c) Natural English translation
-d) Target word/phrase (must include the character)
-e) Read-aloud pinyin of the full Chinese sentence (with tone marks, natural word grouping)
-f) Show pictures if the character is a noun
+    selected_set = set(selected_task_ids or [])
+    parts = []
+    for t in tasks:
+        tid = t.get("id")
+        if tid in selected_set:
+            parts.append(t.get("template", ""))
 
-Hanzi: {char}
-- English definition: {def_en}
-"""
+    full = preamble + "".join(parts) + epilogue
+    # Only replace placeholders we explicitly support.
+    return full.format(char=char, def_en=definition_en or "")
+
+def build_chatgpt_prompt(char: str) -> str:
+    """Backward-compatible single-string prompt (selects ALL tasks by default)."""
+    char = (char or "").strip()[:1]
+    cfg = get_default_prompt_config()
+    selected = [t.get("id") for t in cfg.get("tasks", []) if t.get("id")]
+    def_en = get_char_definition_en(char)
+    return render_combined_prompt(char, cfg, selected, definition_en=def_en)
 
 def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_static: bool = False) -> str:
     """Generate clean HTML card for a character with metadata."""
