@@ -77,6 +77,65 @@ st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 
 
 # --- Dynamic CSS ---
+
+
+
+def normalize_prompt_state() -> None:
+    """Ensure prompt_config/tasks and prompt selection UI state are internally consistent."""
+    cfg = st.session_state.get("prompt_config") or {}
+    if not isinstance(cfg, dict):
+        cfg = {}
+    tasks = cfg.get("tasks", []) or []
+    if not isinstance(tasks, list):
+        tasks = []
+    # Keep only tasks that have a non-empty id
+    cleaned_tasks = []
+    seen_ids = set()
+    for t in tasks:
+        if not isinstance(t, dict):
+            continue
+        tid = t.get("id")
+        if not isinstance(tid, str) or not tid.strip():
+            continue
+        if tid in seen_ids:
+            continue
+        seen_ids.add(tid)
+        cleaned_tasks.append({
+            "id": tid,
+            "title": t.get("title", "") if isinstance(t.get("title", ""), str) else "",
+            "template": t.get("template", "") if isinstance(t.get("template", ""), str) else "",
+        })
+    cfg["tasks"] = cleaned_tasks
+    st.session_state.prompt_config = cfg
+
+    all_task_ids = [t["id"] for t in cleaned_tasks]
+
+    # Normalize prompt_ui defaults
+    pui = st.session_state.get("prompt_ui") or {}
+    if not isinstance(pui, dict):
+        pui = {}
+    default_ids = pui.get("default_selected_task_ids", all_task_ids)
+    if not isinstance(default_ids, list):
+        default_ids = list(all_task_ids)
+    default_ids = [tid for tid in default_ids if tid in all_task_ids]
+    if not default_ids:
+        default_ids = list(all_task_ids)
+    pui["default_selected_task_ids"] = list(default_ids)
+    st.session_state.prompt_ui = pui
+
+    # Normalize current selection
+    cur_sel = st.session_state.get("prompt_selected_task_ids") or []
+    if not isinstance(cur_sel, list):
+        cur_sel = []
+    cur_sel = [tid for tid in cur_sel if tid in all_task_ids]
+    if not cur_sel:
+        cur_sel = list(default_ids)
+    st.session_state.prompt_selected_task_ids = list(cur_sel)
+
+    # Sync checkbox session keys so UI reflects the selection consistently
+    for tid in all_task_ids:
+        st.session_state[f"prompt_task_cb_{tid}"] = (tid in cur_sel)
+
 def apply_dynamic_css():
     css = """
     <style>
@@ -669,17 +728,15 @@ def build_profile_payload() -> dict:
     return build_profile_dict()
 
 def handle_profile_upload():
-    uploaded_file = st.session_state.get("profile_uploader") or st.session_state.get("profile_uploader_favs")
+    uploaded_file = st.session_state.get("profile_uploader")
     if uploaded_file is None:
         return
     try:
         import_profile_dict(json.load(uploaded_file))
-        st.toast("Loaded successfully!", icon="✅")
-        st.rerun()
+        normalize_prompt_state()
+        st.session_state._profile_upload_status = "Loaded successfully!"
     except Exception:
         st.toast("Invalid file.", icon="❌")
-
-
 def search_by_definition():
     query = st.session_state.get("w_def_search", "").strip()
     if not query or len(query) < 2:
@@ -765,71 +822,88 @@ def render_splash():
         st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
         lc1, lc2, lc3 = st.columns([1, 2, 1])
         with lc2:
-            with st.expander("📂 Manage Favourites (Save/Load)", expanded=False):
-                st.caption("Note: saving/loading uses a single data file shared with **Manage AI Prompts**.")
+            
+            with st.expander("📂 User Data (Save/Load/Review & Edit)", expanded=False):
+                st.caption("Single JSON file for **Favourites** + **AI Prompt Tasks (Task 1–3)**. Upload applies immediately in-app; download is your backup/export.")
+
+                # --- Save / Load ---
                 c_dl, c_ul = st.columns(2)
                 with c_dl:
                     st.markdown(
-                        render_ipad_safe_download_html(export_profile_str(), PROFILE_FILENAME, "💾 Save Favourites"),
+                        render_ipad_safe_download_html(export_profile_str(), PROFILE_FILENAME, "💾 Download user data (JSON)"),
                         unsafe_allow_html=True,
                     )
                 with c_ul:
                     st.file_uploader(
-                        "Load",
+                        "Upload user data (JSON)",
                         type=["json"],
-                        key="profile_uploader_favs",
+                        key="profile_uploader",
                         on_change=handle_profile_upload,
                         label_visibility="collapsed",
                     )
 
-                st.markdown("**Edit favourites**")
+                status = st.session_state.pop("_profile_upload_status", None)
+                if status:
+                    st.toast(status, icon="✅")
+
+                # --- Review before download ---
+                with st.expander("🔎 Review current data snapshot (what will be downloaded)", expanded=False):
+                    st.json(build_profile_payload())
+
+                st.markdown("---")
+                st.subheader("Favourites")
+
                 fav_text_default = " ".join(st.session_state.get("favourites_list", []))
                 fav_text = st.text_area(
                     "Favourites (space or newline separated)",
                     value=fav_text_default,
-                    height=80,
+                    height=90,
                     key="fav_bulk_editor",
                     label_visibility="collapsed",
                 )
+
+                tokens = [t for t in re.split(r"\s+", (fav_text or "").strip()) if t]
+                valid = [t for t in tokens if isinstance(t, str) and len(t) == 1]
+                invalid = [t for t in tokens if not (isinstance(t, str) and len(t) == 1)]
+                # de-dup, preserve order
+                seen = set()
+                cleaned = []
+                for c in valid:
+                    if c not in seen:
+                        cleaned.append(c)
+                        seen.add(c)
+
+                st.caption(f"Preview: {len(cleaned)} favourites ready to apply. Ignoring {len(invalid)} token(s) that are not exactly 1 character.")
+
                 c1, c2, c3 = st.columns([1, 1, 2])
                 with c1:
-                    if st.button("Apply edits", use_container_width=True):
-                        chars = [c for c in re.split(r"\s+", fav_text.strip()) if c]
-                        chars = [c[:1] for c in chars if len(c) >= 1]
-                        # de-dup, preserve order
-                        seen = set()
-                        cleaned = []
-                        for c in chars:
-                            if c not in seen:
-                                cleaned.append(c)
-                                seen.add(c)
+                    if st.button("Apply favourites", use_container_width=True, key="fav_apply"):
                         st.session_state.favourites_list = cleaned
                         st.session_state.fav_cursor = 0
                         st.toast("Favourites updated.", icon="✅")
                         st.rerun()
                 with c2:
-                    if st.button("Clear", use_container_width=True):
+                    if st.button("Clear favourites", use_container_width=True, key="fav_clear"):
                         st.session_state.favourites_list = []
                         st.session_state.fav_cursor = 0
                         st.toast("Cleared favourites.", icon="✅")
                         st.rerun()
-
-                st.markdown("**Add / remove**")
-                add_col, _ = st.columns([1, 3])
-                with add_col:
-                    new_fav = st.text_input("Add", value="", max_chars=1, key="fav_add_input", label_visibility="collapsed")
-                    if st.button("Add", key="fav_add_btn", use_container_width=True):
-                        if new_fav and isinstance(new_fav, str):
-                            c = new_fav.strip()[:1]
-                            if c:
-                                favs = st.session_state.get("favourites_list", [])
-                                if c not in favs:
-                                    st.session_state.favourites_list = favs + [c]
-                                    st.toast("Added.", icon="✅")
-                                    st.rerun()
+                with c3:
+                    add_char = st.text_input("Add a character", value="", key="fav_add_one", placeholder="e.g., 我", label_visibility="collapsed")
+                    if st.button("Add", use_container_width=True, key="fav_add_btn"):
+                        c = (add_char or "").strip()
+                        if len(c) != 1:
+                            st.toast("Please enter exactly 1 character.", icon="⚠️")
+                        else:
+                            favs = st.session_state.get("favourites_list", [])
+                            if c not in favs:
+                                st.session_state.favourites_list = favs + [c]
+                                st.toast("Added.", icon="✅")
+                                st.rerun()
 
                 favs = st.session_state.get("favourites_list", [])
                 if favs:
+                    st.markdown("**Current favourites**")
                     for i, c in enumerate(favs):
                         cc1, cc2 = st.columns([6, 1])
                         with cc1:
@@ -839,6 +913,77 @@ def render_splash():
                                 st.session_state.favourites_list = [x for j, x in enumerate(favs) if j != i]
                                 st.toast("Removed.", icon="✅")
                                 st.rerun()
+
+                st.markdown("---")
+                st.subheader("AI Prompt Tasks (Task 1–3)")
+
+                normalize_prompt_state()
+                cfg = st.session_state.get("prompt_config") or {}
+                tasks = cfg.get("tasks", []) or []
+                all_task_ids = [t.get("id") for t in tasks if t.get("id")]
+
+                # Default selection editor (applies when you first open a character prompt)
+                default_sel = st.multiselect(
+                    "Default selected tasks",
+                    options=all_task_ids,
+                    default=list(st.session_state.prompt_ui.get("default_selected_task_ids", all_task_ids)),
+                    key="prompt_default_sel_editor",
+                )
+                if st.button("Save default selection", key="save_default_task_sel"):
+                    st.session_state.prompt_ui["default_selected_task_ids"] = list(default_sel)
+                    normalize_prompt_state()
+                    st.toast("Default task selection updated.", icon="✅")
+                    st.rerun()
+
+                st.caption("Edit titles/templates below. Changes persist in-session and will be included in the next download.")
+                edited_tasks = []
+                for idx, t in enumerate(tasks):
+                    tid = t.get("id")
+                    if not tid:
+                        continue
+                    with st.expander(f"✍️ {t.get('title','(untitled)')}  —  {tid}", expanded=False):
+                        title = st.text_input("Title", value=t.get("title", ""), key=f"pt_title_{tid}")
+                        template = st.text_area("Template", value=t.get("template", ""), height=160, key=f"pt_tpl_{tid}")
+                        cA, cB = st.columns([1, 3])
+                        with cA:
+                            if st.button("Delete task", key=f"pt_del_{tid}"):
+                                # Delete is immediate (no need to click Apply). This avoids "delete then apply" races.
+                                cur = (st.session_state.get("prompt_config") or {}).get("tasks", []) or []
+                                st.session_state.prompt_config["tasks"] = [tt for tt in cur if tt.get("id") != tid]
+                                # Clean up UI/widget keys and selections/defaults
+                                st.session_state.pop(f"pt_title_{tid}", None)
+                                st.session_state.pop(f"pt_tpl_{tid}", None)
+                                st.session_state.pop(f"prompt_task_cb_{tid}", None)
+                                st.session_state.prompt_selected_task_ids = [x for x in (st.session_state.get("prompt_selected_task_ids") or []) if x != tid]
+                                st.session_state.setdefault("prompt_ui", {})
+                                st.session_state.prompt_ui["default_selected_task_ids"] = [x for x in (st.session_state.prompt_ui.get("default_selected_task_ids", []) or []) if x != tid]
+                                normalize_prompt_state()
+                                st.toast("Task deleted.", icon="✅")
+                                st.rerun()
+                        with cB:
+                            st.caption("Tip: Keep the template as plain instructions. The character and definition are inserted separately.")
+
+                    edited_tasks.append({"id": tid, "title": title, "template": template})
+                c_add, c_apply = st.columns([1, 1])
+                with c_add:
+                    if st.button("Add new task", key="pt_add_new_home", use_container_width=True):
+                        new_id = f"task_{uuid.uuid4().hex[:8]}"
+                        edited_tasks.append({
+                            "id": new_id,
+                            "title": "New task",
+                            "template": "Write your task instructions here.\n\n⸻\n\n",
+                        })
+                        st.session_state.prompt_selected_task_ids = list(set((st.session_state.prompt_selected_task_ids or []) + [new_id]))
+                        st.toast("Task added. Edit it below.", icon="✅")
+                        st.rerun()
+                with c_apply:
+                    if st.button("Apply task edits", key="pt_apply_home", use_container_width=True):
+                        st.session_state.prompt_config["tasks"] = edited_tasks
+                        normalize_prompt_state()
+                        st.toast("Tasks updated.", icon="✅")
+                        st.rerun()
+
+
         st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
         
         unique_demos = []
@@ -1172,9 +1317,19 @@ def main():
         if phrases_html:
             st.markdown(phrases_html, unsafe_allow_html=True)
 
+
+        # Guard: prompt rendering requires a selected character.
+        # Streamlit reruns (e.g., after profile upload) can execute this section
+        # before a character is selected, so we must enforce the invariant here.
+        char = (st.session_state.stroke_view_char or "").strip()
+        if not char:
+            st.info("Select a character to generate the ChatGPT prompt.")
+            st.stop()
+
         st.markdown("### ChatGPT Prompt")
 
         # --- Task selection (default: ALL) ---
+        normalize_prompt_state()
         cfg = st.session_state.prompt_config
         tasks = cfg.get("tasks", []) or []
         all_task_ids = [t.get("id") for t in tasks if t.get("id")]
@@ -1198,89 +1353,13 @@ def main():
             # If user unchecks everything, keep empty (allowed), but default is ALL on first load
             st.session_state.prompt_selected_task_ids = sel
 
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("Set current selection as default", key="set_prompt_default_sel"):
-                    st.session_state.prompt_ui["default_selected_task_ids"] = list(sel)
-                    st.toast("Default task selection updated.", icon="✅")
-            with c2:
-                if st.button("Select all", key="select_all_prompt_tasks"):
-                    st.session_state.prompt_selected_task_ids = list(all_task_ids)
-                    # force checkbox state update
-                    for tid in all_task_ids:
-                        st.session_state[f"prompt_task_cb_{tid}"] = True
-                    st.rerun()
+        if st.button("Select all tasks", key="select_all_prompt_tasks"):
+            st.session_state.prompt_selected_task_ids = list(all_task_ids)
+            for tid in all_task_ids:
+                st.session_state[f"prompt_task_cb_{tid}"] = True
+            st.rerun()
 
-        # --- Prompt editor (in-app edits; persisted via profile download) ---
-        with st.expander("Edit prompt tasks (in-app)", expanded=False):
-            st.caption("Edits are stored in the current session. Use Save/Load below to download or restore them.")
-            cfg_edit = st.session_state.prompt_config
 
-            preamble = st.text_area("Preamble", value=cfg_edit.get("preamble", ""), height=120, key="prompt_preamble_edit")
-            epilogue = st.text_area("Epilogue", value=cfg_edit.get("epilogue", ""), height=80, key="prompt_epilogue_edit")
-
-            # Task editor list
-            edited_tasks = []
-            delete_id = None
-            for t in (cfg_edit.get("tasks", []) or []):
-                tid = t.get("id", "")
-                if not tid:
-                    continue
-                st.markdown(f"**{tid}**")
-                title = st.text_input("Title", value=t.get("title", tid), key=f"pt_title_{tid}")
-                template = st.text_area("Template", value=t.get("template", ""), height=180, key=f"pt_template_{tid}")
-                c_del, c_sp = st.columns([1, 3])
-                with c_del:
-                    if st.button("Delete task", key=f"pt_delete_{tid}"):
-                        delete_id = tid
-                edited_tasks.append({"id": tid, "title": title, "template": template})
-
-                st.markdown("---")
-
-            if delete_id:
-                edited_tasks = [t for t in edited_tasks if t["id"] != delete_id]
-                # Also clear checkbox state for deleted tasks
-                st.session_state.pop(f"prompt_task_cb_{delete_id}", None)
-
-            if st.button("Add new task", key="pt_add_new"):
-                new_id = f"task_{uuid.uuid4().hex[:8]}"
-                edited_tasks.append({"id": new_id, "title": "New task", "template": "Write your task instructions here.\n\n⸻\n\n"})
-                st.session_state.prompt_selected_task_ids = list(dict.fromkeys((st.session_state.prompt_selected_task_ids or []) + [new_id]))
-                st.rerun()
-
-            # Apply edits back to session config
-            st.session_state.prompt_config = normalize_prompt_config({
-                "version": cfg_edit.get("version", 1),
-                "preamble": preamble,
-                "tasks": edited_tasks,
-                "epilogue": epilogue,
-            })
-
-            # Recompute task ids for defaults/selection
-            new_ids = [t.get("id") for t in st.session_state.prompt_config.get("tasks", []) if t.get("id")]
-            # If defaults empty, default = ALL
-            if not st.session_state.prompt_ui.get("default_selected_task_ids"):
-                st.session_state.prompt_ui["default_selected_task_ids"] = list(new_ids)
-
-        # --- Save/Load profile (browser download/upload; works on hosted) ---
-        with st.expander("📂 Manage AI Prompts (Save/Load)", expanded=False):
-            st.caption("Note: saving/loading uses a single data file shared with **Manage Favourites**.")
-            c_dl, c_ul = st.columns(2)
-            with c_dl:
-                st.markdown(
-                    render_ipad_safe_download_html(export_profile_str(), PROFILE_FILENAME, "💾 Save AI Prompts"),
-                    unsafe_allow_html=True,
-                )
-            with c_ul:
-                st.file_uploader(
-                    "Load",
-                    type=["json"],
-                    key="profile_uploader",
-                    on_change=handle_profile_upload,
-                    label_visibility="collapsed",
-                )
-        # Build final prompt for this character
-        char = st.session_state.stroke_view_char
         def_en = get_char_definition_en(char)
         prompt_text = render_combined_prompt(
             char=char,
