@@ -9,7 +9,6 @@ import html as pyhtml
 import math
 import uuid
 import re
-import copy
 
 from radix_core import (
     component_map,
@@ -39,6 +38,8 @@ from radix_core import (
     sort_key_frequency_primary,
 )
 
+
+
 # -----------------------------
 # Profile (single-file) storage
 # -----------------------------
@@ -57,152 +58,87 @@ def export_profile_str() -> str:
     return json.dumps(build_profile_dict(), ensure_ascii=False, indent=2)
 
 def import_profile_dict(data: dict) -> None:
-    """
-    Imports data into session state and marks it as an 'upload' 
-    so the initialization logic treats it as the source of truth.
-    """
     if not isinstance(data, dict):
         raise ValueError("Uploaded JSON must be an object.")
     if data.get("schema_version") != PROFILE_SCHEMA_VERSION:
         raise ValueError("Unsupported schema_version.")
-    
-    # 1. Extract and Deep Copy
-    favs = data.get("favourites_list", [])
-    prompts = data.get("prompt_config", {})
-    prompt_ui = data.get("prompt_ui", {})
-    
-    st.session_state.favourites_list = list(favs)
+    favs = data.get("favourites_list")
+    prompts = data.get("prompt_config")
+    if not isinstance(favs, list) or not all(isinstance(c, str) and len(c) == 1 for c in favs):
+        raise ValueError("Invalid favourites_list.")
+    if not isinstance(prompts, dict):
+        raise ValueError("Invalid prompt_config.")
+    st.session_state.favourites_list = favs
     st.session_state.fav_cursor = 0
-    st.session_state.prompt_config = copy.deepcopy(prompts)
-    st.session_state.prompt_ui = copy.deepcopy(prompt_ui)
-
-    # 2. Force Normalization Immediately (Sanity Check)
-    normalized = normalize_prompt_config(st.session_state.prompt_config)
-    if normalized:
-        st.session_state.prompt_config = normalized
-    else:
-        st.session_state.prompt_config = get_default_prompt_config()
-
-    # 3. Set Lock Flag
-    # This prevents the disk-loader from overwriting this data on the next run.
-    st.session_state["_upload_applied"] = True
-
-    # 4. Clean Slate for UI
-    # We remove derived UI keys so they get rebuilt fresh from the new config.
-    keys_to_kill = ["prompt_selected_task_ids", "fav_bulk_editor"]
-    for k in list(st.session_state.keys()):
-        if k.startswith("prompt_task_cb_") or k.startswith("pt_"):
-            keys_to_kill.append(k)
-            
-    for k in keys_to_kill:
-        st.session_state.pop(k, None)
-
-# -----------------------------
-# Initialization Logic
-# -----------------------------
-def init_app_state():
-    """
-    The Single Source of Truth for State Initialization.
-    Runs at the top of every script execution.
-    """
-    # 1. Define Static Defaults (Scalars)
-    DEFAULTS = {
-        "onboarding_done": False,
-        "selected_comp": "",
-        "stroke_range": (3, 8),
-        "radical": "none",
-        "component_idc": "none",
-        "display_mode": "2-Characters",
-        "text_input_comp": "",
-        "page": 1,
-        "text_input_warning": None,
-        "show_inputs": True,
-        "last_valid_selected_comp": "",
-        "preview_comp": None,
-        "stroke_view_active": False,
-        "stroke_view_char": "",
-        "script_filter": "Any",
-        "fav_cursor": 0,
-        "history": [],
-        "definition_search_mode": False,
-        "definition_search_query": "",
-        "definition_search_results": None,
-        "grid_sort_mode": "usage",
-        "grid_script_filter": "Any",
-        # Complex objects defaulting to None/Empty
-        "favourites_list": [],
-        "prompt_config": None, 
-        "prompt_ui": {},
-        "prompt_selected_task_ids": []
-    }
-
-    # Initialize missing keys
-    for k, v in DEFAULTS.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
-
-    # 2. Disk Load Logic
-    # Only load from disk if:
-    #   a) prompt_config is missing/None 
-    #   b) We are NOT in the middle of applying a manual upload ("_upload_applied")
-    if not st.session_state.get("_upload_applied"):
-        if st.session_state.prompt_config is None:
-            loaded = False
-            try:
-                with open("radix_user_data.json", "r", encoding="utf-8") as f:
-                    obj = json.load(f)
-                    if isinstance(obj, dict) and obj.get("schema_version") == 1:
-                        st.session_state.favourites_list = obj.get("favourites_list", [])
-                        st.session_state.prompt_config = obj.get("prompt_config")
-                        st.session_state.prompt_ui = obj.get("prompt_ui", {})
-                        loaded = True
-            except (FileNotFoundError, json.JSONDecodeError):
-                pass
-            
-            if not loaded:
-                # Apply hardcoded defaults if disk load failed
-                st.session_state.prompt_config = get_default_prompt_config()
-                st.session_state.prompt_ui = {"default_selected_task_ids": []}
-
-    # 3. Ensure Config Validity (Normalization)
-    if st.session_state.prompt_config:
-        normalized = normalize_prompt_config(st.session_state.prompt_config)
-        if normalized:
-            st.session_state.prompt_config = normalized
-
-    # 4. Sync Derived UI State
-    cfg = st.session_state.get("prompt_config", {})
-    tasks = cfg.get("tasks", []) if isinstance(cfg, dict) else []
-    _task_ids = [t.get('id') for t in tasks if isinstance(t, dict) and t.get('id')]
-    
-    # Init prompt_ui if empty
-    if not st.session_state.get('prompt_ui'):
-        st.session_state.prompt_ui = {'default_selected_task_ids': _task_ids}
-        
-    # Init prompt_selected_task_ids if empty or missing
-    current_sel = st.session_state.get("prompt_selected_task_ids")
-    if current_sel is None or not isinstance(current_sel, list) or not current_sel:
-        defaults = st.session_state.prompt_ui.get('default_selected_task_ids', [])
-        valid_defaults = [t for t in defaults if t in _task_ids]
-        st.session_state.prompt_selected_task_ids = valid_defaults if valid_defaults else list(_task_ids)
+    st.session_state.prompt_config = prompts
+    st.session_state.prompt_ui = data.get("prompt_ui", {}) if isinstance(data.get("prompt_ui", {}), dict) else {}
 
 
-st.set_page_config(layout="wide", page_title="Radix", page_icon=" 🈑 ")
+st.set_page_config(layout="wide", page_title="Radix", page_icon="🈷")
 
-# --- STARTUP ---
-init_app_state()
-# ---------------
+
+# --- Dynamic CSS ---
+
+
 
 def normalize_prompt_state() -> None:
-    """Helper to refresh UI keys after a config change."""
-    init_app_state() 
-    cfg = st.session_state.get("prompt_config", {})
-    tasks = cfg.get("tasks", [])
-    cur_sel = st.session_state.get("prompt_selected_task_ids", [])
+    """Ensure prompt_config/tasks and prompt selection UI state are internally consistent."""
+    cfg = st.session_state.get("prompt_config") or {}
+    if not isinstance(cfg, dict):
+        cfg = {}
+    tasks = cfg.get("tasks", []) or []
+    if not isinstance(tasks, list):
+        tasks = []
+    # Keep only tasks that have a non-empty id
+    cleaned_tasks = []
+    seen_ids = set()
     for t in tasks:
+        if not isinstance(t, dict):
+            continue
         tid = t.get("id")
-        if tid:
-            st.session_state[f"prompt_task_cb_{tid}"] = (tid in cur_sel)
+        if not isinstance(tid, str) or not tid.strip():
+            continue
+        if tid in seen_ids:
+            continue
+        seen_ids.add(tid)
+        cleaned_tasks.append({
+            "id": tid,
+            "title": t.get("title", "") if isinstance(t.get("title", ""), str) else "",
+            "template": t.get("template", "") if isinstance(t.get("template", ""), str) else "",
+        })
+    cfg["tasks"] = cleaned_tasks
+    st.session_state.prompt_config = cfg
+
+    all_task_ids = [t["id"] for t in cleaned_tasks]
+
+    # Normalize prompt_ui defaults
+    pui = st.session_state.get("prompt_ui") or {}
+    if not isinstance(pui, dict):
+        pui = {}
+    default_ids = pui.get("default_selected_task_ids", all_task_ids)
+    if not isinstance(default_ids, list):
+        default_ids = list(all_task_ids)
+    default_ids = [tid for tid in default_ids if tid in all_task_ids]
+    if not default_ids:
+        default_ids = list(all_task_ids)
+    pui["default_selected_task_ids"] = list(default_ids)
+    st.session_state.prompt_ui = pui
+
+    # Normalize current selection
+    cur_sel = st.session_state.get("prompt_selected_task_ids") or []
+    if not isinstance(cur_sel, list):
+        cur_sel = []
+    cur_sel = [tid for tid in cur_sel if tid in all_task_ids]
+    if not cur_sel:
+        cur_sel = list(default_ids)
+    st.session_state.prompt_selected_task_ids = list(cur_sel)
+
+    # CRITICAL FIX: Only sync checkbox keys if they DON'T exist yet
+    # This prevents the widget conflict warning
+    for tid in all_task_ids:
+        checkbox_key = f"prompt_task_cb_{tid}"
+        if checkbox_key not in st.session_state:
+            st.session_state[checkbox_key] = (tid in cur_sel)
 
 def apply_dynamic_css():
     css = """
@@ -435,6 +371,8 @@ def apply_dynamic_css():
         flex: 1;
         line-height: 1.5;
     }
+
+/* PALACE ENTRANCE STYLING */
     .splash-wrap {
         max-width: 850px;
         margin: 0 auto;
@@ -514,23 +452,13 @@ def apply_dynamic_css():
         line-height: 1.4;
     }
     .status-line span {
-        color: #0f5132;
+        color: #0f5132; /* Ensure the text inside remains the dark green */
     }
-    /* Button override for the entrance to look nicer */
-    .entrance-btn button {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: #2c3e50 !important;
-    }
-    .entrance-btn button:hover {
-        background: transparent !important;
-        transform: scale(1.05);
-        color: #e67e22 !important;
-    }
+
 </style>
     """
     st.markdown(css, unsafe_allow_html=True)
+
 
 def render_copy_to_clipboard(prompt_text: str, widget_id: str):
     safe_text = json.dumps(prompt_text, ensure_ascii=False)
@@ -568,6 +496,87 @@ def render_copy_to_clipboard(prompt_text: str, widget_id: str):
         height=90,
     )
 
+
+# --- Session State Defaults (initialized at top) ---
+DEFAULTS = {
+    "startup_file_choice_made": False,
+    "onboarding_done": False,
+    "selected_comp": "",
+    "stroke_range": (3, 8),
+    "radical": "none",
+    "component_idc": "none",
+    "display_mode": "2-Characters",
+    "text_input_comp": "",
+    "page": 1,
+    "text_input_warning": None,
+    "show_inputs": True,
+    "last_valid_selected_comp": "",
+    "preview_comp": None,
+    "stroke_view_active": False,
+    "stroke_view_char": "",
+    "script_filter": "Any",
+    "favourites_list": [],
+    "fav_cursor": 0,
+    "prompt_config": None,
+    "prompt_ui": {"default_selected_task_ids": []},
+    "prompt_selected_task_ids": [],
+    "history": [],
+    "definition_search_mode": False,
+    "definition_search_query": "",
+    "definition_search_results": None,
+    "grid_sort_mode": "usage",
+    "grid_script_filter": "Any",
+}
+
+for k, v in DEFAULTS.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# Auto-load server-side user data on startup (will be used if user chooses not to upload)
+if "server_data_loaded" not in st.session_state:
+    st.session_state.server_data_loaded = True
+    st.session_state.server_data_available = False
+    try:
+        with open("radix_user_data.json", "r", encoding="utf-8") as f:
+            obj = json.load(f)
+
+        # strict schema only (no legacy)
+        if (
+            isinstance(obj, dict)
+            and obj.get("schema_version") == 1
+            and isinstance(obj.get("favourites_list"), list)
+            and isinstance(obj.get("prompt_config"), dict)
+            and isinstance(obj.get("prompt_ui"), dict)
+        ):
+            # Store server data but don't apply yet - wait for user choice
+            st.session_state.server_data = obj
+            st.session_state.server_data_available = True
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        st.error(f"Error loading server radix_user_data.json: {e}")
+
+
+st.session_state.prompt_config = normalize_prompt_config(
+    st.session_state.get("prompt_config")
+)
+
+
+# Init prompt config (in-app editable; persisted via browser download/upload)
+if st.session_state.prompt_config is None:
+    st.session_state.prompt_config = get_default_prompt_config()
+else:
+    st.session_state.prompt_config = normalize_prompt_config(st.session_state.prompt_config)
+
+# Default selection: ALL tasks
+_task_ids = [t.get('id') for t in st.session_state.prompt_config.get('tasks', []) if t.get('id')]
+if not st.session_state.prompt_ui.get('default_selected_task_ids'):
+    st.session_state.prompt_ui['default_selected_task_ids'] = _task_ids
+if not st.session_state.prompt_selected_task_ids:
+    st.session_state.prompt_selected_task_ids = list(st.session_state.prompt_ui.get('default_selected_task_ids', _task_ids))
+
+
+# --- Callbacks ---
 def sync_stroke_range():
     st.session_state.stroke_range = st.session_state.w_stroke_range
     st.session_state.page = 1
@@ -648,22 +657,18 @@ def tile_click(c):
 
 def list_tile_click(c):
     if st.session_state.preview_comp == c:
+        # Trigger the feature alert toast
         if not st.session_state.get("has_drilled_down", False):
             st.toast("Feature Discovered: You have entered the Character Lineage view!", icon="🌳")
             st.session_state.has_drilled_down = True
+            
+        # Standard navigation logic
         if st.session_state.selected_comp:
             st.session_state.history.append(st.session_state.selected_comp)
         st.session_state.selected_comp = c
-        st.session_state.last_valid_selected_comp = c
-
-        # If the user drills down from a definition search result, exit search mode
-        # so the character lineage view renders as expected.
-        st.session_state.definition_search_mode = False
-        st.session_state.definition_search_results = None
-
         st.session_state.show_inputs = False
         st.session_state.preview_comp = None
-        st.session_state.display_mode = "2-Characters"
+        st.session_state.display_mode = "2-Characters" # Ensure default
     else:
         st.session_state.preview_comp = c
 
@@ -717,37 +722,43 @@ def toggle_favourite(char):
         if char in st.session_state.favourites_list:
             st.session_state.favourites_list.remove(char)
 
+def build_profile_payload() -> dict:
+    # Backing store for Save/Load actions; single file shared across the app.
+    return build_profile_dict()
+
 def _apply_uploaded_profile_bytes(file_bytes: bytes) -> None:
-    """Cleans the widget cache and applies the takeover."""
+    """Apply uploaded profile bytes into session_state (safe across reruns)."""
     try:
         obj = json.loads(file_bytes.decode("utf-8"))
+    except Exception as e:
+        st.session_state["_upload_error"] = f"Invalid JSON: {e}"
+        return
+
+    try:
         import_profile_dict(obj)
         
-        # EXHAUSTIVE WIDGET PURGE: Forces UI text boxes to refresh
-        keys_to_purge = [
-            k for k in st.session_state.keys()
-            if k.startswith("pt_title_")
-            or k.startswith("pt_tpl_")
-            or k.startswith("prompt_task_cb_")
-            or k == "fav_bulk_editor"
-        ]
+        # CRITICAL FIX: Clear ALL prompt-related widget keys to prevent conflicts
+        keys_to_clear = []
+        for k in list(st.session_state.keys()):
+            if (k == "fav_bulk_editor" or 
+                k.startswith("pt_title_") or 
+                k.startswith("pt_tpl_") or 
+                k.startswith("prompt_task_cb_")):
+                keys_to_clear.append(k)
         
-        for k in keys_to_purge:
+        for k in keys_to_clear:
             st.session_state.pop(k, None)
         
-        # Purge the selection list so it regenerates from defaults
-        st.session_state.pop("prompt_selected_task_ids", None)
-        
-        # Re-run normalization to populate prompt_selected_task_ids from the new defaults
+        # Normalize state AFTER clearing widgets
         normalize_prompt_state()
         
         st.session_state["_upload_applied"] = True
         st.session_state.pop("_upload_error", None)
         st.session_state["_post_apply_rerun"] = True
-        st.rerun()
         
     except Exception as e:
-        st.session_state["_upload_error"] = f"Takeover failed: {e}"
+        st.session_state["_upload_error"] = f"Invalid profile structure: {e}"
+        st.session_state["_upload_applied"] = False
 
 def search_by_definition():
     query = st.session_state.get("w_def_search", "").strip()
@@ -791,6 +802,92 @@ def enter_component(comp: str):
     st.session_state.display_mode = "2-Characters"
     st.session_state.definition_search_mode = False
     st.session_state.definition_search_results = None
+
+def render_startup_file_choice():
+    """Prompt user to choose between local file or server-side data at startup."""
+    st.markdown(
+        """
+        <div class="splash-wrap">
+          <div class="splash-card">
+            <div class="splash-title">🈷 Radix - Data Setup</div>
+            <div class="splash-sub" style="margin-top: 20px;">
+              Do you have a local Radix user data file you'd like to use?
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    
+    st.markdown("<div style='max-width: 600px; margin: 40px auto;'>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📱 Yes, upload my local file", use_container_width=True, type="primary"):
+            st.session_state.startup_choice = "upload"
+            st.rerun()
+    
+    with col2:
+        if st.button("☁️ No, use server defaults", use_container_width=True):
+            st.session_state.startup_choice = "server"
+            # Load server data if available
+            if st.session_state.get("server_data_available"):
+                obj = st.session_state.server_data
+                st.session_state.favourites_list = obj["favourites_list"]
+                st.session_state.prompt_config = obj["prompt_config"]
+                st.session_state.prompt_ui = obj["prompt_ui"]
+            st.session_state.startup_file_choice_made = True
+            st.rerun()
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Show upload interface if user chose to upload
+    if st.session_state.get("startup_choice") == "upload":
+        st.markdown("<div style='max-width: 600px; margin: 40px auto;'>", unsafe_allow_html=True)
+        st.markdown("### 📤 Upload Your Local File")
+        
+        uploaded_file = st.file_uploader(
+            "Choose your radix_user_data.json file",
+            type=["json"],
+            key="startup_uploader",
+        )
+        
+        if uploaded_file is not None:
+            try:
+                file_bytes = uploaded_file.getvalue()
+                obj = json.loads(file_bytes.decode("utf-8"))
+                
+                # Validate and apply
+                import_profile_dict(obj)
+                
+                # Clear all widget keys
+                keys_to_clear = []
+                for k in list(st.session_state.keys()):
+                    if (k == "fav_bulk_editor" or 
+                        k.startswith("pt_title_") or 
+                        k.startswith("pt_tpl_") or 
+                        k.startswith("prompt_task_cb_")):
+                        keys_to_clear.append(k)
+                
+                for k in keys_to_clear:
+                    st.session_state.pop(k, None)
+                
+                normalize_prompt_state()
+                
+                st.success("✅ File loaded successfully!")
+                
+                if st.button("Continue to Radix", type="primary", use_container_width=True):
+                    st.session_state.startup_file_choice_made = True
+                    st.rerun()
+                    
+            except Exception as e:
+                st.error(f"❌ Error loading file: {e}")
+                if st.button("← Back to choice", use_container_width=True):
+                    st.session_state.startup_choice = None
+                    st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
 
 def render_splash():
     st.markdown(
@@ -967,170 +1064,633 @@ def render_radix_row(c, context="detail", is_static=False):
     col_char, col_details = st.columns([2, 10])
     is_preview = st.session_state.preview_comp == c
     is_active_focus = is_preview or (st.session_state.preview_comp is None and c == st.session_state.selected_comp)
+
     with col_char:
         if is_static:
+            # Static display for non-interactive cards
             st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
         else:
+            # Interactive button with preview/drill-down functionality
             st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
-            st.button(c, key=f"explore_{context}_{c}_{ord(c)}_{uuid.uuid4().hex[:8]}", type="primary" if is_preview else "secondary", on_click=list_tile_click, args=(c,), use_container_width=True)
-            st.markdown(f"<div class='char-btn-hint {'previewing' if is_preview else ''}'>{'Drill down' if is_preview else 'Preview'}</div>", unsafe_allow_html=True)
+            unique_id = str(uuid.uuid4())[:8]
+
+            btn_help = (
+                "Previewing in the sidebar. Click again to drill down into this character family."
+                if is_preview
+                else "Click once to preview in the sidebar; click the same button again to drill down."
+            )
+
+            st.button(
+                c,
+                key=f"explore_char_{context}_{c}_{ord(c)}_{unique_id}",
+                type="primary" if is_preview else "secondary",
+                help=btn_help,
+                on_click=list_tile_click,
+                args=(c,),
+                use_container_width=True,
+            )
+
+            hint_text = "Click again to drill down" if is_preview else "Click once to preview"
+            hint_class = "char-btn-hint previewing" if is_preview else "char-btn-hint"
+            st.markdown(f"<div class='{hint_class}'>{hint_text}</div>", unsafe_allow_html=True)
+
             st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
+            
             def activate_stroke_view(char):
                 st.session_state.stroke_view_char = char
                 st.session_state.stroke_view_active = True
                 st.session_state.show_inputs = False
                 if not st.session_state.selected_comp:
                     st.session_state.selected_comp = char
-            if st.button("🧠 link", key=f"strk_{c}_{ord(c)}_{uuid.uuid4().hex[:8]}", use_container_width=True, on_click=activate_stroke_view, args=(c,)): pass
-            st.markdown("</div></div>", unsafe_allow_html=True)
+                    st.session_state.last_valid_selected_comp = char
+            
+            if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}_{unique_id}", 
+                         help="Write AI prompt", use_container_width=True,
+                         on_click=activate_stroke_view, args=(c,)):
+                pass
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+        
     with col_details:
-        st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c), is_static=is_static), unsafe_allow_html=True)
+        usage_count = component_usage_count(c)
+        # Pass the is_static flag to control the tip text
+        st.markdown(
+            generate_clean_card_html(c, usage_count=usage_count, is_static=is_static), 
+            unsafe_allow_html=True
+        )
+        
         if not is_static and is_active_focus and st.session_state.display_mode != "Single Character":
             n = {"2-Characters": 2, "3-Characters": 3, "4-Characters": 4}.get(st.session_state.display_mode, 0)
             meta_compounds = component_map.get(c, {}).get("meta", {}).get("compounds", [])
-            relevant = [w for w in meta_compounds if len(w) == n]
+            relevant = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
+            
             if relevant:
                 db_conn = get_db_connection()
                 if db_conn:
                     phrases_map = batch_get_phrase_details(sorted(relevant), db_conn)
-                    items = [f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{phrases_map.get(word,{}).get('pinyin','')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{pyhtml.escape(phrases_map.get(word,{}).get('meanings','')[:130])}</span></div>" for word in sorted(relevant)]
-                    st.markdown(f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{st.session_state.display_mode} containing {c}</div>{''.join(items)}</div>", unsafe_allow_html=True)
+                    items_html_list = []
+                    for word in sorted(relevant):
+                        entry = phrases_map.get(word)
+                        if entry:
+                            raw_mean = entry.get('meanings', '')
+                            p_mean = pyhtml.escape(raw_mean[:130] + ('...' if len(raw_mean) > 130 else ''))
+                            items_html_list.append(
+                                f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'>"
+                                f"<span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span>"
+                                f"<span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span>"
+                                f"<span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span>"
+                                f"</div>"
+                            )
+                    
+                    all_rows = "".join(items_html_list)
+                    st.markdown(f"""
+                        <div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>
+                          <div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>
+                            {st.session_state.display_mode} containing {c}
+                          </div>
+                          {all_rows}
+                        </div>
+                        """, unsafe_allow_html=True)
+    st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
 def main():
-    if not component_map: st.stop()
+    if not component_map:
+        st.error("Component dataset not loaded. Ensure enhanced_component_map_with_etymology.json exists.")
+        st.stop()
+
     apply_dynamic_css()
+
+    # Step 1: Ask user about local file vs server data (only once at startup)
+    if not st.session_state.get("startup_file_choice_made", False):
+        render_startup_file_choice()
+        st.stop()
+
+    # Step 2: Show onboarding/entrance screen
     if not st.session_state.get("onboarding_done", False):
         render_splash()
         st.stop()
+
     with st.sidebar:
-        cur = st.session_state.stroke_view_char if st.session_state.stroke_view_active else (st.session_state.preview_comp or st.session_state.selected_comp)
-        if cur:
-            sidebar_html, sidebar_height = get_stroke_order_sidebar_html(cur, size=140)
-            if sidebar_html: st_html(sidebar_html, height=sidebar_height)
-            count = len(apply_script_filter([c for c in component_map.get(cur, {}).get("related_characters", []) if len(c) == 1], st.session_state.script_filter))
-            if count > 0: st.markdown(f"<div style='font-size:0.75em; line-height:1.1; margin:0.15rem 0 0.35rem 0; opacity:0.8;'>{count} chars contain <span class='char'>{cur}</span></div>", unsafe_allow_html=True)
-            st.checkbox("Favourite", value=(cur in st.session_state.favourites_list), key=f"fav_chk_{cur}", on_change=toggle_favourite, args=(cur,))
-            if st.button("Show Favourites", use_container_width=True): go_to_root(); st.session_state.onboarding_done = False; st.rerun()
+
+        current_char_for_sidebar = (
+            st.session_state.stroke_view_char if st.session_state.stroke_view_active
+            else (st.session_state.preview_comp or st.session_state.selected_comp)
+        )
+
+        # 1) Stroke/drawing preview stays at the top
+        if current_char_for_sidebar:
+            sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
+            if sidebar_html:
+                st_html(sidebar_html, height=sidebar_height)
+
+            # Compact related-count line (kept intentionally small to save space)
+            related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
+            chars_all = [c for c in related if isinstance(c, str) and len(c) == 1 and c in component_map]
+            chars_filtered = apply_script_filter(chars_all, st.session_state.script_filter)
+            count = len(chars_filtered)
+            if count > 0:
+                st.markdown(
+                    f"""<div style="font-size:0.75em; line-height:1.1; margin:0.15rem 0 0.35rem 0; opacity:0.8;">
+                    {count} characters contain <span class='char'>{current_char_for_sidebar}</span>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+
+            # Favourite toggle for the current character
+            is_fav = current_char_for_sidebar in st.session_state.favourites_list
+            st.checkbox(
+                "Show in Favourites",
+                value=is_fav,
+                key=f"fav_chk_{current_char_for_sidebar}",
+                on_change=toggle_favourite,
+                args=(current_char_for_sidebar,),
+            )
+
+            if st.button("Show Favourites", use_container_width=True):
+                go_to_root()
+                st.session_state.onboarding_done = False
+                st.rerun()
+
+            # Character info in stroke view (kept compact)
+            if st.session_state.stroke_view_active:
+                st.markdown("### Character Info")
+                st.markdown(
+                    f"""<div style='font-size:2em; font-weight:600; text-align:center; margin:6px 0 10px;'>
+                    {current_char_for_sidebar}
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
+
+        # 2) Breadcrumb and navigation (breadcrumb should be above nav buttons)
+
+
+        current_main_char = (
+            st.session_state.stroke_view_char if st.session_state.stroke_view_active
+            else st.session_state.selected_comp
+        )
+        if current_main_char:
+            path_items = ["🏠 Root"] + st.session_state.history
+            if st.session_state.stroke_view_active:
+                path_items += [f"<i>{current_main_char}</i> (🧠)"]
+            else:
+                path_items += [f"<b>{current_main_char}</b>"]
+            path_str = " → ".join(path_items)
+            st.markdown(
+                f"""<div style='font-size:0.85em; margin:8px 0 10px; color:#444; text-align:center; font-weight:500;'>
+                {path_str}
+                </div>""",
+                unsafe_allow_html=True,
+            )
         if not st.session_state.show_inputs:
-            c1, c2 = st.columns(2)
-            with c1: st.button("← Back", on_click=(end_stroke_view if st.session_state.stroke_view_active else go_back), use_container_width=True)
-            with c2: st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+            nav_col1, nav_col2 = st.columns(2)
+            with nav_col1:
+                if st.session_state.stroke_view_active:
+                    st.button("← Back", on_click=end_stroke_view, use_container_width=True)
+                else:
+                    st.button("← Back", on_click=go_back, use_container_width=True)
+            with nav_col2:
+                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+
+        # 3) Display phrases does not filter, so keep it outside the filter expander
+        if not st.session_state.show_inputs:
             with st.expander("Display Phrases", expanded=False):
                 modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
-                new_mode = st.radio("Select mode", options=modes, index=modes.index(st.session_state.display_mode), label_visibility="collapsed")
-                if new_mode != st.session_state.display_mode: st.session_state.display_mode = new_mode; st.rerun()
-        with st.expander("Search", expanded=True):
-            st.markdown("**Single character**")
-            st.text_input("Single character", key="sb_search", on_change=sync_sidebar_text, placeholder="Hanzi...", label_visibility="collapsed")
-            st.markdown("**English definition**")
-            st.text_input("English definition", key="w_def_search", placeholder="e.g., water", label_visibility="collapsed")
-            if st.button("Search", use_container_width=True, type="primary", key="sb_def_search_btn"):
-                search_by_definition(); st.rerun()
-        with st.expander("🔎 Filters", expanded=False):
-            if not st.session_state.show_inputs: st.radio("Filter", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(st.session_state.script_filter), key="w_script_filter", on_change=sync_script_filter)
-            else:
-                st.slider("Stroke count", min_value=1, max_value=30, value=st.session_state.stroke_range, key="w_stroke_range", on_change=sync_stroke_range)
-                st.selectbox("Radical", options=["none"] + sorted(list(set(info.get("meta", {}).get("radical") for info in component_map.values() if info.get("meta", {}).get("radical")))), key="w_radical", on_change=sync_radical)
-                st.selectbox("IDC", options=["none"] + sorted(stats_cache.get("idc_counts", {}).keys()), key="w_idc", on_change=sync_idc)
-                st.radio("Sort", options=["Most Useful", "Most Common"], index=(0 if st.session_state.grid_sort_mode == "usage" else 1), key="grid_sort_mode_radio", on_change=lambda: st.session_state.update({"grid_sort_mode": "usage" if st.session_state.grid_sort_mode_radio == "Most Useful" else "frequency", "page": 1}))
+                current_idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 1
+                new_mode = st.radio(
+                    "Select mode",
+                    options=modes,
+                    index=current_idx,
+                    key="sidebar_display_mode",
+                    label_visibility="collapsed",
+                )
+                if new_mode != st.session_state.display_mode:
+                    st.session_state.display_mode = new_mode
+                    st.rerun()
 
+        st.text_input("Shortcut: Paste/Type characters", key="sb_search", on_change=sync_sidebar_text)
+
+        # 2) All filtering / hiding / showing controls live under one expander
+        with st.expander("🔎 Filters", expanded=False):
+            # Related-character script filter (applies to the drilldown list)
+            if not st.session_state.stroke_view_active and not st.session_state.show_inputs:
+                current_script = st.session_state.get("script_filter", st.session_state.grid_script_filter)
+                st.radio(
+                    "Filter Results",
+                    options=SCRIPT_FILTERS,
+                    index=SCRIPT_FILTERS.index(current_script),
+                    key="w_script_filter",
+                    on_change=sync_script_filter,
+                )
+
+            # Grid filters (root view)
+            if st.session_state.show_inputs:
+                max_s_val = max(
+                    (get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None),
+                    default=30,
+                )
+                st.slider(
+                    "Stroke count",
+                    min_value=1,
+                    max_value=max_s_val,
+                    value=st.session_state.stroke_range,
+                    key="w_stroke_range",
+                    on_change=sync_stroke_range,
+                )
+
+                all_radicals = sorted(
+                    set(
+                        info.get("meta", {}).get("radical")
+                        for info in component_map.values()
+                        if info.get("meta", {}).get("radical")
+                    )
+                )
+                radical_options = ["none"] + all_radicals
+                st.selectbox(
+                    "Radical",
+                    options=radical_options,
+                    index=radical_options.index(st.session_state.radical)
+                    if st.session_state.radical in radical_options
+                    else 0,
+                    key="w_radical",
+                    on_change=sync_radical,
+                )
+
+                idc_options = ["none"] + sorted(stats_cache.get("idc_counts", {}).keys())
+                st.selectbox(
+                    "Structure (IDC)",
+                    options=idc_options,
+                    index=idc_options.index(st.session_state.component_idc)
+                    if st.session_state.component_idc in idc_options
+                    else 0,
+                    key="w_idc",
+                    on_change=sync_idc,
+                )
+
+                # Most frequent components / characters preference (sorting mode)
+                st.markdown("### Sort Grid By")
+
+                def update_grid_sort_mode():
+                    selected = st.session_state.grid_sort_mode_radio
+                    if selected == "Component frequency":
+                        # (a) Component frequency: how often a component appears inside other characters
+                        st.session_state.grid_sort_mode = "usage"
+                        # Assumption: user wants to browse components only
+                        st.session_state.page = 1
+                    else:
+                        # (b) Character frequency: how often a character appears in everyday language usage
+                        st.session_state.grid_sort_mode = "frequency"
+                        # Assumption: user wants to browse all characters
+                        st.session_state.page = 1
+
+                st.radio(
+                    "Sort key",
+                    options=["Component frequency", "Character frequency"],
+                    index=0 if st.session_state.get("grid_sort_mode", "usage") == "usage" else 1,
+                    key="grid_sort_mode_radio",
+                    on_change=update_grid_sort_mode,
+                    help="Component frequency: how often this component appears inside other characters (components-only grid).\nCharacter frequency: how often this character appears in common use (all-characters grid).",
+                )
+
+                if st.session_state.grid_sort_mode == "frequency":
+
+                    def update_grid_script():
+                        st.session_state.grid_script_filter = st.session_state.grid_script_radio
+                        st.session_state.page = 1
+
+                    st.markdown("#### Script Preference (affects all views)")
+                    st.radio(
+                        "Show characters in:",
+                        options=["Simplified", "Traditional", "Any"],
+                        index=["Simplified", "Traditional", "Any"].index(st.session_state.grid_script_filter),
+                        key="grid_script_radio",
+                        on_change=update_grid_script,
+                        horizontal=True,
+                    )
     if st.session_state.stroke_view_active:
+        st.markdown("### Stroke Order Animation")
         main_html, phrases_html = get_stroke_order_view_html(st.session_state.stroke_view_char, st.session_state.display_mode)
         st_html(main_html, height=450)
-        if phrases_html: st.markdown(phrases_html, unsafe_allow_html=True)
+        if phrases_html:
+            st.markdown(phrases_html, unsafe_allow_html=True)
+
+
+        # Guard: prompt rendering requires a selected character.
+        # Streamlit reruns (e.g., after profile upload) can execute this section
+        # before a character is selected, so we must enforce the invariant here.
+        char = (st.session_state.stroke_view_char or "").strip()
+        if not char:
+            st.info("Select a character to generate the ChatGPT prompt.")
+            st.stop()
+
         st.markdown("### ChatGPT Prompt")
+
+        # --- Task selection (default: ALL) ---
+        normalize_prompt_state()
         cfg = st.session_state.prompt_config
-        tasks = cfg.get("tasks", [])
-        all_ids = [t.get("id") for t in tasks]
-        with st.expander("Prompt tasks", expanded=True):
-            # FALLBACK: Use .get() here to prevent crashes if prompt_selected_task_ids is momentarily missing
-            sel_ids = st.session_state.get("prompt_selected_task_ids", [])
-            sel = [tid for tid in all_ids if st.checkbox(next(t["title"] for t in tasks if t["id"] == tid), value=(tid in sel_ids), key=f"prompt_task_cb_{tid}")]
+        tasks = cfg.get("tasks", []) or []
+        all_task_ids = [t.get("id") for t in tasks if t.get("id")]
+
+        # Ensure current selection stays valid (in case tasks were added/removed)
+        cur_sel = [tid for tid in (st.session_state.prompt_selected_task_ids or []) if tid in all_task_ids]
+        if not cur_sel:
+            cur_sel = list(st.session_state.prompt_ui.get("default_selected_task_ids", all_task_ids)) or list(all_task_ids)
+        st.session_state.prompt_selected_task_ids = cur_sel
+
+        with st.expander("Prompt tasks (choose what to include)", expanded=True):
+            sel = []
+            for t in tasks:
+                tid = t.get("id", "")
+                title = t.get("title", tid)
+                if not tid:
+                    continue
+                # CRITICAL: Don't use value= parameter when managing via session_state
+                # The widget automatically reads from session_state when key= is provided
+                if st.checkbox(title, key=f"prompt_task_cb_{tid}"):
+                    sel.append(tid)
+
+            # If user unchecks everything, keep empty (allowed), but default is ALL on first load
             st.session_state.prompt_selected_task_ids = sel
-        if st.button("Select all"): st.session_state.prompt_selected_task_ids = all_ids; st.rerun()
-        prompt_text = render_combined_prompt(char=st.session_state.stroke_view_char, prompt_config=st.session_state.prompt_config, selected_task_ids=st.session_state.prompt_selected_task_ids, definition_en=get_char_definition_en(st.session_state.stroke_view_char))
-        st.text_area("Prompt", value=prompt_text, height=320)
+
+        if st.button("Select all tasks", key="select_all_prompt_tasks"):
+            st.session_state.prompt_selected_task_ids = list(all_task_ids)
+            for tid in all_task_ids:
+                st.session_state[f"prompt_task_cb_{tid}"] = True
+            st.rerun()
+
+
+        def_en = get_char_definition_en(char)
+        prompt_text = render_combined_prompt(
+            char=char,
+            prompt_config=st.session_state.prompt_config,
+            selected_task_ids=st.session_state.prompt_selected_task_ids,
+            definition_en=def_en,
+        )
+
+        st.text_area("Copy this prompt into ChatGPT", value=prompt_text, height=320)
         render_copy_to_clipboard(prompt_text, str(hash(st.session_state.stroke_view_char)))
+
         st.stop()
 
     if st.session_state.show_inputs:
-        f_sum = "".join([f"<span class='status-tag'>{st.session_state.stroke_range} strokes</span>", f"<span class='status-tag'>Rad. {st.session_state.radical}</span>" if st.session_state.radical != "none" else ""])
-        st.markdown(f"<div class='status-line'><div style='display: flex; justify-content: space-between;'><div><b>🔍 Filters:</b> {f_sum or 'All'}</div><div style='font-size: 0.8em;'>Preview then drill down.</div></div></div>", unsafe_allow_html=True)
-        filtered = [c for c in component_map if st.session_state.stroke_range[0] <= (get_stroke_count(c) or 0) <= st.session_state.stroke_range[1] and (st.session_state.radical == "none" or component_map[c]["meta"].get("radical") == st.session_state.radical) and (st.session_state.component_idc == "none" or component_map[c]["meta"].get("decomposition", "").startswith(st.session_state.component_idc)) and (st.session_state.grid_sort_mode != "usage" or c in stats_cache["used_components"])]
-        sorted_comps = sorted(filtered, key=(sort_key_frequency_primary if st.session_state.grid_sort_mode == "frequency" else sort_key_usage_primary))
-        if not sorted_comps: st.info("No match.")
+        cur_min, cur_max = st.session_state.stroke_range
+
+        filter_parts = []
+
+        # Grid sort summary (shown in the top banner)
+        sort_label = (
+            "Component frequency" if st.session_state.grid_sort_mode == "usage" else "Character frequency"
+        )
+        filter_parts.append(f"<span class='status-tag'>Sort: {sort_label}</span>")
+        max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
+
+        if not (cur_min == 1 and cur_max == max_s_val):
+            if cur_min == cur_max:
+                filter_parts.append(f"<span class='status-tag'>{cur_min} strokes</span>")
+            elif cur_min == 1:
+                filter_parts.append(f"<span class='status-tag'>≤ {cur_max} strokes</span>")
+            elif cur_max == max_s_val:
+                filter_parts.append(f"<span class='status-tag'>≥ {cur_min} strokes</span>")
+            else:
+                filter_parts.append(f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>")
+
+        if st.session_state.radical != "none":
+            filter_parts.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
+        if st.session_state.component_idc != "none":
+            filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
+
+        force_components_only = (st.session_state.grid_sort_mode == "usage")
+        if force_components_only:
+            filter_parts.append("<span class='status-tag'>View: Components only</span>")
+
+        if st.session_state.grid_sort_mode == "frequency":
+            filter_parts.append(f"<span class='status-tag'>Script: {st.session_state.grid_script_filter}</span>")
+
+        filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
+
+
+        st.markdown(
+            f"""
+            <div class='status-line' style='display: flex; flex-direction: column; gap: 8px;'>
+                <div style='display: flex; justify-content: space-between; align-items: center;'>
+                    <div style='display: flex; flex-wrap: wrap; gap: 8px;'>
+                        <span style='font-weight: 800; margin-right: 5px;'>🔍 Filters:</span> {filter_summary}
+                    </div>
+                    <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>Click once to preview in the sidebar; click the same button again to drill down. </div>
+                </div>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+
+        use_component_only = force_components_only
+
+        filtered = [
+            c for c in component_map
+            if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max
+            and (st.session_state.radical == "none" or component_map[c]["meta"].get("radical") == st.session_state.radical)
+            and (st.session_state.component_idc == "none" or component_map[c]["meta"].get("decomposition", "").startswith(st.session_state.component_idc))
+            and (not use_component_only or c in stats_cache["used_components"])
+        ]
+
+        if st.session_state.grid_sort_mode == "frequency":
+            filtered = apply_script_filter(filtered, st.session_state.grid_script_filter)
+
+        if st.session_state.grid_sort_mode == "frequency":
+            sorted_comps = sorted(filtered, key=sort_key_frequency_primary)
         else:
-            P_SIZE = 120
-            max_p = max(1, math.ceil(len(sorted_comps) / P_SIZE))
-            st.session_state.page = max(1, min(st.session_state.page, max_p))
+            sorted_comps = sorted(filtered, key=sort_key_usage_primary)
+
+        if not sorted_comps:
+            st.info("No components match current filters.")
+        else:
+            PAGE_SIZE = 120
+            GRID_COLS = 10
+            total = len(sorted_comps)
+            max_page = max(1, math.ceil(total / PAGE_SIZE))
+            st.session_state.page = max(1, min(st.session_state.page, max_page))
+
             p1, p2, p3 = st.columns([1, 3, 1])
-            with p1: st.button("◀ Prev", disabled=(st.session_state.page <= 1), on_click=lambda: st.session_state.update({"page": st.session_state.page - 1}), use_container_width=True)
-            with p2: st.markdown(f"<div style='text-align:center;'><b>{(st.session_state.page-1)*P_SIZE+1}–{min(st.session_state.page*P_SIZE, len(sorted_comps))} of {len(sorted_comps)}</b></div>", unsafe_allow_html=True)
-            with p3: st.button("Next ▶", disabled=(st.session_state.page >= max_p), on_click=lambda: st.session_state.update({"page": st.session_state.page + 1}), use_container_width=True)
-            page = sorted_comps[(st.session_state.page - 1) * P_SIZE : st.session_state.page * P_SIZE]
+            with p1:
+                if st.button("◀ Prev", disabled=st.session_state.page <= 1, use_container_width=True):
+                    st.session_state.page -= 1
+                    st.rerun()
+            with p2:
+                start = (st.session_state.page - 1) * PAGE_SIZE + 1
+                end = min(st.session_state.page * PAGE_SIZE, total)
+                st.markdown(f"<div style='text-align:center; padding:10px 0; color:#555;'><div style='font-size:1.1em; font-weight:bold;'>{start}–{end} of {total}</div></div>", unsafe_allow_html=True)
+            with p3:
+                if st.button("Next ▶", disabled=st.session_state.page >= max_page, use_container_width=True):
+                    st.session_state.page += 1
+                    st.rerun()
+
+            page = sorted_comps[(st.session_state.page - 1) * PAGE_SIZE : st.session_state.page * PAGE_SIZE]
             st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
-            cols = st.columns(10)
+            cols = st.columns(GRID_COLS)
             for i, ch in enumerate(page):
-                with cols[i % 10]: st.button(ch, key=f"b_{ch}_{st.session_state.page}", type="primary" if st.session_state.preview_comp == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
+                with cols[i % GRID_COLS]:
+                    is_preview = st.session_state.preview_comp == ch
+                    st.button(ch, key=f"b_{ch}_{st.session_state.page}", type="primary" if is_preview else "secondary",
+                              on_click=tile_click, args=(ch,), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
-            col2 = st.columns([1, 2, 1])[1]
+
+            st.markdown("<div class='jump-footer'>", unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.session_state.text_input_warning:
+                    st.warning(st.session_state.text_input_warning)
+                st.text_input("Go to component/character", value=st.session_state.text_input_comp, key="w_text",
+                              on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
+                st.caption("Enter one Chinese character to jump directly to its details")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            st.markdown("<div class='jump-footer' style='margin-top:20px;'>", unsafe_allow_html=True)
+            st.markdown("<h4 style='text-align:center; color:#2c3e50; margin-bottom:15px;'>🔍 Search by English Definition</h4>", unsafe_allow_html=True)
+            col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
+            with col_s2:
+                st.text_input("Search definitions", key="w_def_search", placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
+                if st.button("Search Definitions", use_container_width=True, type="primary"):
+                    search_by_definition()
+                    st.rerun()
+                st.caption("Search across character definitions and phrase meanings")
+            st.markdown("</div>", unsafe_allow_html=True)
 
     else:
         if st.session_state.definition_search_mode and st.session_state.definition_search_results:
-            res = st.session_state.definition_search_results
-            st.markdown(f"<div class='status-line'><b>Search for \"{pyhtml.escape(st.session_state.definition_search_query)}\"</b></div>", unsafe_allow_html=True)
-            for char in res['characters'][:30]:
-                render_radix_row(char)
-            for p in res['phrases']:
-                st.markdown(
-                    f"<div class='compound-item'><span class='cp-word'>{p['word']}</span><span class='cp-pinyin'>{p['pinyin']}</span><span class='cp-mean'>{pyhtml.escape(p['meanings'][:200])}</span></div>",
-                    unsafe_allow_html=True
-                )
+            results = st.session_state.definition_search_results
+            query = st.session_state.definition_search_query
+            
+            st.markdown(f"""
+                <div class='status-line'>
+                    <div style='font-size:1.2em; font-weight:700;'>
+                        Search Results for "{pyhtml.escape(query)}"
+                    </div>
+                    <div class='status-text' style='font-size:0.85em; color:#666; margin-top:8px;'>
+                        Found {len(results['characters'])} characters and {len(results['phrases'])} phrases
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            if results['characters']:
+                st.markdown("<div class='lineage-header'>📖 Characters</div>", unsafe_allow_html=True)
+                for char in results['characters'][:30]:
+                    render_radix_row(char)
+            
+            if results['phrases']:
+                st.markdown("<div class='lineage-header'>💬 Phrases</div>", unsafe_allow_html=True)
+                st.markdown("<div style='max-width:900px; margin:0 auto;'>", unsafe_allow_html=True)
+                for phrase_data in results['phrases']:
+                    word = phrase_data['word']
+                    pinyin = phrase_data['pinyin']
+                    meanings = pyhtml.escape(phrase_data['meanings'][:200] + ('...' if len(phrase_data['meanings']) > 200 else ''))
+                    st.markdown(f"""
+                        <div class='compound-item' style='margin-bottom:15px;'>
+                            <span class='cp-word' style='font-size:1.4em;'>{word}</span>
+                            <span class='cp-pinyin'>{pinyin}</span>
+                            <span class='cp-mean'>{meanings}</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+            
+            if not results['characters'] and not results['phrases']:
+                st.info(f"No results found for '{query}'. Try different search terms.")
         else:
+
+            # --- NEW DYNAMIC LINEAGE BANNER ---
             sel = st.session_state.selected_comp
             info = component_map.get(sel, {})
-            p_html = "".join([
-                f"<span class='status-tag'>{p}</span>"
-                for p in apply_script_filter(
-                    [p for p in info.get("meta", {}).get("decomposition", "") if p in component_map and p not in IDC_CHARS],
-                    st.session_state.script_filter
-                )
-            ])
-            c_html = "".join([
-                f"<span class='status-tag' style='opacity: 0.8;'>{c}</span>"
-                for c in apply_script_filter(
-                    [c for c in info.get("related_characters", []) if len(c) == 1],
-                    st.session_state.script_filter
-                )[:50]
-            ])
-            st.markdown(
-                f"<div class='status-line'><div style='display: flex; justify-content: space-between;'><div><b>{sel}</b><br/>Built from: {p_html or 'Root'}</div><div style='text-align: left;'><b>Derivatives</b><br/>{c_html}</div></div></div>",
-                unsafe_allow_html=True
-            )
-    
-            parents = apply_script_filter(
-                [p for p in info.get("meta", {}).get("decomposition", "") if p in component_map and p not in IDC_CHARS and p != sel],
-                st.session_state.script_filter
-            )
+            
+            # 1. Get Parents (for the banner only)
+            decomp = info.get("meta", {}).get("decomposition", "")
+            parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
+            parents = apply_script_filter(parents, st.session_state.script_filter)
+            p_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px;'>{p}</span>" for p in parents])
+            
+            # 2. Get Derivatives
+            rel = info.get("related_characters", [])
+            children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
+            children_preview = apply_script_filter(children, st.session_state.script_filter)[:50]
+            c_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px; opacity: 0.8;'>{c}</span>" for c in children_preview])
+
+            st.markdown(f"""
+                <div class='status-line'>
+                    <div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'>
+                        <div>
+                            <div style='font-weight: 800; font-size: 1.2em;'> {sel}</div>
+                            <div style='margin-top:4px; font-size:0.85em;'>
+                                <b>Components</b> {p_html if parents else "Basic Root"}
+                            </div>
+                        </div>
+                        <div style='text-align: left; font-size: 1.0em; opacity: 0.7;'>
+                            <b>Derivatives</b><br/>{c_html}{"..." if len(children) > 50 else ""}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            # --- END DYNAMIC BANNER ---
+
+            selected = st.session_state.selected_comp
+
+            # 1. PARENTS (Ingredients) - exclude self if present
+            decomp_raw = component_map.get(selected, {}).get("meta", {}).get("decomposition", "")
+            parents = [p for p in decomp_raw if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != selected]
+            
             if parents:
-                st.markdown("<div class='lineage-header'>🧱 Components</div>", unsafe_allow_html=True)
-                for p in parents:
+                st.markdown("<div class='lineage-header'>🧱 Components (How it's built)</div>", unsafe_allow_html=True)
+                for p in apply_script_filter(parents, st.session_state.script_filter):
                     render_radix_row(p)
-    
-            st.markdown("<div class='lineage-header'>🎯 Selection</div>", unsafe_allow_html=True)
-            render_radix_row(sel)
-    
-            children = apply_script_filter(
-                sorted([c for c in info.get("related_characters", []) if len(c) == 1 and c != sel], key=sort_key_usage_primary),
-                st.session_state.script_filter
-            )
+
+                    
+
+            st.markdown("<div class='lineage-header'>🎯 Current Selection</div>", unsafe_allow_html=True)
+            focus_group = [selected]
+            if cc_t2s and cc_s2t:
+                s_cand = cc_t2s.convert(selected)
+                t_cand = cc_s2t.convert(selected)
+                variant = s_cand if s_cand != selected else t_cand
+                if variant != selected and variant in component_map:
+                    focus_group.append(variant)
+            
+            for f in apply_script_filter(focus_group, st.session_state.script_filter):
+                render_radix_row(f)
+
+            related_raw = component_map.get(selected, {}).get("related_characters", [])
+            children = [c for c in related_raw if isinstance(c, str) and len(c) == 1 and c in component_map and c != selected]
+            
             if children:
-                st.markdown(f"<div class='lineage-header'>🌲 Derivatives ({len(children)})</div>", unsafe_allow_html=True)
-                for child in children[:120]:
+                children_sorted = sorted(children, key=sort_key_usage_primary)
+                visible_children = apply_script_filter(children_sorted, st.session_state.script_filter)    
+                
+                # Remove duplicates while preserving order
+                seen = set()
+                unique_visible = []
+                for child in visible_children:
+                    if child not in seen:
+                        unique_visible.append(child)
+                        seen.add(child)
+                visible_children = unique_visible
+
+                # Now use the deduplicated count in the header
+                st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {len(visible_children)} characters)</div>", unsafe_allow_html=True)
+                
+                # First 120: Fully interactive
+                for child in visible_children[:120]:
                     render_radix_row(child)
-                if len(children) > 120:
-                    st.markdown(f"<div style='text-align:center;'>⬇️ {len(children)-120} More ⬇️</div>", unsafe_allow_html=True)
-                    for c in children[120:]:
-                        render_radix_row(c, is_static=True)
-    
-if __name__ == "__main__": main()
+                
+                # Remaining: Static cards (unlimited)
+                if len(visible_children) > 120:
+                    remaining = len(visible_children) - 120
+                    st.markdown("---")
+                    st.markdown(
+                        f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>"
+                        f"⬇️ {remaining} More Derivatives ⬇️</div>",
+                        unsafe_allow_html=True
+                    )
+                    for c in visible_children[120:]:
+                        # Render with is_static=True to show appropriate tip
+                        render_radix_row(c, context="static_derivative", is_static=True)
+
+
+if __name__ == "__main__":
+    main()
