@@ -654,6 +654,13 @@ def list_tile_click(c):
         if st.session_state.selected_comp:
             st.session_state.history.append(st.session_state.selected_comp)
         st.session_state.selected_comp = c
+        st.session_state.last_valid_selected_comp = c
+
+        # If the user drills down from a definition search result, exit search mode
+        # so the character lineage view renders as expected.
+        st.session_state.definition_search_mode = False
+        st.session_state.definition_search_results = None
+
         st.session_state.show_inputs = False
         st.session_state.preview_comp = None
         st.session_state.display_mode = "2-Characters"
@@ -1012,7 +1019,13 @@ def main():
                 modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
                 new_mode = st.radio("Select mode", options=modes, index=modes.index(st.session_state.display_mode), label_visibility="collapsed")
                 if new_mode != st.session_state.display_mode: st.session_state.display_mode = new_mode; st.rerun()
-        st.text_input("Shortcut search", key="sb_search", on_change=sync_sidebar_text)
+        with st.expander("Search", expanded=True):
+            st.markdown("**Single character**")
+            st.text_input("Single character", key="sb_search", on_change=sync_sidebar_text, placeholder="Hanzi...", label_visibility="collapsed")
+            st.markdown("**English definition**")
+            st.text_input("English definition", key="w_def_search", placeholder="e.g., water", label_visibility="collapsed")
+            if st.button("Search", use_container_width=True, type="primary", key="sb_def_search_btn"):
+                search_by_definition(); st.rerun()
         with st.expander("🔎 Filters", expanded=False):
             if not st.session_state.show_inputs: st.radio("Filter", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(st.session_state.script_filter), key="w_script_filter", on_change=sync_script_filter)
             else:
@@ -1061,35 +1074,63 @@ def main():
                 with cols[i % 10]: st.button(ch, key=f"b_{ch}_{st.session_state.page}", type="primary" if st.session_state.preview_comp == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
             col2 = st.columns([1, 2, 1])[1]
-            with col2: st.text_input("Jump", key="w_text", on_change=sync_text, placeholder="Hanzi...", label_visibility="collapsed")
-            st.markdown("<div class='jump-footer'><h4>🔍 Definition Search</h4>", unsafe_allow_html=True)
-            with st.columns([1, 2, 1])[1]:
-                st.text_input("Search", key="w_def_search", placeholder="e.g., water", label_visibility="collapsed")
-                if st.button("Search", use_container_width=True, type="primary"): search_by_definition(); st.rerun()
+
     else:
         if st.session_state.definition_search_mode and st.session_state.definition_search_results:
             res = st.session_state.definition_search_results
             st.markdown(f"<div class='status-line'><b>Search for \"{pyhtml.escape(st.session_state.definition_search_query)}\"</b></div>", unsafe_allow_html=True)
-            for char in res['characters'][:30]: render_radix_row(char)
-            for p in res['phrases']: st.markdown(f"<div class='compound-item'><span class='cp-word'>{p['word']}</span><span class='cp-pinyin'>{p['pinyin']}</span><span class='cp-mean'>{pyhtml.escape(p['meanings'][:200])}</span></div>", unsafe_allow_html=True)
+            for char in res['characters'][:30]:
+                render_radix_row(char)
+            for p in res['phrases']:
+                st.markdown(
+                    f"<div class='compound-item'><span class='cp-word'>{p['word']}</span><span class='cp-pinyin'>{p['pinyin']}</span><span class='cp-mean'>{pyhtml.escape(p['meanings'][:200])}</span></div>",
+                    unsafe_allow_html=True
+                )
         else:
             sel = st.session_state.selected_comp
             info = component_map.get(sel, {})
-            p_html = "".join([f"<span class='status-tag'>{p}</span>" for p in apply_script_filter([p for p in info.get("meta", {}).get("decomposition", "") if p in component_map and p not in IDC_CHARS], st.session_state.script_filter)])
-            c_html = "".join([f"<span class='status-tag' style='opacity: 0.8;'>{c}</span>" for c in apply_script_filter([c for c in info.get("related_characters", []) if len(c) == 1], st.session_state.script_filter)[:50]])
-            st.markdown(f"<div class='status-line'><div style='display: flex; justify-content: space-between;'><div><b>{sel}</b><br/>Built from: {p_html or 'Root'}</div><div style='text-align: left;'><b>Derivatives</b><br/>{c_html}</div></div></div>", unsafe_allow_html=True)
-            parents = apply_script_filter([p for p in info.get("meta", {}).get("decomposition", "") if p in component_map and p not in IDC_CHARS and p != sel], st.session_state.script_filter)
-            if parents: 
+            p_html = "".join([
+                f"<span class='status-tag'>{p}</span>"
+                for p in apply_script_filter(
+                    [p for p in info.get("meta", {}).get("decomposition", "") if p in component_map and p not in IDC_CHARS],
+                    st.session_state.script_filter
+                )
+            ])
+            c_html = "".join([
+                f"<span class='status-tag' style='opacity: 0.8;'>{c}</span>"
+                for c in apply_script_filter(
+                    [c for c in info.get("related_characters", []) if len(c) == 1],
+                    st.session_state.script_filter
+                )[:50]
+            ])
+            st.markdown(
+                f"<div class='status-line'><div style='display: flex; justify-content: space-between;'><div><b>{sel}</b><br/>Built from: {p_html or 'Root'}</div><div style='text-align: left;'><b>Derivatives</b><br/>{c_html}</div></div></div>",
+                unsafe_allow_html=True
+            )
+    
+            parents = apply_script_filter(
+                [p for p in info.get("meta", {}).get("decomposition", "") if p in component_map and p not in IDC_CHARS and p != sel],
+                st.session_state.script_filter
+            )
+            if parents:
                 st.markdown("<div class='lineage-header'>🧱 Components</div>", unsafe_allow_html=True)
-                for p in parents: render_radix_row(p)
+                for p in parents:
+                    render_radix_row(p)
+    
             st.markdown("<div class='lineage-header'>🎯 Selection</div>", unsafe_allow_html=True)
             render_radix_row(sel)
-            children = apply_script_filter(sorted([c for c in info.get("related_characters", []) if len(c) == 1 and c != sel], key=sort_key_usage_primary), st.session_state.script_filter)
+    
+            children = apply_script_filter(
+                sorted([c for c in info.get("related_characters", []) if len(c) == 1 and c != sel], key=sort_key_usage_primary),
+                st.session_state.script_filter
+            )
             if children:
                 st.markdown(f"<div class='lineage-header'>🌲 Derivatives ({len(children)})</div>", unsafe_allow_html=True)
-                for child in children[:120]: render_radix_row(child)
+                for child in children[:120]:
+                    render_radix_row(child)
                 if len(children) > 120:
                     st.markdown(f"<div style='text-align:center;'>⬇️ {len(children)-120} More ⬇️</div>", unsafe_allow_html=True)
-                    for c in children[120:]: render_radix_row(c, is_static=True)
-
+                    for c in children[120:]:
+                        render_radix_row(c, is_static=True)
+    
 if __name__ == "__main__": main()
