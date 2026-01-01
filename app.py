@@ -438,21 +438,21 @@ def apply_dynamic_css():
     .splash-wrap {
         max-width: 850px;
         margin: 0 auto;
-        padding: 60px 20px 20px 20px;
+        padding: 15px 15px 10px 15px;  /* Very compact */
     }
     .splash-card {
         background: #ffffff;
         border: 1px solid #e0e0e0;
-        border-radius: 40px;
-        padding: 60px;
-        box-shadow: 0 15px 50px rgba(0,0,0,0.05);
+        border-radius: 20px;           /* Smaller radius */
+        padding: 25px;                  /* Much smaller */
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
         text-align: center;
     }
     .splash-title {
-        font-size: 3.0em;
+        font-size: 2.5em;              /* Even smaller */
         font-weight: 800;
         color: #1a1a1a;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
     }
     .splash-sub {
         font-size: 1.3em;
@@ -810,7 +810,7 @@ def render_splash():
     # Use columns to center the button nicely
     col_c = st.columns([1, 1.2, 1])[1]
     with col_c:
-        if st.button("Enter the Grand Hall of Radix 🈑", use_container_width=True, type="primary"):
+        if st.button("Grand Hall of Radix 🈑 Components", use_container_width=True, type="primary"):
             st.session_state.onboarding_done = True
             st.rerun()
 
