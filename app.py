@@ -74,7 +74,7 @@ def import_profile_dict(data: dict) -> None:
     st.session_state.prompt_ui = data.get("prompt_ui", {}) if isinstance(data.get("prompt_ui", {}), dict) else {}
 
 
-st.set_page_config(layout="wide", page_title="Radix", page_icon="🈷")
+st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 
 
 # --- Dynamic CSS ---
@@ -809,7 +809,7 @@ def render_startup_file_choice():
         """
         <div class="splash-wrap">
           <div class="splash-card">
-            <div class="splash-title">🈷 Radix - Data Setup</div>
+            <div class="splash-title">Radix 🈑 - Data Setup</div>
             <div class="splash-sub" style="margin-top: 20px;">
               Do you have a local Radix user data file you'd like to use?
             </div>
