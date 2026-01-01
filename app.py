@@ -74,7 +74,7 @@ def import_profile_dict(data: dict) -> None:
     st.session_state.prompt_ui = data.get("prompt_ui", {}) if isinstance(data.get("prompt_ui", {}), dict) else {}
 
 
-st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
+st.set_page_config(layout="wide", page_title="Radix", page_icon="�")
 
 
 # --- Dynamic CSS ---
@@ -376,21 +376,21 @@ def apply_dynamic_css():
     .splash-wrap {
         max-width: 850px;
         margin: 0 auto;
-        padding: 15px 15px 10px 15px;  /* Very compact */
+        padding: 60px 20px 20px 20px;
     }
     .splash-card {
         background: #ffffff;
         border: 1px solid #e0e0e0;
-        border-radius: 20px;           /* Smaller radius */
-        padding: 25px;                  /* Much smaller */
-        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        border-radius: 40px;
+        padding: 60px;
+        box-shadow: 0 15px 50px rgba(0,0,0,0.05);
         text-align: center;
     }
     .splash-title {
-        font-size: 2.5em;              /* Even smaller */
+        font-size: 3.0em;
         font-weight: 800;
         color: #1a1a1a;
-        margin-bottom: 5px;
+        margin-bottom: 10px;
     }
     .splash-sub {
         font-size: 1.3em;
@@ -401,7 +401,7 @@ def apply_dynamic_css():
         margin: 60px 0;
     }
     .grand-torii {
-        font-size: 250px !important;
+        font-size: 250px !important; /* Palace Scale */
         cursor: pointer;
         line-height: 1;
         transition: transform 0.4s ease;
@@ -417,6 +417,9 @@ def apply_dynamic_css():
         margin-top: 20px;
         letter-spacing: 2px;
     }
+    
+    
+    /* --- List View Interaction Banner + Button Hints --- */
     .interaction-banner {
         padding: 12px 14px;
         border-radius: 14px;
@@ -809,7 +812,7 @@ def render_startup_file_choice():
         """
         <div class="splash-wrap">
           <div class="splash-card">
-            <div class="splash-title">Radix 🈑 - Data Setup</div>
+            <div class="splash-title">Radix 🈑- Data Setup</div>
             <div class="splash-sub" style="margin-top: 20px;">
               Do you have a local Radix user data file you'd like to use?
             </div>
@@ -890,6 +893,8 @@ def render_startup_file_choice():
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_splash():
+    """Renders the entry screen with a grand palace-style entrance."""
+    # 1. Main Title Card - Styled for a premium, palace feel
     st.markdown(
         """
         <div class="splash-wrap">
@@ -900,31 +905,37 @@ def render_splash():
         """,
         unsafe_allow_html=True,
     )
-    
-    # REPLACED HTML LINK WITH NATIVE BUTTON TO FIX STATE RESET
+
+    # 2. ENLARGED ENTRANCE: The Torii gate scaled to palace proportions
     st.markdown(
         """
         <div class="palace-entrance-container">
-            <div class="grand-torii">⛩️</div>
+            <a href="/?onboarding=done" target="_self" style="text-decoration:none;">
+                <div class="grand-torii">⛩️</div>
+                <div class="entrance-text">Grand Hall of Radix 🈑 Components</div>
+            </a>
         </div>
         """, 
         unsafe_allow_html=True
     )
+
+    # Handling the entrance logic via query parameters
+    if st.query_params.get("onboarding") == "done":
+        st.session_state.onboarding_done = True
+        st.query_params.clear() 
+        st.rerun()
     
-    # Use columns to center the button nicely
-    col_c = st.columns([1, 1.2, 1])[1]
-    with col_c:
-        if st.button("Grand Hall of Radix 🈑 Components", use_container_width=True, type="primary"):
-            st.session_state.onboarding_done = True
-            st.rerun()
 
     demos = st.session_state.favourites_list
     if demos:
         st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
         lc1, lc2, lc3 = st.columns([1, 2, 1])
         with lc2:
+            
             with st.expander("📂 User Data (Save/Load/Review & Edit)", expanded=False):
-                st.caption("Single JSON file for **Favourites** + **AI Prompt Tasks**. Upload applies immediately; download is your backup.")
+                st.caption("Single JSON file for **Favourites** + **AI Prompt Tasks (Tasks)**. Upload applies immediately in-app; download is your backup/export.")
+
+                # --- Save / Load ---
                 c_dl, c_ul = st.columns(2)
                 with c_dl:
                     st.download_button(
@@ -935,129 +946,240 @@ def render_splash():
                         use_container_width=True,
                     )
                 with c_ul:
-                    # Separate logic for widget vs state
+                    # Use a persistent key that doesn't change
                     uploaded_file = st.file_uploader(
                         "Upload user data (JSON)",
                         type=["json"],
                         key="profile_uploader_persistent",
                         label_visibility="collapsed",
                     )
-                    
+
                     if uploaded_file is not None:
                         file_bytes = uploaded_file.getvalue()
                         file_hash = hashlib.sha256(file_bytes).hexdigest()
                         last_hash = st.session_state.get('_last_upload_hash', '')
-                        
-                        # Only show "Apply" if it's a new or un-applied file
+
+                        # Show apply button prominently
                         if file_hash != last_hash:
                             st.warning("⚠️ New file detected - click Apply to use it")
-                            if st.button("✅ Apply uploaded file now", use_container_width=True, type="primary", key="apply_upload_btn"):
+                            
+                            if st.button("✅ Apply uploaded file now", 
+                                        use_container_width=True, 
+                                        type="primary",
+                                        key="apply_upload_btn"):
                                 st.session_state["_last_upload_hash"] = file_hash
                                 _apply_uploaded_profile_bytes(file_bytes)
+                                st.rerun()
                         else:
                             st.success("✓ Current file is active")
-                        
-                        if st.button("♻️ Upload different file", use_container_width=True, key="reset_uploader_btn"):
+                            
+                        if st.button("♻️ Upload different file", 
+                                    use_container_width=True,
+                                    key="reset_uploader_btn"):
                             st.session_state.pop("_last_upload_hash", None)
                             st.session_state.pop("_upload_error", None)
                             st.session_state.pop("_upload_applied", None)
+                            # Clear the uploader by removing it from session state
                             st.session_state.pop("profile_uploader_persistent", None)
                             st.rerun()
 
+                # Show errors/success messages
                 if st.session_state.get("_upload_error"):
                     st.error(st.session_state["_upload_error"])
                 elif st.session_state.get("_upload_applied"):
-                    st.success("✅ Upload applied! Download to save.")
+                    st.success("✅ Upload applied successfully! Download to save changes.")
+                    # Auto-clear the success message after showing once
                     if st.button("Dismiss", key="dismiss_success"):
                         st.session_state["_upload_applied"] = False
                         st.rerun()
 
-                with st.expander("🔎 Review current data snapshot", expanded=False):
-                    st.json(build_profile_dict()) # Match the defined function name
+                # Ensure UI widgets fully rebuild from imported session_state
+                if st.session_state.get("_post_apply_rerun"):
+                    st.session_state["_post_apply_rerun"] = False
+                    st.rerun()
+
+                # --- Review before download ---
+                with st.expander("🔎 Review current data snapshot (what will be downloaded)", expanded=False):
+                    st.json(build_profile_payload())
 
                 st.markdown("---")
                 st.subheader("Favourites")
+
                 fav_text_default = " ".join(st.session_state.get("favourites_list", []))
-                fav_text = st.text_area("Favourites", value=fav_text_default, height=90, key="fav_bulk_editor", label_visibility="collapsed")
+                fav_text = st.text_area(
+                    "Favourites (space or newline separated)",
+                    value=fav_text_default,
+                    height=90,
+                    key="fav_bulk_editor",
+                    label_visibility="collapsed",
+                )
+
                 tokens = [t for t in re.split(r"\s+", (fav_text or "").strip()) if t]
                 valid = [t for t in tokens if isinstance(t, str) and len(t) == 1]
+                invalid = [t for t in tokens if not (isinstance(t, str) and len(t) == 1)]
+                # de-dup, preserve order
                 seen = set()
                 cleaned = []
                 for c in valid:
                     if c not in seen:
                         cleaned.append(c)
                         seen.add(c)
-                st.caption(f"Preview: {len(cleaned)} favourites ready.")
+
+                st.caption(f"Preview: {len(cleaned)} favourites ready to apply. Ignoring {len(invalid)} token(s) that are not exactly 1 character.")
 
                 c1, c2, c3 = st.columns([1, 1, 2])
                 with c1:
                     if st.button("Apply favourites", use_container_width=True, key="fav_apply"):
                         st.session_state.favourites_list = cleaned
                         st.session_state.fav_cursor = 0
-                        st.toast("Updated.", icon="✅")
+                        st.toast("Favourites updated.", icon="✅")
                         st.rerun()
                 with c2:
                     if st.button("Clear favourites", use_container_width=True, key="fav_clear"):
                         st.session_state.favourites_list = []
                         st.session_state.fav_cursor = 0
+                        st.toast("Cleared favourites.", icon="✅")
                         st.rerun()
+                with c3:
+                    add_char = st.text_input("Add a character", value="", key="fav_add_one", placeholder="e.g., 我", label_visibility="collapsed")
+                    if st.button("Add", use_container_width=True, key="fav_add_btn"):
+                        c = (add_char or "").strip()
+                        if len(c) != 1:
+                            st.toast("Please enter exactly 1 character.", icon="⚠️")
+                        else:
+                            favs = st.session_state.get("favourites_list", [])
+                            if c not in favs:
+                                st.session_state.favourites_list = favs + [c]
+                                st.toast("Added.", icon="✅")
+                                st.rerun()
+
+                favs = st.session_state.get("favourites_list", [])
+                if favs:
+                    st.markdown("**Current favourites**")
+                    for i, c in enumerate(favs):
+                        cc1, cc2 = st.columns([6, 1])
+                        with cc1:
+                            st.write(c)
+                        with cc2:
+                            if st.button("✕", key=f"fav_rm_{i}", help="Remove"):
+                                st.session_state.favourites_list = [x for j, x in enumerate(favs) if j != i]
+                                st.toast("Removed.", icon="✅")
+                                st.rerun()
 
                 st.markdown("---")
-                st.subheader("AI Prompt Tasks")
+                st.subheader("AI Prompt Tasks (Task 1–10)")
+
                 normalize_prompt_state()
                 cfg = st.session_state.get("prompt_config") or {}
                 tasks = cfg.get("tasks", []) or []
                 all_task_ids = [t.get("id") for t in tasks if t.get("id")]
-                default_sel = st.multiselect("Default tasks", options=all_task_ids, default=list(st.session_state.prompt_ui.get("default_selected_task_ids", all_task_ids)), key="prompt_default_sel_editor")
-                if st.button("Save defaults", key="save_default_task_sel"):
+
+                # Default selection editor (applies when you first open a character prompt)
+                default_sel = st.multiselect(
+                    "Default selected tasks",
+                    options=all_task_ids,
+                    default=list(st.session_state.prompt_ui.get("default_selected_task_ids", all_task_ids)),
+                    key="prompt_default_sel_editor",
+                )
+                if st.button("Save default selection", key="save_default_task_sel"):
                     st.session_state.prompt_ui["default_selected_task_ids"] = list(default_sel)
+                    normalize_prompt_state()
+                    st.toast("Default task selection updated.", icon="✅")
                     st.rerun()
 
+                st.caption("Edit titles/templates below. Changes persist in-session and will be included in the next download.")
                 edited_tasks = []
-                for t in tasks:
+                for idx, t in enumerate(tasks):
                     tid = t.get("id")
-                    if not tid: continue
-                    with st.expander(f"✏️ {t.get('title','(untitled)')}", expanded=False):
+                    if not tid:
+                        continue
+                    with st.expander(f"✏️ {t.get('title','(untitled)')}  —  {tid}", expanded=False):
                         title = st.text_input("Title", value=t.get("title", ""), key=f"pt_title_{tid}")
                         template = st.text_area("Template", value=t.get("template", ""), height=160, key=f"pt_tpl_{tid}")
-                        if st.button("Delete task", key=f"pt_del_{tid}"):
-                            cur = (st.session_state.get("prompt_config") or {}).get("tasks", []) or []
-                            st.session_state.prompt_config["tasks"] = [tt for tt in cur if tt.get("id") != tid]
-                            st.rerun()
+                        cA, cB = st.columns([1, 3])
+                        with cA:
+                            if st.button("Delete task", key=f"pt_del_{tid}"):
+                                # Delete is immediate (no need to click Apply). This avoids "delete then apply" races.
+                                cur = (st.session_state.get("prompt_config") or {}).get("tasks", []) or []
+                                st.session_state.prompt_config["tasks"] = [tt for tt in cur if tt.get("id") != tid]
+                                # Clean up UI/widget keys and selections/defaults
+                                st.session_state.pop(f"pt_title_{tid}", None)
+                                st.session_state.pop(f"pt_tpl_{tid}", None)
+                                st.session_state.pop(f"prompt_task_cb_{tid}", None)
+                                st.session_state.prompt_selected_task_ids = [x for x in (st.session_state.get("prompt_selected_task_ids") or []) if x != tid]
+                                st.session_state.setdefault("prompt_ui", {})
+                                st.session_state.prompt_ui["default_selected_task_ids"] = [x for x in (st.session_state.prompt_ui.get("default_selected_task_ids", []) or []) if x != tid]
+                                normalize_prompt_state()
+                                st.toast("Task deleted.", icon="✅")
+                                st.rerun()
+                        with cB:
+                            st.caption("Tip: Keep the template as plain instructions. The character and definition are inserted separately.")
+
                     edited_tasks.append({"id": tid, "title": title, "template": template})
-                
                 c_add, c_apply = st.columns([1, 1])
                 with c_add:
                     if st.button("Add new task", key="pt_add_new_home", use_container_width=True):
                         cfg = st.session_state.get("prompt_config") or {}
                         tasks_cur = list(cfg.get("tasks", []) or [])
-                        existing_ids = [t.get("id") for t in tasks_cur]
-                        nums = [int(re.match(r"^task(\d+)$", tid).group(1)) for tid in existing_ids if re.match(r"^task(\d+)$", tid)]
-                        next_num = (max(nums) + 1) if nums else 1
-                        tasks_cur.append({"id": f"task{next_num}", "title": "New task", "template": "Prompt template...\n"})
+
+                        # Prefer sequential ids like task4, task5... when existing tasks are task1..taskN
+                        existing_ids = [t.get("id") for t in tasks_cur if isinstance(t, dict)]
+                        nums = []
+                        for tid in existing_ids:
+                            if isinstance(tid, str):
+                                m = re.match(r"^task(\d+)$", tid)
+                                if m:
+                                    nums.append(int(m.group(1)))
+                        next_num = (max(nums) + 1) if nums else None
+                        new_id = f"task{next_num}" if next_num is not None else f"task_{uuid.uuid4().hex[:8]}"
+
+                        tasks_cur.append({
+                            "id": new_id,
+                            "title": "New task",
+                            "template": "Write your task instructions here.\n",
+                        })
                         st.session_state.prompt_config["tasks"] = tasks_cur
-                        st.rerun()
+
+                        # Optionally include the new task in the current selection
+                        current_sel = list(st.session_state.get("prompt_selected_task_ids") or [])
+                        if new_id not in current_sel:
+                            current_sel.append(new_id)
+                        st.session_state.prompt_selected_task_ids = current_sel
+
+                        normalize_prompt_state()
+                        st.toast("Task added. Edit it below.", icon="✅")
                 with c_apply:
                     if st.button("Apply task edits", key="pt_apply_home", use_container_width=True):
                         st.session_state.prompt_config["tasks"] = edited_tasks
+                        normalize_prompt_state()
+                        st.toast("Tasks updated.", icon="✅")
                         st.rerun()
 
+
         st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+        
+        unique_demos = []
+        seen = set()
+        for d in demos:
+            if d not in seen:
+                unique_demos.append(d)
+                seen.add(d)
+
         COLS = 5
-        rows = (len(demos) + COLS - 1) // COLS
+        rows = (len(unique_demos) + COLS - 1) // COLS
         for r in range(rows):
             cols = st.columns(COLS)
             for j in range(COLS):
                 idx = r * COLS + j
-                if idx < len(demos):
-                    ch = demos[idx]
+                if idx < len(unique_demos):
+                    ch = unique_demos[idx]
                     count = component_usage_count(ch)
                     with cols[j]:
-                        if st.button(f"Explore {ch}", key=f"v4_splash_{idx}_{ord(ch)}", use_container_width=True, type="primary"):
+                        if st.button(f"Explore {ch}", key=f"v4_splash_btn_{idx}_{ord(ch)}", use_container_width=True, type="primary"):
                             st.session_state.onboarding_done = True
                             enter_component(ch)
                             st.rerun()
-                        st.caption(f"in {count} chars")
+                        st.caption(f"used in {count} characters")
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_radix_row(c, context="detail", is_static=False):
@@ -1399,6 +1521,14 @@ def main():
         st.session_state.prompt_selected_task_ids = cur_sel
 
         with st.expander("Prompt tasks (choose what to include)", expanded=True):
+            # Bulk actions must happen BEFORE the checkboxes are created in this run.
+            # Otherwise Streamlit raises: "session_state[...] cannot be modified after the widget ... is instantiated."
+            if st.button("Select all tasks", key="select_all_prompt_tasks"):
+                st.session_state.prompt_selected_task_ids = list(all_task_ids)
+                for tid in all_task_ids:
+                    st.session_state[f"prompt_task_cb_{tid}"] = True
+                st.rerun()
+
             sel = []
             for t in tasks:
                 tid = t.get("id", "")
@@ -1412,12 +1542,6 @@ def main():
 
             # If user unchecks everything, keep empty (allowed), but default is ALL on first load
             st.session_state.prompt_selected_task_ids = sel
-
-        if st.button("Select all tasks", key="select_all_prompt_tasks"):
-            st.session_state.prompt_selected_task_ids = list(all_task_ids)
-            for tid in all_task_ids:
-                st.session_state[f"prompt_task_cb_{tid}"] = True
-            st.rerun()
 
 
         def_en = get_char_definition_en(char)
