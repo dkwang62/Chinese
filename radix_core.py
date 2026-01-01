@@ -32,7 +32,7 @@ def load_subtlex_freq():
     """Load SUBTLEX-CH character frequencies from SUBTLEX-CH-CHR.txt (GBK encoded)"""
     global SUBTLEX_FREQ
     try:
-        with open("SUBTLEX-CH-CHR.txt", "r", encoding="gbk") as f:  # ← Change to gbk
+        with open("SUBTLEX-CH-CHR.txt", "r", encoding="gbk") as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line or line.startswith("Character") or line.startswith("Total"):
@@ -246,7 +246,7 @@ def resolve_to_known_variant(ch: str) -> str:
     return ""
 
 def get_default_prompt_config() -> dict:
-    # Inline defaults (Option B): radix_core.py does not depend on PROMPT_CONFIG_DEFAULT.
+    """Default prompt configuration with 3 tasks (matches original design)"""
     return {
         "version": 1,
         "preamble": (
@@ -258,7 +258,7 @@ def get_default_prompt_config() -> dict:
         "tasks": [
             {
                 "id": "task1",
-                "title": "Task ONE — Character Analysis",
+                "title": "Task 1 — Character Analysis",
                 "template": (
                     "Task 1 — Character Analysis\n\n"
                     "For the Hanzi below, provide:\n"
@@ -272,7 +272,7 @@ def get_default_prompt_config() -> dict:
             },
             {
                 "id": "task2",
-                "title": "Task TWO — Example Sentences and Images",
+                "title": "Task 2 — Example Sentences and Images",
                 "template": (
                     "Task 2 — Example Sentences and Images\n\n"
                     "Provide two example sentences that best illustrate modern, everyday usage of the character (or its modern equivalent if the original is rare). For each sentence, include:\n"
@@ -290,7 +290,7 @@ def get_default_prompt_config() -> dict:
             },
             {
                 "id": "task3",
-                "title": "Task THREE — Conceptual Contrast",
+                "title": "Task 3 — Conceptual Contrast",
                 "template": (
                     "Task 3 — Conceptual Contrast\n\n"
                     "Compare this character with 2–3 other characters of similar meaning or usage, including pinyin. Explain:\n"
@@ -503,6 +503,9 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
     <div style="display:flex; flex-direction:column; align-items:center; margin:20px 0;">
         <div style="text-align:center; font-size:2.5rem; font-weight:bold; color:#e67e22; margin-bottom:10px;">{pinyin}</div>
         <div id="sb-hw-{hash(char)}" style="width:{size}px; height:{size}px;"></div>
+        <div style="font-size:11px; color:#666; text-align:center; margin-top:5px;">
+            🔄 Continuous animation (keeps session alive)
+        </div>
     </div>
     <script>
     (function() {{
@@ -539,9 +542,31 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
                 await ensureLib();
                 const writer = window.HanziWriter.create(target, char, {{
                     width: {size}, height: {size}, padding: 8, showOutline: true, showCharacter: false,
-                    strokeAnimationSpeed: 1.3, delayBetweenStrokes: 100
+                    strokeAnimationSpeed: 1.5, delayBetweenStrokes: 80  // Slightly faster for continuous
                 }});
-                writer.showCharacter();
+                
+                // INFINITE ANIMATION LOOP - keeps page alive
+                async function continuousAnimation() {{
+                    while (true) {{
+                        // Animate once
+                        writer.hideCharacter();
+                        await writer.animateCharacter();
+                        writer.showCharacter();
+                        
+                        // Optional: Speak every 5th animation
+                        if (Math.random() < 0.2) {{  // 20% chance per cycle
+                            speak(char);
+                        }}
+                        
+                        // Wait 2 seconds before next animation
+                        await new Promise(r => setTimeout(r, 2000));
+                    }}
+                }}
+                
+                // Start the infinite loop
+                continuousAnimation().catch(console.error);
+                
+                // Keep existing click/touch functionality
                 const el = document.getElementById(target);
                 el.style.cursor = 'pointer';
                 const trigger = (e) => {{
@@ -552,8 +577,13 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
                 }};
                 el.addEventListener('click', trigger);
                 el.addEventListener('touchend', trigger);
+                
+                // Optional: Log to console for debugging
+                console.log(`Sidebar infinite animation started for ${{char}}`);
+                
             }} catch(e) {{
-                document.getElementById(target).innerHTML = `<div style="font-size:${size*0.7}px; line-height:${size}px; text-align:center;">${{char}}</div>`;
+                console.error("HanziWriter init failed:", e);
+                document.getElementById(target).innerHTML = `<div style="font-size:${{size*0.7}}px; line-height:${{size}}px; text-align:center;">${{char}}</div>`;
             }}
         }}
         init();
@@ -698,7 +728,7 @@ def get_stroke_order_view_html(primary_char: str, display_mode: str) -> tuple[st
         async function playSequence(item, silent) {{
             const writer = item.w;
             const char = item.c;
-            for (let k = 0; k < 3; k++) {{
+            for (let k = 0; k < 30; k++) {{
                 if (!silent) speak(char);
                 writer.hideCharacter();
                 await writer.animateCharacter();
