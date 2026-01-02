@@ -30,6 +30,72 @@ PROFILE_FILENAME = "radix_user_data.json"
 st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 
 # -----------------------------
+# Session State Initialization (RESTORED FULL LIST)
+# -----------------------------
+# Critical: This must contain EVERY key used in the app to prevent AttributeErrors
+DEFAULTS = {
+    "startup_file_choice_made": False,
+    "onboarding_done": False,
+    "selected_comp": "",
+    "stroke_range": (3, 8),
+    "radical": "none",
+    "component_idc": "none",
+    "display_mode": "2-Characters",
+    "text_input_comp": "",
+    "page": 1,
+    "text_input_warning": None,
+    "show_inputs": True,
+    "last_valid_selected_comp": "",
+    "preview_comp": None,
+    "stroke_view_active": False,
+    "stroke_view_char": "",
+    "script_filter": "Any",
+    "favourites_list": [],
+    "fav_cursor": 0,
+    "prompt_config": None,
+    "prompt_ui": {"default_selected_task_ids": []},
+    "prompt_selected_task_ids": [],
+    "history": [],
+    "definition_search_mode": False,
+    "definition_search_query": "",
+    "definition_search_results": None,
+    "grid_sort_mode": "usage",
+    "grid_script_filter": "Any",
+}
+
+for k, v in DEFAULTS.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# Auto-load server-side data (if available and no manual upload override)
+if "server_data_loaded" not in st.session_state:
+    st.session_state.server_data_loaded = True
+    st.session_state.server_data_available = False
+    if not st.session_state.get("_manual_config_active", False):
+        try:
+            with open("radix_user_data.json", "r", encoding="utf-8") as f:
+                obj = json.load(f)
+            if (isinstance(obj, dict) and obj.get("schema_version") == 1):
+                st.session_state.server_data = obj
+                st.session_state.server_data_available = True
+        except:
+            pass
+
+# Ensure prompt config is valid
+if st.session_state.prompt_config is None:
+    st.session_state.prompt_config = get_default_prompt_config()
+else:
+    st.session_state.prompt_config = normalize_prompt_config(st.session_state.prompt_config)
+
+# Default Prompt Selection Logic
+_task_ids = [t.get('id') for t in st.session_state.prompt_config.get('tasks', []) if t.get('id')]
+if not st.session_state.prompt_ui.get('default_selected_task_ids'):
+    st.session_state.prompt_ui['default_selected_task_ids'] = _task_ids
+if not st.session_state.prompt_selected_task_ids:
+    st.session_state.prompt_selected_task_ids = list(st.session_state.prompt_ui.get('default_selected_task_ids', _task_ids))
+
+
+# -----------------------------
 # State Management Helpers
 # -----------------------------
 def build_profile_dict() -> dict:
@@ -212,6 +278,42 @@ def toggle_favourite(char):
             st.session_state.fav_cursor = (st.session_state.fav_cursor + 1) % 20
     elif not chk and char in lst:
         lst.remove(char)
+
+def render_copy_to_clipboard(prompt_text: str, widget_id: str):
+    safe_text = json.dumps(prompt_text, ensure_ascii=False)
+    st_html(
+        f"""
+        <div style="display:flex; justify-content:center; margin:10px 0 0 0;">
+          <button id="copy-btn-{widget_id}" style="
+              padding:10px 14px; border-radius:10px; border:1px solid #ddd;
+              background:#fff; cursor:pointer; font-weight:700;">
+            Copy Prompt to Clipboard
+          </button>
+        </div>
+        <div id="copy-msg-{widget_id}" style="text-align:center; margin-top:8px; color:#2e7d32; font-weight:600;"></div>
+        <script>
+          (function() {{
+            const text = {safe_text};
+            const btn = document.getElementById("copy-btn-{widget_id}");
+            const msg = document.getElementById("copy-msg-{widget_id}");
+            if (!btn) return;
+
+            async function copy() {{
+              try {{
+                await navigator.clipboard.writeText(text);
+                msg.textContent = "Copied. Paste into ChatGPT.";
+              }} catch (e) {{
+                msg.textContent = "Copy failed. Please manually select and copy from the textbox above.";
+              }}
+              setTimeout(() => {{ msg.textContent = ""; }}, 2500);
+            }}
+
+            btn.addEventListener("click", copy);
+          }})();
+        </script>
+        """,
+        height=90,
+    )
 
 # -----------------------------
 # UI Component Helpers
@@ -506,15 +608,6 @@ def main():
     if not component_map: st.error("Dataset missing."); st.stop()
     apply_dynamic_css()
     
-    defaults = {
-        "startup_file_choice_made": False, "onboarding_done": False, "selected_comp": "", 
-        "stroke_range": (3, 8), "radical": "none", "component_idc": "none", 
-        "display_mode": "2-Characters", "page": 1, "show_inputs": True, "script_filter": "Any", 
-        "favourites_list": [], "grid_sort_mode": "usage", "grid_script_filter": "Any"
-    }
-    for k,v in defaults.items(): 
-        if k not in st.session_state: st.session_state[k] = v
-
     if st.session_state.get("_post_apply_rerun"): st.session_state["_post_apply_rerun"] = False
 
     if not st.session_state.startup_file_choice_made:
