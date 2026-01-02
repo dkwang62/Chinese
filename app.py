@@ -823,7 +823,7 @@ def render_startup_file_choice():
         """
         <div class="splash-wrap">
           <div class="splash-card">
-            <div class="splash-title">Radix 🈑- Data Setup</div>
+            <div class="splash-title">Radix 🈑 - Data Setup</div>
             <div class="splash-sub" style="margin-top: 20px;">
               Do you have a local Radix user data file you'd like to use?
             </div>
@@ -982,13 +982,14 @@ def render_splash():
                 # --- Save / Load ---
                 c_dl, c_ul = st.columns(2)
                 with c_dl:
-                    st.download_button(
-                        label="💾 Download user data (JSON)",
-                        data=export_profile_str(),
-                        file_name=PROFILE_FILENAME,
-                        mime="application/json",
-                        use_container_width=True,
+                    # iPad-safe download with graceful close button
+                    profile_data = export_profile_str()
+                    download_html = render_ipad_safe_download_html(
+                        data_str=profile_data,
+                        filename=PROFILE_FILENAME,
+                        label="💾 Download user data",
                     )
+                    st.markdown(download_html, unsafe_allow_html=True)
                 with c_ul:
                     # Use a persistent key that doesn't change
                     uploaded_file = st.file_uploader(
