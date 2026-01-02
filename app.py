@@ -52,7 +52,6 @@ def build_profile_dict() -> dict:
     }
 
 def build_profile_payload() -> dict:
-    # Backing store for Save/Load actions
     return build_profile_dict()
 
 def export_profile_str() -> str:
@@ -79,21 +78,74 @@ def apply_dynamic_css():
     /* Card Styling */
     .char-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-        padding: 24px; border-radius: 16px; margin-bottom: 0px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #e9ecef; transition: all 0.3s ease;
+        padding: 24px;
+        border-radius: 16px;
+        margin-bottom: 0px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
     }
-    .char-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
+    .char-card:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
     
-    /* Typography & Tags */
-    .meta-pinyin { font-weight: 700; font-size: 2.4em; color: #d35400; text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1); }
-    .meta-tag { 
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
-        padding: 4px 12px; border-radius: 8px; font-size: 0.85em; 
-        color: #495057; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-        margin-bottom: 6px; /* Prevent overlap when wrapping */
+    /* Meta Row & Tags */
+    .meta-row {
+        font-size: 0.95em;
+        color: #555;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .meta-pinyin {
+        font-weight: 700;
+        font-size: 2.4em;
+        color: #d35400;
+        text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1);
+    }
+    .meta-tag {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-size: 0.85em;
+        color: #495057;
+        font-weight: 600;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        margin-bottom: 6px;
         display: inline-block;
     }
-    
+    .meta-tag-trad {
+        background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+        color: #856404;
+        border: 1px solid #ffd54f;
+    }
+    .meta-tag-simp {
+        background: linear-gradient(135deg, #d1e7dd 0%, #a3cfbb 100%);
+        color: #0f5132;
+        border: 1px solid #81c784;
+    }
+
+    /* Definition & Etymology (The Distinction You Requested) */
+    .def-row {
+        font-size: 1.15em;
+        line-height: 1.6;
+        color: #2c3e50;
+        margin-bottom: 10px;
+        font-weight: 500;
+    }
+    .ety-row {
+        font-size: 0.92em;
+        color: #666;
+        font-style: italic;
+        border-top: 2px solid #e9ecef;
+        padding-top: 12px;
+        margin-top: 8px;
+        line-height: 1.5;
+    }
+
     /* Sidebar Specific Fixes */
     section[data-testid="stSidebar"] .meta-pinyin { font-size: 2.0em !important; }
     section[data-testid="stSidebar"] .char-card { padding: 16px !important; }
@@ -702,6 +754,9 @@ def main():
 
             if st.session_state.stroke_view_active:
                 st.markdown("### Character Info")
+                # Updated: Use 'char-card' div wrapper + generate_clean_card_html with is_static=True 
+                # This ensures the card looks exactly like the "wide card" screenshot (Screenshot 2)
+                # with usage count, definition/etymology separation, and tip box.
                 st.markdown(f"<div class='char-card'>{generate_clean_card_html(current_char_for_sidebar, usage_count=component_usage_count(current_char_for_sidebar), is_static=True)}</div>", unsafe_allow_html=True)
 
         if not st.session_state.show_inputs:
@@ -743,6 +798,7 @@ def main():
         main_html, _ = get_stroke_order_view_html(st.session_state.stroke_view_char, st.session_state.display_mode)
         st_html(main_html, height=450)
         
+        # Explicitly render the phrase table using our reliable helper
         if st.session_state.display_mode != "Single Character":
             if phrase_html := _render_phrase_html(st.session_state.stroke_view_char):
                 st.markdown(phrase_html, unsafe_allow_html=True)
