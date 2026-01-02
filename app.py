@@ -502,7 +502,7 @@ def render_splash():
                     if st.button("Dismiss", key="dismiss_success"): st.session_state["_upload_applied"] = False; st.rerun()
                 if st.session_state.get("_post_apply_rerun"): st.session_state["_post_apply_rerun"] = False; st.rerun()
 
-                with st.expander("🔎 Review current data snapshot (what will be downloaded)", expanded=False): st.json(build_profile_payload())
+                with st.expander("🔎 Review current data snapshot (what will be downloaded)", expanded=False): st.json(build_profile_dict())
 
                 st.markdown("---"); st.subheader("Favourites")
                 fav_txt = st.text_area("Favourites (space or newline separated)", value=" ".join(st.session_state.get("favourites_list", [])), height=90, key="fav_bulk_editor", label_visibility="collapsed")
@@ -593,31 +593,6 @@ def render_splash():
                         st.caption(f"used in {component_usage_count(ch)} characters")
         st.markdown("</div>", unsafe_allow_html=True)
 
-def _render_phrase_html(c: str) -> str:
-    """Consolidated logic to render the phrase table HTML for any character."""
-    n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
-    n = n_map.get(st.session_state.display_mode, 2)
-    compounds = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
-    
-    if compounds and (db := get_db_connection()):
-        phrases = batch_get_phrase_details(sorted(compounds), db)
-        items_html_list = []
-        for word in sorted(compounds):
-            entry = phrases.get(word)
-            if entry:
-                p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
-                items_html_list.append(f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span></div>")
-        
-        return f"""
-        <div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>
-            <div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>
-                {st.session_state.display_mode} containing {c}
-            </div>
-            {''.join(items_html_list)}
-        </div>
-        """
-    return ""
-
 def render_radix_row(c, context="detail", is_static=False):
     col_char, col_details = st.columns([2, 10])
     is_preview = st.session_state.preview_comp == c
@@ -644,6 +619,32 @@ def render_radix_row(c, context="detail", is_static=False):
             if html := _render_phrase_html(c):
                 st.markdown(html, unsafe_allow_html=True)
     st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
+
+def _render_phrase_html(c: str) -> str:
+    """Consolidated logic to render the phrase table HTML for any character."""
+    n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
+    n = n_map.get(st.session_state.display_mode, 2)
+    compounds = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
+    
+    if compounds and (db := get_db_connection()):
+        phrases = batch_get_phrase_details(sorted(compounds), db)
+        items_html_list = []
+        for word in sorted(compounds):
+            entry = phrases.get(word)
+            if entry:
+                p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
+                items_html_list.append(f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span></div>")
+        
+        if items_html_list:
+            return f"""
+            <div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>
+                <div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>
+                    {st.session_state.display_mode} containing {c}
+                </div>
+                {''.join(items_html_list)}
+            </div>
+            """
+    return ""
 
 def main():
     if not component_map: st.error("Component dataset not loaded."); st.stop()
@@ -681,7 +682,6 @@ def main():
 
             if st.session_state.stroke_view_active:
                 st.markdown("### Character Info")
-                # Fix: Wrapped the card in a div with 'char-card' class for correct formatting
                 st.markdown(f"<div class='char-card'>{generate_clean_card_html(current_char_for_sidebar)}</div>", unsafe_allow_html=True)
 
         if not st.session_state.show_inputs:
@@ -720,7 +720,6 @@ def main():
     
     if st.session_state.stroke_view_active:
         st.markdown("### Stroke Order Animation")
-        # Fix: Using our unified phrase rendering function instead of relying on the possibly broken imported one
         main_html, _ = get_stroke_order_view_html(st.session_state.stroke_view_char, st.session_state.display_mode)
         st_html(main_html, height=450)
         
@@ -847,7 +846,7 @@ def main():
             if cc_t2s and cc_s2t:
                 s_cand = cc_t2s.convert(sel); t_cand = cc_s2t.convert(sel)
                 variant = s_cand if s_cand != sel else t_cand
-                if variant != selected and variant in component_map: focus_group.append(variant)
+                if variant != sel and variant in component_map: focus_group.append(variant)
             
             for f in apply_script_filter(focus_group, st.session_state.script_filter): render_radix_row(f)
 
