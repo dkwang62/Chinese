@@ -1,11 +1,6 @@
 # app.py
 # Main Streamlit app for Radix - with definition search and commonality ranking
 
-"""
-STATE MANAGEMENT ARCHITECTURE (The Three Traps Fixed)
-... (Comments preserved) ...
-"""
-
 import streamlit as st
 from streamlit.components.v1 import html as st_html
 import json
@@ -28,7 +23,6 @@ from radix_core import (
     apply_script_filter,
     normalize_single_hanzi,
     resolve_to_known_variant,
-    build_chatgpt_prompt,
     get_default_prompt_config,
     normalize_prompt_config,
     render_combined_prompt,
@@ -68,46 +62,11 @@ def import_profile_dict(data: dict) -> None:
     st.session_state.favourites_list = data.get("favourites_list", [])
     st.session_state.fav_cursor = 0
     st.session_state.prompt_config = data.get("prompt_config", {})
-    st.session_state.prompt_ui = data.get("prompt_ui", {})
+    st.session_state.prompt_ui = data.get("prompt_ui", {}) if isinstance(data.get("prompt_ui", {}), dict) else {}
 
 st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 
 # --- Dynamic CSS ---
-def normalize_prompt_state() -> None:
-    """Ensure prompt_config/tasks and prompt selection UI state are internally consistent."""
-    cfg = st.session_state.get("prompt_config") or {}
-    tasks = cfg.get("tasks", []) or []
-    
-    # Deduplicate and clean tasks
-    cleaned_tasks = []
-    seen_ids = set()
-    for t in tasks:
-        if isinstance(t, dict) and t.get("id"):
-            tid = t.get("id")
-            if tid not in seen_ids:
-                seen_ids.add(tid)
-                cleaned_tasks.append(t)
-    cfg["tasks"] = cleaned_tasks
-    st.session_state.prompt_config = cfg
-
-    all_task_ids = [t["id"] for t in cleaned_tasks]
-    pui = st.session_state.get("prompt_ui") or {}
-    
-    # Normalize defaults
-    default_ids = pui.get("default_selected_task_ids", [])
-    pui["default_selected_task_ids"] = [tid for tid in default_ids if tid in all_task_ids] or list(all_task_ids)
-    st.session_state.prompt_ui = pui
-
-    # Normalize current selection
-    cur_sel = st.session_state.get("prompt_selected_task_ids") or []
-    st.session_state.prompt_selected_task_ids = [tid for tid in cur_sel if tid in all_task_ids] or list(pui["default_selected_task_ids"])
-
-    # Sync checkboxes
-    for tid in all_task_ids:
-        checkbox_key = f"prompt_task_cb_{tid}"
-        if checkbox_key not in st.session_state:
-            st.session_state[checkbox_key] = (tid in st.session_state.prompt_selected_task_ids)
-
 def apply_dynamic_css():
     css = """
     <style>
@@ -124,50 +83,81 @@ def apply_dynamic_css():
         width: 100% !important; font-size: 2.2em !important; height: 85px !important;
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
         border: 2px solid #dee2e6 !important; border-radius: 14px !important;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.08) !important;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.08) !important; padding: 0 !important;
+        line-height: 85px !important; font-weight: 600 !important; transition: all 0.2s ease !important;
+    }
+    .comp-grid .stButton > button:hover {
+        background: linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%) !important;
+        border-color: #f2c6c6 !important; color: #c0392b !important;
+        transform: translateY(-3px) !important; box-shadow: 0 6px 16px rgba(192, 57, 43, 0.15) !important;
     }
     .char-btn-wrap .stButton > button {
         width: 100% !important; font-size: 3.8em !important; font-weight: 700 !important;
         background: linear-gradient(135deg, #ffffff 0%, #f0f4f8 100%) !important;
         border: 3px solid #dee2e6 !important; padding: 10px !important; min-height: 90px !important;
-        border-radius: 16px !important;
+        border-radius: 16px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        transition: all 0.25s ease !important;
+    }
+    .char-btn-wrap .stButton > button:hover {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        border-color: #3b82f6 !important; transform: scale(1.02) !important;
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.2) !important;
     }
     .pen-btn-wrap .stButton > button {
         width: 100% !important; font-size: 1.6em !important; border: 2px solid #dee2e6 !important;
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
-        margin-top: 8px !important; height: 45px !important; border-radius: 12px !important;
+        margin-top: 8px !important; height: 45px !important; line-height: 1 !important;
+        color: #555 !important; font-weight: 600 !important; border-radius: 12px !important;
+        transition: all 0.2s ease !important;
+    }
+    .pen-btn-wrap .stButton > button:hover {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        border-color: #64b5f6 !important; color: #1565c0 !important;
+        transform: translateY(-2px) !important; box-shadow: 0 4px 12px rgba(100, 181, 246, 0.2) !important;
     }
     .char-static-box {
         font-size: 3.8em; font-weight: 700; background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%);
         color: #bbb; border: 2px solid #e0e0e0; border-radius: 16px; padding: 10px;
-        min-height: 90px; display: flex; align-items: center; justify-content: center; width: 100%;
+        min-height: 90px; display: flex; align-items: center; justify-content: center;
+        width: 100%; cursor: default; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
     .status-line {
         font-size: 1.1em; font-weight: 600; color: #0f5132;
         background: linear-gradient(135deg, #d1e7dd 0%, #c3e6cb 100%);
-        border: 2px solid #95d5b2; padding: 18px; border-radius: 12px; margin: 20px 0 30px 0;
+        border: 2px solid #95d5b2; padding: 18px; border-radius: 12px;
+        margin: 20px 0 30px 0; box-shadow: 0 3px 10px rgba(15, 81, 50, 0.08);
     }
     .status-tag {
         background: linear-gradient(135deg, #ffffff 0%, #f1f3f5 100%);
         color: #2c3e50; padding: 6px 14px; border-radius: 8px; font-weight: 700;
         font-size: 0.9em; border: 2px solid #dee2e6; display: inline-flex; align-items: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
     }
     .lineage-header {
         font-size: 1.4em; font-weight: 800; color: #2c3e50; margin: 30px 0 20px 0;
         padding: 12px 20px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
         border-left: 5px solid #1976d2; border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(25, 118, 210, 0.1);
     }
     .compound-item {
         display: flex; align-items: baseline; margin-bottom: 10px; padding: 12px;
         border-bottom: 2px solid #e9ecef; border-radius: 8px; background: #ffffff;
+        transition: all 0.2s ease;
     }
+    .compound-item:hover { background: #f8f9fa; transform: translateX(4px); }
     .cp-word { font-weight: 700; font-size: 1.2em; color: #2c3e50; min-width: 85px; margin-right: 15px; }
     .cp-pinyin { color: #d35400; font-family: 'Monaco', 'Menlo', monospace; margin-right: 15px; font-weight: 600; font-size: 1.5em; }
     .cp-mean { color: #495057; font-size: 1em; flex: 1; line-height: 1.5; }
     .char-btn-hint { margin-top: 6px; text-align: center; font-size: 0.86em; color: #6c757d; font-weight: 700; }
     .char-btn-hint.previewing { color: #c0392b; }
-    .splash-card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 40px; padding: 60px; text-align: center; }
+    .status-line span { color: #0f5132; }
+    .splash-wrap { max-width: 850px; margin: 0 auto; padding: 60px 20px 20px 20px; }
+    .splash-card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 40px; padding: 60px; box-shadow: 0 15px 50px rgba(0,0,0,0.05); text-align: center; }
+    .splash-title { font-size: 3.0em; font-weight: 800; color: #1a1a1a; margin-bottom: 10px; }
+    .splash-sub { font-size: 1.3em; color: #666; }
+    .palace-entrance-container { text-align: center; margin: 60px 0; }
     .grand-torii { font-size: 250px !important; line-height: 1; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1)); }
+    .entrance-text { color: #2c3e50; font-size: 24px; font-weight: 700; margin-top: 20px; margin-bottom: 30px; letter-spacing: 2px; }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -190,13 +180,14 @@ def render_copy_to_clipboard(prompt_text: str, widget_id: str):
             if (!btn) return;
             async function copy() {{
               try {{ await navigator.clipboard.writeText(text); msg.textContent = "Copied. Paste into ChatGPT."; }} 
-              catch (e) {{ msg.textContent = "Copy failed."; }}
+              catch (e) {{ msg.textContent = "Copy failed. Please manually select and copy from the textbox above."; }}
               setTimeout(() => {{ msg.textContent = ""; }}, 2500);
             }}
             btn.addEventListener("click", copy);
           }})();
         </script>
-        """, height=90,
+        """,
+        height=90,
     )
 
 # --- Session State Defaults ---
@@ -245,7 +236,8 @@ if "server_data_loaded" not in st.session_state:
             if (isinstance(obj, dict) and obj.get("schema_version") == 1):
                 st.session_state.server_data = obj
                 st.session_state.server_data_available = True
-        except: pass
+        except FileNotFoundError: pass
+        except Exception as e: st.error(f"Error loading server radix_user_data.json: {e}")
 
 st.session_state.prompt_config = normalize_prompt_config(st.session_state.get("prompt_config"))
 if st.session_state.prompt_config is None:
@@ -253,6 +245,7 @@ if st.session_state.prompt_config is None:
 else:
     st.session_state.prompt_config = normalize_prompt_config(st.session_state.prompt_config)
 
+# Default selection: ALL tasks
 _task_ids = [t.get('id') for t in st.session_state.prompt_config.get('tasks', []) if t.get('id')]
 if not st.session_state.prompt_ui.get('default_selected_task_ids'):
     st.session_state.prompt_ui['default_selected_task_ids'] = _task_ids
@@ -260,11 +253,43 @@ if not st.session_state.prompt_selected_task_ids:
     st.session_state.prompt_selected_task_ids = list(st.session_state.prompt_ui.get('default_selected_task_ids', _task_ids))
 
 # --- Callbacks & Helpers ---
+
+def normalize_prompt_state() -> None:
+    """Ensure prompt_config/tasks and prompt selection UI state are internally consistent."""
+    cfg = st.session_state.get("prompt_config") or {}
+    tasks = cfg.get("tasks", []) or []
+    cleaned_tasks = []
+    seen_ids = set()
+    for t in tasks:
+        if isinstance(t, dict) and t.get("id"):
+            if t["id"] not in seen_ids:
+                seen_ids.add(t["id"])
+                cleaned_tasks.append(t)
+    cfg["tasks"] = cleaned_tasks
+    st.session_state.prompt_config = cfg
+    
+    all_task_ids = [t["id"] for t in cleaned_tasks]
+    pui = st.session_state.get("prompt_ui") or {}
+    default_ids = pui.get("default_selected_task_ids", [])
+    pui["default_selected_task_ids"] = [t for t in default_ids if t in all_task_ids] or list(all_task_ids)
+    st.session_state.prompt_ui = pui
+    
+    cur_sel = st.session_state.get("prompt_selected_task_ids") or []
+    st.session_state.prompt_selected_task_ids = [t for t in cur_sel if t in all_task_ids] or list(pui["default_selected_task_ids"])
+    
+    for tid in all_task_ids:
+        key = f"prompt_task_cb_{tid}"
+        if key not in st.session_state:
+            st.session_state[key] = (tid in st.session_state.prompt_selected_task_ids)
+
 def _clear_derived_widget_state():
     """Nuclear clear of ALL derived keys to prevent zombie state from old configs."""
-    keys_to_clear = [k for k in st.session_state.keys() if 
-                     k.startswith(("pt_title_", "pt_tpl_", "prompt_task_cb_", "fav_chk_", "fav_bulk")) or 
-                     k in ["prompt_selected_task_ids", "prompt_default_sel_editor"]]
+    keys_to_clear = []
+    for k in list(st.session_state.keys()):
+        if (k == "fav_bulk_editor" or k.startswith("pt_title_") or k.startswith("pt_tpl_") or 
+            k.startswith("prompt_task_cb_") or k == "prompt_selected_task_ids" or 
+            k == "prompt_default_sel_editor" or k.startswith("fav_chk_")):
+            keys_to_clear.append(k)
     for k in keys_to_clear:
         st.session_state.pop(k, None)
 
@@ -290,11 +315,11 @@ def _validate_and_search(raw: str, error_callback=None):
     """Refactored shared search logic."""
     v = normalize_single_hanzi(raw)
     if not v:
-        if error_callback: error_callback("Please enter exactly one character.")
+        if error_callback: error_callback("One character only")
         return
     resolved = resolve_to_known_variant(v)
     if not resolved:
-        if error_callback: error_callback("Character not found.")
+        if error_callback: error_callback("Not found")
         return
     _enter_character_view(resolved)
 
@@ -306,8 +331,11 @@ def sync_sidebar_text():
     _validate_and_search(st.session_state.get("sb_search", ""), st.toast)
 
 def sync_splash_text():
-    st.session_state.sb_search = st.session_state.get("splash_search", "")
-    st.session_state.onboarding_done = True
+    # Only sets onboarding_done if valid
+    raw = st.session_state.get("splash_search", "")
+    if normalize_single_hanzi(raw) and resolve_to_known_variant(normalize_single_hanzi(raw)):
+        st.session_state.onboarding_done = True
+    st.session_state.sb_search = raw
     sync_sidebar_text()
 
 def sync_stroke_range(): st.session_state.stroke_range = st.session_state.w_stroke_range; st.session_state.page = 1
@@ -316,36 +344,33 @@ def sync_idc(): st.session_state.component_idc = st.session_state.w_idc; st.sess
 def sync_script_filter(): st.session_state.script_filter = st.session_state.w_script_filter
 
 def tile_click(c):
-    if st.session_state.show_inputs and st.session_state.preview_comp == c:
-        _enter_character_view(c)
-    else:
-        st.session_state.preview_comp = c
+    if st.session_state.show_inputs and st.session_state.preview_comp == c: _enter_character_view(c)
+    else: st.session_state.preview_comp = c
 
 def list_tile_click(c):
     if st.session_state.preview_comp == c:
         if not st.session_state.get("has_drilled_down", False):
             st.toast("Feature Discovered: You have entered the Character Lineage view!", icon="🌳")
             st.session_state.has_drilled_down = True
-        if st.session_state.selected_comp:
-            st.session_state.history.append(st.session_state.selected_comp)
+        if st.session_state.selected_comp: st.session_state.history.append(st.session_state.selected_comp)
         st.session_state.selected_comp = c
         st.session_state.show_inputs = False
         st.session_state.preview_comp = None
-    else:
-        st.session_state.preview_comp = c
+    else: st.session_state.preview_comp = c
 
 def go_back():
     st.session_state.update({"preview_comp": None, "stroke_view_active": False, "stroke_view_char": "", 
                            "definition_search_mode": False, "definition_search_results": None, "text_input_warning": None})
     if st.session_state.history:
         prev = st.session_state.history.pop()
-        st.session_state.update({"selected_comp": prev, "last_valid_selected_comp": prev, "show_inputs": False})
-    else:
-        st.session_state.show_inputs = True
+        st.session_state.update({"selected_comp": prev, "last_valid_selected_comp": prev, "script_filter": "Any", "show_inputs": False})
+    else: st.session_state.show_inputs = True
 
 def go_to_root():
-    st.session_state.update({"history": [], "preview_comp": None, "stroke_view_active": False, "selected_comp": "",
-                           "show_inputs": True, "definition_search_mode": False, "definition_search_results": None})
+    st.session_state.update({"history": [], "preview_comp": None, "stroke_view_active": False, "stroke_view_char": "", 
+                           "text_input_comp": "", "text_input_warning": None, "selected_comp": "", "show_inputs": True, 
+                           "script_filter": "Any", "display_mode": "2-Characters", "definition_search_mode": False, 
+                           "definition_search_results": None})
 
 def end_stroke_view():
     st.session_state.stroke_view_active = False
@@ -354,14 +379,12 @@ def end_stroke_view():
 def toggle_favourite(char):
     if st.session_state.get(f"fav_chk_{char}", False):
         if char not in st.session_state.favourites_list:
-            if len(st.session_state.favourites_list) < 20:
-                st.session_state.favourites_list.append(char)
+            if len(st.session_state.favourites_list) < 20: st.session_state.favourites_list.append(char)
             else:
                 idx = st.session_state.fav_cursor
                 st.session_state.favourites_list[idx] = char
                 st.session_state.fav_cursor = (idx + 1) % 20
-    elif char in st.session_state.favourites_list:
-        st.session_state.favourites_list.remove(char)
+    elif char in st.session_state.favourites_list: st.session_state.favourites_list.remove(char)
 
 def _apply_uploaded_profile_bytes(file_bytes: bytes) -> None:
     try:
@@ -372,7 +395,7 @@ def _apply_uploaded_profile_bytes(file_bytes: bytes) -> None:
         st.session_state.pop("_upload_error", None)
         normalize_prompt_state()
     except Exception as e:
-        st.session_state["_upload_error"] = f"Invalid: {e}"
+        st.session_state["_upload_error"] = f"Invalid JSON: {e}"
         st.session_state["_upload_applied"] = False
 
 def search_by_definition():
@@ -380,9 +403,19 @@ def search_by_definition():
     if not query or len(query) < 2:
         st.toast("Please enter at least 2 characters to search.")
         return
-    char_results = [c for c, i in component_map.items() if query.lower() in i.get("meta", {}).get("definition", "").lower()]
+    
+    char_results = []
+    query_lower = query.lower()
+    for char, info in component_map.items():
+        definition = info.get("meta", {}).get("definition", "")
+        if isinstance(definition, str) and query_lower in definition.lower():
+            char_results.append(char)
+    
     db_conn = get_db_connection()
-    phrase_results = search_phrases_by_definition(query, db_conn, limit=200) if db_conn else []
+    phrase_results = []
+    if db_conn:
+        phrase_results = search_phrases_by_definition(query, db_conn, limit=200)
+    
     st.session_state.update({"definition_search_mode": True, "definition_search_query": query, 
                            "definition_search_results": {"characters": char_results[:120], "phrases": phrase_results[:200]},
                            "show_inputs": False, "selected_comp": "", "preview_comp": None})
@@ -401,10 +434,10 @@ def render_definition_search_ui(key_prefix: str):
 
 def render_startup_file_choice():
     st.markdown("""<div class="splash-wrap"><div class="splash-card"><div class="splash-title">Radix 🈑 - Data Setup</div>
-                   <div class="splash-sub" style="margin-top: 20px;">Do you have a local Radix user data file?</div></div></div>""", unsafe_allow_html=True)
+                   <div class="splash-sub" style="margin-top: 20px;">Do you have a local Radix user data file you'd like to use?</div></div></div>""", unsafe_allow_html=True)
     st.markdown("<div style='max-width: 600px; margin: 40px auto;'>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    if c1.button("📱 Yes, upload local file", use_container_width=True, type="primary"):
+    if c1.button("📱 Yes, upload my local file", use_container_width=True, type="primary"):
         st.session_state.startup_choice = "upload"; st.rerun()
     if c2.button("☁️ No, use server defaults", use_container_width=True):
         st.session_state.startup_choice = "server"
@@ -415,207 +448,402 @@ def render_startup_file_choice():
     st.markdown("</div>", unsafe_allow_html=True)
     
     if st.session_state.get("startup_choice") == "upload":
-        st.markdown("<div style='max-width: 600px; margin: 40px auto;'><h3>📤 Upload</h3>", unsafe_allow_html=True)
-        if f := st.file_uploader("Choose file", type=["json"], key="startup_uploader"):
+        st.markdown("<div style='max-width: 600px; margin: 40px auto;'><h3>📤 Upload Your Local File</h3>", unsafe_allow_html=True)
+        if f := st.file_uploader("Choose your radix_user_data.json file", type=["json"], key="startup_uploader"):
             _apply_uploaded_profile_bytes(f.getvalue())
             if st.session_state.get("_upload_applied"):
-                 st.success("✅ Loaded!"); 
-                 if st.button("Continue"): st.session_state.startup_file_choice_made = True; st.rerun()
+                 st.success("✅ File loaded successfully!"); 
+                 if st.button("Continue to Radix", type="primary", use_container_width=True):
+                    st.session_state.startup_file_choice_made = True; st.rerun()
             elif st.session_state.get("_upload_error"): st.error(st.session_state["_upload_error"])
+            elif st.button("← Back to choice", use_container_width=True): st.session_state.startup_choice = None; st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_splash():
-    st.markdown("""<div class="palace-entrance-container"><div class="grand-torii">⛩️</div>
-        <div class="entrance-text">Grand Hall of Radix 🈑 Components</div></div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="splash-wrap"><div class="splash-card"><div class="splash-title">Radix 🈑 Components</div></div></div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="palace-entrance-container"><div class="grand-torii">⛩️</div><div class="entrance-text">Grand Hall of Radix 🈑 Components</div></div>""", unsafe_allow_html=True)
     _, c, _ = st.columns([1,1,1])
-    if c.button("🚪 Enter", key="entrance_btn", use_container_width=True, type="primary"):
-        st.session_state.onboarding_done = True; st.rerun()
+    if c.button("🚪 Enter", key="entrance_btn", use_container_width=True, type="primary"): st.session_state.onboarding_done = True; st.rerun()
 
     st.markdown("<div style='max-width: 600px; margin: 40px auto;'>", unsafe_allow_html=True)
     with st.expander("🔍 Search", expanded=False):
-        st.text_input("Char Search", key="splash_search", on_change=sync_splash_text, placeholder="e.g., 水")
+        st.markdown("**Character Search**")
+        st.text_input("Paste or type a character to explore", key="splash_search", on_change=sync_splash_text, placeholder="e.g., 水", label_visibility="collapsed")
+        st.caption("Enter one Chinese character to jump directly to its details")
         st.markdown("---")
         render_definition_search_ui("splash")
     st.markdown("</div>", unsafe_allow_html=True)
 
     if demos := st.session_state.favourites_list:
-        st.markdown("<h4 style='text-align:center; color:#666;'>Favourites</h4>", unsafe_allow_html=True)
-        # ... (Data Management Logic Preserved) ...
-        # (This block is identical to original, just ensuring imports are correct)
+        st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
         lc1, lc2, lc3 = st.columns([1, 2, 1])
         with lc2:
-            with st.expander("📂 User Data (Save/Load)", expanded=False):
+            with st.expander("📂 User Data (Save/Load/Review & Edit)", expanded=False):
+                st.caption("Single JSON file for **Favourites** + **AI Prompt Tasks (Tasks)**. Upload applies immediately in-app; download is your backup/export.")
+                if st.session_state.get("_manual_config_active"): st.info("🔒 Using uploaded configuration (overrides server defaults)")
+                elif st.session_state.get("server_data_available"): st.info("☁️ Using server default configuration")
+                else: st.info("🆕 Using app default configuration")
+
                 c_dl, c_ul = st.columns(2)
-                with c_dl: st.markdown(render_ipad_safe_download_html(export_profile_str(), PROFILE_FILENAME, "💾 Download"), unsafe_allow_html=True)
+                with c_dl: st.markdown(render_ipad_safe_download_html(export_profile_str(), PROFILE_FILENAME, "💾 Download user data"), unsafe_allow_html=True)
                 with c_ul: 
-                    if uf := st.file_uploader("Upload", type=["json"], key="profile_uploader_persistent", label_visibility="collapsed"):
-                        if hashlib.sha256(uf.getvalue()).hexdigest() != st.session_state.get('_last_upload_hash', ''):
-                            st.warning("New file detected"); 
-                            if st.button("✅ Apply"): st.session_state["_last_upload_hash"] = hashlib.sha256(uf.getvalue()).hexdigest(); _apply_uploaded_profile_bytes(uf.getvalue()); st.rerun()
-                        else: st.success("Active")
+                    if uf := st.file_uploader("Upload user data (JSON)", type=["json"], key="profile_uploader_persistent", label_visibility="collapsed"):
+                        hash_val = hashlib.sha256(uf.getvalue()).hexdigest()
+                        if hash_val != st.session_state.get('_last_upload_hash', ''):
+                            st.warning("⚠️ New file detected - click Apply to use it")
+                            if st.button("✅ Apply uploaded file now", use_container_width=True, type="primary", key="apply_upload_btn"):
+                                st.session_state["_last_upload_hash"] = hash_val; _apply_uploaded_profile_bytes(uf.getvalue()); st.rerun()
+                        else: st.success("✓ Current file is active")
+                        if st.button("♻️ Upload different file", use_container_width=True, key="reset_uploader_btn"):
+                            st.session_state.pop("_last_upload_hash", None); st.session_state.pop("_upload_error", None)
+                            st.session_state.pop("_upload_applied", None); st.session_state.pop("profile_uploader_persistent", None); st.rerun()
                 
+                if st.session_state.get("_upload_error"): st.error(st.session_state["_upload_error"])
+                elif st.session_state.get("_upload_applied"):
+                    st.success("✅ Upload applied successfully! Download to save changes.")
+                    if st.button("Dismiss", key="dismiss_success"): st.session_state["_upload_applied"] = False; st.rerun()
+                if st.session_state.get("_post_apply_rerun"): st.session_state["_post_apply_rerun"] = False; st.rerun()
+
+                with st.expander("🔎 Review current data snapshot (what will be downloaded)", expanded=False): st.json(build_profile_dict())
+
                 st.markdown("---"); st.subheader("Favourites")
-                fav_txt = st.text_area("Favourites", value=" ".join(st.session_state.favourites_list), height=90, key="fav_bulk_editor")
-                if st.button("Apply Favourites"): st.session_state.favourites_list = list(dict.fromkeys(re.split(r"\s+", fav_txt.strip()))); st.rerun()
+                fav_txt = st.text_area("Favourites (space or newline separated)", value=" ".join(st.session_state.get("favourites_list", [])), height=90, key="fav_bulk_editor", label_visibility="collapsed")
+                c1, c2, c3 = st.columns([1, 1, 2])
+                with c1:
+                    if st.button("Apply favourites", use_container_width=True, key="fav_apply"):
+                        tokens = [t for t in re.split(r"\s+", (fav_txt or "").strip()) if t]
+                        cleaned = []
+                        seen = set()
+                        for c in [t for t in tokens if len(t)==1]:
+                            if c not in seen: cleaned.append(c); seen.add(c)
+                        st.session_state.favourites_list = cleaned; st.session_state.fav_cursor = 0
+                        st.toast("Favourites updated.", icon="✅"); st.rerun()
+                with c2: 
+                    if st.button("Clear favourites", use_container_width=True, key="fav_clear"): st.session_state.favourites_list = []; st.session_state.fav_cursor = 0; st.toast("Cleared favourites.", icon="✅"); st.rerun()
+                with c3:
+                    add_char = st.text_input("Add a character", value="", key="fav_add_one", placeholder="e.g., 我", label_visibility="collapsed")
+                    if st.button("Add", use_container_width=True, key="fav_add_btn"):
+                        c = (add_char or "").strip()
+                        if len(c) != 1: st.toast("Please enter exactly 1 character.", icon="⚠️")
+                        else:
+                            if c not in st.session_state.favourites_list: st.session_state.favourites_list.append(c); st.toast("Added.", icon="✅"); st.rerun()
+
+                favs = st.session_state.get("favourites_list", [])
+                if favs:
+                    st.markdown("**Current favourites**")
+                    for i, c in enumerate(favs):
+                        cc1, cc2 = st.columns([6, 1])
+                        with cc1: st.write(c)
+                        with cc2:
+                            if st.button("✕", key=f"fav_rm_{i}", help="Remove"): st.session_state.favourites_list.pop(i); st.toast("Removed.", icon="✅"); st.rerun()
+
+                st.markdown("---"); st.subheader("AI Prompt Tasks (Task 1–10)")
+                normalize_prompt_state()
+                cfg = st.session_state.get("prompt_config") or {}
+                tasks = cfg.get("tasks", []) or []
+                all_task_ids = [t.get("id") for t in tasks if t.get("id")]
                 
-                st.markdown("---"); st.subheader("AI Tasks")
-                # (Prompt editor logic preserved)
+                default_sel = st.multiselect("Default selected tasks", options=all_task_ids, default=list(st.session_state.prompt_ui.get("default_selected_task_ids", all_task_ids)), key="prompt_default_sel_editor")
+                if st.button("Save default selection", key="save_default_task_sel"):
+                    st.session_state.prompt_ui["default_selected_task_ids"] = list(default_sel)
+                    normalize_prompt_state(); st.toast("Default task selection updated.", icon="✅"); st.rerun()
+
+                st.caption("Edit titles/templates below. Changes persist in-session and will be included in the next download.")
+                edited_tasks = []
+                for idx, t in enumerate(tasks):
+                    tid = t.get("id")
+                    if not tid: continue
+                    with st.expander(f"✏️ {t.get('title','(untitled)')}  —  {tid}", expanded=False):
+                        title = st.text_input("Title", value=t.get("title", ""), key=f"pt_title_{tid}")
+                        template = st.text_area("Template", value=t.get("template", ""), height=160, key=f"pt_tpl_{tid}")
+                        cA, cB = st.columns([1, 3])
+                        with cA:
+                            if st.button("Delete task", key=f"pt_del_{tid}"):
+                                st.session_state.prompt_config["tasks"] = [tt for tt in tasks if tt.get("id") != tid]
+                                st.session_state.pop(f"pt_title_{tid}", None); st.session_state.pop(f"pt_tpl_{tid}", None); st.session_state.pop(f"prompt_task_cb_{tid}", None)
+                                normalize_prompt_state(); st.toast("Task deleted.", icon="✅"); st.rerun()
+                        with cB: st.caption("Tip: Keep the template as plain instructions. The character and definition are inserted separately.")
+                    edited_tasks.append({"id": tid, "title": title, "template": template})
                 
+                c_add, c_apply = st.columns([1, 1])
+                with c_add:
+                    if st.button("Add new task", key="pt_add_new_home", use_container_width=True):
+                        new_id = f"task_{uuid.uuid4().hex[:8]}"
+                        tasks.append({"id": new_id, "title": "New task", "template": "Write your task instructions here.\n"})
+                        st.session_state.prompt_config["tasks"] = tasks
+                        normalize_prompt_state(); st.toast("Task added. Edit it below.", icon="✅")
+                with c_apply:
+                    if st.button("Apply task edits", key="pt_apply_home", use_container_width=True):
+                        st.session_state.prompt_config["tasks"] = edited_tasks; normalize_prompt_state(); st.toast("Tasks updated.", icon="✅"); st.rerun()
+
         st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
-        cols = st.columns(5)
-        for i, ch in enumerate(list(dict.fromkeys(demos))):
-             with cols[i % 5]:
-                if st.button(f"Explore {ch}", key=f"sp_{i}", use_container_width=True, type="primary"):
-                    st.session_state.onboarding_done = True; _enter_character_view(ch); st.rerun()
+        unique_demos = []
+        seen = set()
+        for d in demos:
+            if d not in seen: unique_demos.append(d); seen.add(d)
+        
+        COLS = 5
+        for r in range((len(unique_demos) + COLS - 1) // COLS):
+            cols = st.columns(COLS)
+            for j in range(COLS):
+                idx = r * COLS + j
+                if idx < len(unique_demos):
+                    ch = unique_demos[idx]
+                    with cols[j]:
+                        if st.button(f"Explore {ch}", key=f"v4_splash_btn_{idx}_{ord(ch)}", use_container_width=True, type="primary"):
+                            st.session_state.onboarding_done = True; _enter_character_view(ch); st.rerun()
+                        st.caption(f"used in {component_usage_count(ch)} characters")
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_radix_row(c, context="detail", is_static=False):
     col_char, col_details = st.columns([2, 10])
     is_preview = st.session_state.preview_comp == c
-    
+    is_active_focus = is_preview or (st.session_state.preview_comp is None and c == st.session_state.selected_comp)
+
     with col_char:
         if is_static: st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
         else:
-            uid = str(uuid.uuid4())[:8]
             st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
-            st.button(c, key=f"btn_{context}_{c}_{uid}", type="primary" if is_preview else "secondary", on_click=list_tile_click, args=(c,), use_container_width=True)
+            uid = str(uuid.uuid4())[:8]
+            st.button(c, key=f"explore_char_{context}_{c}_{ord(c)}_{uid}", type="primary" if is_preview else "secondary",
+                      help="Previewing..." if is_preview else "Click to preview", on_click=list_tile_click, args=(c,), use_container_width=True)
             st.markdown(f"<div class='char-btn-hint {'previewing' if is_preview else ''}'>{'Click again to drill down' if is_preview else 'Click once to preview'}</div>", unsafe_allow_html=True)
             st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-            if st.button("🧠 link", key=f"sk_{c}_{uid}", use_container_width=True):
-                st.session_state.update({"stroke_view_char": c, "stroke_view_active": True, "show_inputs": False, "selected_comp": c}); st.rerun()
+            def activate_stroke_view(char):
+                st.session_state.stroke_view_char = char; st.session_state.stroke_view_active = True; st.session_state.show_inputs = False
+                if not st.session_state.selected_comp: st.session_state.selected_comp = char; st.session_state.last_valid_selected_comp = char
+            if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}_{uid}", help="Write AI prompt", use_container_width=True, on_click=activate_stroke_view, args=(c,)): pass
             st.markdown("</div></div>", unsafe_allow_html=True)
-    
+        
     with col_details:
         st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c), is_static=is_static), unsafe_allow_html=True)
-        if not is_static and (is_preview or (not st.session_state.preview_comp and c == st.session_state.selected_comp)) and st.session_state.display_mode != "Single Character":
+        if not is_static and is_active_focus and st.session_state.display_mode != "Single Character":
             n = {"2-Characters": 2, "3-Characters": 3, "4-Characters": 4}.get(st.session_state.display_mode, 0)
-            relevant = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
+            meta_compounds = component_map.get(c, {}).get("meta", {}).get("compounds", [])
+            relevant = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
             if relevant and (db := get_db_connection()):
                 phrases_map = batch_get_phrase_details(sorted(relevant), db)
-                items = []
-                for w in sorted(relevant):
-                    if p := phrases_map.get(w):
-                        items.append(f"<div style='display:flex; padding:5px 8px; border-bottom:1px solid #eee;'>"
-                                     f"<span style='font-weight:700; min-width:65px;'>{w}</span>"
-                                     f"<span style='color:#d35400; font-family:monospace; margin-right:12px;'>{p.get('pinyin')}</span>"
-                                     f"<span style='color:#444;'>{pyhtml.escape(p.get('meanings','')[:100])}</span></div>")
-                st.markdown(f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px;'>{''.join(items)}</div>", unsafe_allow_html=True)
+                items_html_list = []
+                for word in sorted(relevant):
+                    entry = phrases_map.get(word)
+                    if entry:
+                        p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
+                        items_html_list.append(f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span></div>")
+                st.markdown(f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{st.session_state.display_mode} containing {c}</div>{''.join(items_html_list)}</div>", unsafe_allow_html=True)
     st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
 def main():
-    if not component_map: st.error("Dataset missing."); st.stop()
+    if not component_map: st.error("Component dataset not loaded."); st.stop()
     apply_dynamic_css()
     if st.session_state.get("_post_apply_rerun"): st.session_state["_post_apply_rerun"] = False
-    
-    if not st.session_state.startup_file_choice_made: render_startup_file_choice(); st.stop()
-    if not st.session_state.onboarding_done: render_splash(); st.stop()
+
+    if not st.session_state.get("startup_file_choice_made", False): render_startup_file_choice(); st.stop()
+    if not st.session_state.get("onboarding_done", False): render_splash(); st.stop()
 
     with st.sidebar:
-        curr = st.session_state.stroke_view_char if st.session_state.stroke_view_active else st.session_state.selected_comp
-        if curr:
-            hist = " → ".join(["🏠 Root"] + st.session_state.get("history", []) + [f"<b>{curr}</b>"])
-            st.markdown(f"<div style='padding:10px; background:#667eea; color:white; border-radius:8px; text-align:center;'>{hist}</div>", unsafe_allow_html=True)
+        current_main_char = st.session_state.stroke_view_char if st.session_state.stroke_view_active else st.session_state.selected_comp
+        if current_main_char:
+            path_items = ["🏠 Root"] + st.session_state.history + ([f"<i>{current_main_char}</i> (🧠)"] if st.session_state.stroke_view_active else [f"<b>{current_main_char}</b>"])
+            st.markdown(f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>{' → '.join(path_items)}</div>", unsafe_allow_html=True)
         
         if not st.session_state.show_inputs:
-            c1, c2 = st.columns(2)
-            if c1.button("← Back", use_container_width=True):
-                if st.session_state.stroke_view_active: end_stroke_view()
-                else: go_back()
-                st.rerun()
-            if c2.button("🏠 Root", use_container_width=True): go_to_root(); st.rerun()
+            nav_col1, nav_col2 = st.columns(2)
+            with nav_col1:
+                if st.session_state.stroke_view_active: st.button("← Back", on_click=end_stroke_view, use_container_width=True, type="primary")
+                else: st.button("← Back", on_click=go_back, use_container_width=True, type="primary")
+            with nav_col2: st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
             st.markdown("---")
-        
-        target = st.session_state.stroke_view_char if st.session_state.stroke_view_active else (st.session_state.preview_comp or st.session_state.selected_comp)
-        if target:
-            h, ht = get_stroke_order_sidebar_html(target, size=140)
-            if h: st_html(h, height=ht)
-            st.checkbox("Favourite", key=f"fav_chk_{target}", value=target in st.session_state.favourites_list, on_change=toggle_favourite, args=(target,))
+
+        current_char_for_sidebar = st.session_state.stroke_view_char if st.session_state.stroke_view_active else (st.session_state.preview_comp or st.session_state.selected_comp)
+        if current_char_for_sidebar:
+            sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
+            if sidebar_html: st_html(sidebar_html, height=sidebar_height)
+            
+            related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
+            chars_filtered = apply_script_filter([c for c in related if c in component_map], st.session_state.script_filter)
+            if len(chars_filtered) > 0: st.markdown(f"<div style='font-size:0.75em; line-height:1.1; margin:0.15rem 0 0.35rem 0; opacity:0.8;'>{len(chars_filtered)} characters contain <span class='char'>{current_char_for_sidebar}</span></div>", unsafe_allow_html=True)
+            
+            st.checkbox("Show in Favourites", value=(current_char_for_sidebar in st.session_state.favourites_list), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
+            if st.button("Show Favourites", use_container_width=True): go_to_root(); st.session_state.onboarding_done = False; st.rerun()
+
             if st.session_state.stroke_view_active:
                 st.markdown("### Character Info")
-                st.markdown(generate_clean_card_html(target), unsafe_allow_html=True)
+                st.markdown(f"<div style='font-size:2em; font-weight:600; text-align:center; margin:6px 0 10px;'>{current_char_for_sidebar}</div>", unsafe_allow_html=True)
+                st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
+
+        if not st.session_state.show_inputs:
+            with st.expander("Display Phrases", expanded=False):
+                modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
+                idx = modes.index(st.session_state.display_mode) if st.session_state.display_mode in modes else 1
+                if (nm := st.radio("Select mode", options=modes, index=idx, key="sidebar_display_mode", label_visibility="collapsed")) != st.session_state.display_mode:
+                    st.session_state.display_mode = nm; st.rerun()
 
         with st.expander("🔍 Search", expanded=False):
-            st.text_input("Char Search", key="sb_search", on_change=sync_sidebar_text)
+            st.markdown("**Character Search**")
+            st.text_input("Paste or type a character", key="sb_search", on_change=sync_sidebar_text, placeholder="e.g., 水", label_visibility="collapsed")
             st.markdown("---")
             render_definition_search_ui("sb")
-        
-        if not st.session_state.stroke_view_active:
-             with st.expander("🔎 Filters", expanded=False):
-                if not st.session_state.show_inputs:
-                    st.radio("Filter", SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(st.session_state.get("script_filter", "Any")), key="w_script_filter", on_change=sync_script_filter)
-                else:
-                    st.slider("Strokes", 1, 30, key="w_stroke_range", value=st.session_state.stroke_range, on_change=sync_stroke_range)
-                    # (Radical/IDC Selectors omitted for brevity but logic is preserved)
 
+        if not st.session_state.stroke_view_active:
+            with st.expander("🔎 Filters", expanded=False):
+                if not st.session_state.show_inputs:
+                    st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(st.session_state.get("script_filter", "Any")), key="w_script_filter", on_change=sync_script_filter)
+                if st.session_state.show_inputs:
+                    st.slider("Stroke count", 1, 30, value=st.session_state.stroke_range, key="w_stroke_range", on_change=sync_stroke_range)
+                    rads = sorted(list(set(i.get("meta", {}).get("radical") for i in component_map.values() if i.get("meta", {}).get("radical"))))
+                    st.selectbox("Radical", options=["none"] + rads, index=(["none"] + rads).index(st.session_state.radical) if st.session_state.radical in rads else 0, key="w_radical", on_change=sync_radical)
+                    idcs = sorted(stats_cache.get("idc_counts", {}).keys())
+                    st.selectbox("Structure (IDC)", options=["none"] + idcs, index=(["none"] + idcs).index(st.session_state.component_idc) if st.session_state.component_idc in idcs else 0, key="w_idc", on_change=sync_idc)
+                    
+                    st.markdown("### Sort Grid By")
+                    def update_grid_sort_mode():
+                        st.session_state.grid_sort_mode = "usage" if st.session_state.grid_sort_mode_radio == "Component frequency" else "frequency"
+                        st.session_state.page = 1
+                    st.radio("Sort key", options=["Component frequency", "Character frequency"], index=0 if st.session_state.get("grid_sort_mode", "usage") == "usage" else 1, key="grid_sort_mode_radio", on_change=update_grid_sort_mode, help="Component frequency: how often this component appears inside other characters.\nCharacter frequency: how often this character appears in common use.")
+                    
+                    if st.session_state.grid_sort_mode == "frequency":
+                        st.markdown("#### Script Preference")
+                        st.radio("Show characters in:", options=["Simplified", "Traditional", "Any"], index=["Simplified", "Traditional", "Any"].index(st.session_state.grid_script_filter), key="grid_script_radio", on_change=lambda: st.session_state.update({"grid_script_filter": st.session_state.grid_script_radio, "page": 1}), horizontal=True)
+    
     if st.session_state.stroke_view_active:
-        char = st.session_state.stroke_view_char
-        # ORIGINAL LOGIC RESTORED: Use the provided HTML for both stroke and phrases
-        main_html, phrases_html = get_stroke_order_view_html(char, st.session_state.display_mode)
+        st.markdown("### Stroke Order Animation")
+        main_html, phrases_html = get_stroke_order_view_html(st.session_state.stroke_view_char, st.session_state.display_mode)
         st_html(main_html, height=450)
         if phrases_html: st.markdown(phrases_html, unsafe_allow_html=True)
 
+        char = (st.session_state.stroke_view_char or "").strip()
+        if not char: st.info("Select a character to generate the ChatGPT prompt."); st.stop()
+
         st.markdown("### ChatGPT Prompt")
         normalize_prompt_state()
-        # (Prompt Rendering Logic Preserved)
-        prompt = render_combined_prompt(char, st.session_state.prompt_config, st.session_state.prompt_selected_task_ids, get_char_definition_en(char))
-        st.text_area("Prompt", value=prompt, height=300)
-        render_copy_to_clipboard(prompt, str(hash(char)))
+        cfg = st.session_state.prompt_config
+        tasks = cfg.get("tasks", []) or []
+        all_task_ids = [t.get("id") for t in tasks if t.get("id")]
+        cur_sel = [tid for tid in (st.session_state.prompt_selected_task_ids or []) if tid in all_task_ids]
+        if not cur_sel: cur_sel = list(st.session_state.prompt_ui.get("default_selected_task_ids", all_task_ids)) or list(all_task_ids)
+        st.session_state.prompt_selected_task_ids = cur_sel
+
+        with st.expander("Prompt tasks (choose what to include)", expanded=True):
+            if st.button("Select all tasks", key="select_all_prompt_tasks"):
+                st.session_state.prompt_selected_task_ids = list(all_task_ids)
+                for tid in all_task_ids: st.session_state[f"prompt_task_cb_{tid}"] = True
+                st.rerun()
+            sel = []
+            for t in tasks:
+                tid = t.get("id", "")
+                if tid and st.checkbox(t.get("title", tid), key=f"prompt_task_cb_{tid}"): sel.append(tid)
+            st.session_state.prompt_selected_task_ids = sel
+
+        prompt_text = render_combined_prompt(char=char, prompt_config=st.session_state.prompt_config, selected_task_ids=st.session_state.prompt_selected_task_ids, definition_en=get_char_definition_en(char))
+        st.text_area("Copy this prompt into ChatGPT", value=prompt_text, height=320)
+        render_copy_to_clipboard(prompt_text, str(hash(st.session_state.stroke_view_char)))
         st.stop()
 
     if st.session_state.show_inputs:
-        min_s, max_s = st.session_state.get("w_stroke_range", (3, 8))
-        # (Filter Logic Preserved)
-        filtered = [c for c in component_map if min_s <= get_stroke_count(c) <= max_s and c in stats_cache["used_components"]]
+        cur_min, cur_max = st.session_state.stroke_range
+        filter_parts = [f"<span class='status-tag'>Sort: {'Component' if st.session_state.grid_sort_mode == 'usage' else 'Character'} frequency</span>"]
+        max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
+        if not (cur_min == 1 and cur_max == max_s_val):
+            filter_parts.append(f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>")
+        if st.session_state.radical != "none": filter_parts.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
+        if st.session_state.component_idc != "none": filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
+        if st.session_state.grid_sort_mode == "usage": filter_parts.append("<span class='status-tag'>View: Components only</span>")
+        if st.session_state.grid_sort_mode == "frequency": filter_parts.append(f"<span class='status-tag'>Script: {st.session_state.grid_script_filter}</span>")
         
-        st.markdown(f"<div class='status-line'>Found {len(filtered)} characters</div>", unsafe_allow_html=True)
-        page_size = 120
-        curr_page = st.session_state.page = max(1, min(st.session_state.page, max(1, math.ceil(len(filtered) / page_size))))
+        st.markdown(f"<div class='status-line' style='display: flex; flex-direction: column; gap: 8px;'><div style='display: flex; justify-content: space-between; align-items: center;'><div style='display: flex; flex-wrap: wrap; gap: 8px;'><span style='font-weight: 800; margin-right: 5px;'>🔍 Filters:</span> {''.join(filter_parts) if filter_parts else '<span class=\"status-tag\">All characters</span>'}</div><div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>Click once to preview in the sidebar; click the same button again to drill down. </div></div></div>", unsafe_allow_html=True)
+
+        filtered = [c for c in component_map if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max and (st.session_state.radical == "none" or component_map[c]["meta"].get("radical") == st.session_state.radical) and (st.session_state.component_idc == "none" or component_map[c]["meta"].get("decomposition", "").startswith(st.session_state.component_idc)) and (st.session_state.grid_sort_mode != "usage" or c in stats_cache["used_components"])]
+        if st.session_state.grid_sort_mode == "frequency": filtered = apply_script_filter(filtered, st.session_state.grid_script_filter)
         
-        c1, c2, c3 = st.columns([1,3,1])
-        if c1.button("◀") and curr_page > 1: st.session_state.page -= 1; st.rerun()
-        c2.markdown(f"<div style='text-align:center'>{curr_page}</div>", unsafe_allow_html=True)
-        if c3.button("▶") and curr_page < math.ceil(len(filtered)/page_size): st.session_state.page += 1; st.rerun()
+        sorted_comps = sorted(filtered, key=sort_key_frequency_primary if st.session_state.grid_sort_mode == "frequency" else sort_key_usage_primary)
 
-        st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
-        cols = st.columns(10)
-        for i, ch in enumerate(filtered[(curr_page-1)*page_size : curr_page*page_size]):
-            with cols[i%10]:
-                is_prev = st.session_state.preview_comp == ch
-                st.button(ch, key=f"g_{ch}_{curr_page}", type="primary" if is_prev else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        if not sorted_comps: st.info("No components match current filters.")
+        else:
+            PAGE_SIZE = 120
+            total = len(sorted_comps)
+            max_page = max(1, math.ceil(total / PAGE_SIZE))
+            st.session_state.page = max(1, min(st.session_state.page, max_page))
+            p1, p2, p3 = st.columns([1, 3, 1])
+            with p1:
+                if st.button("◀ Prev", disabled=st.session_state.page <= 1, use_container_width=True): st.session_state.page -= 1; st.rerun()
+            with p2: st.markdown(f"<div style='text-align:center; padding:10px 0; color:#555;'><div style='font-size:1.1em; font-weight:bold;'>{(st.session_state.page - 1) * PAGE_SIZE + 1}–{min(st.session_state.page * PAGE_SIZE, total)} of {total}</div></div>", unsafe_allow_html=True)
+            with p3:
+                if st.button("Next ▶", disabled=st.session_state.page >= max_page, use_container_width=True): st.session_state.page += 1; st.rerun()
 
-        with st.expander("Search", expanded=False):
-            st.text_input("Char Search", key="w_text", on_change=sync_text)
-            render_definition_search_ui("w")
+            st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+            cols = st.columns(10)
+            for i, ch in enumerate(sorted_comps[(st.session_state.page - 1) * PAGE_SIZE : st.session_state.page * PAGE_SIZE]):
+                with cols[i % 10]:
+                    st.button(ch, key=f"b_{ch}_{st.session_state.page}", type="primary" if st.session_state.preview_comp == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    elif st.session_state.definition_search_mode:
-        res = st.session_state.definition_search_results
-        st.markdown(f"<div class='status-line'>Found {len(res['characters'])} chars, {len(res['phrases'])} phrases</div>", unsafe_allow_html=True)
-        for c in res['characters'][:30]: render_radix_row(c)
-        for p in res['phrases']: st.markdown(f"<div>{p['word']} {p['pinyin']}</div>", unsafe_allow_html=True)
+            with st.expander("🔍 Search", expanded=False):
+                st.markdown("**Character Search**")
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    if st.session_state.text_input_warning: st.warning(st.session_state.text_input_warning)
+                    st.text_input("Go to component/character", value=st.session_state.text_input_comp, key="w_text", on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
+                    st.caption("Enter one Chinese character to jump directly to its details")
+                st.markdown("---")
+                col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
+                with col_s2: render_definition_search_ui("w")
 
     else:
-        # Lineage View
-        sel = st.session_state.selected_comp
-        info = component_map.get(sel, {})
-        st.markdown(f"<div class='status-line'><b>{sel}</b></div>", unsafe_allow_html=True)
-        
-        decomp = [p for p in info.get("meta", {}).get("decomposition", "") if p in component_map and p not in IDC_CHARS and p != sel]
-        if decomp:
-            st.markdown("<div class='lineage-header'>🧱 Components</div>", unsafe_allow_html=True)
-            for p in apply_script_filter(decomp, st.session_state.script_filter): render_radix_row(p)
+        if st.session_state.definition_search_mode and st.session_state.definition_search_results:
+            results = st.session_state.definition_search_results
+            st.markdown(f"<div class='status-line'><div style='font-size:1.2em; font-weight:700;'>Search Results for \"{pyhtml.escape(st.session_state.definition_search_query)}\"</div><div class='status-text' style='font-size:0.85em; color:#666; margin-top:8px;'>Found {len(results['characters'])} characters and {len(results['phrases'])} phrases</div></div>", unsafe_allow_html=True)
+            if results['characters']:
+                st.markdown("<div class='lineage-header'>📖 Characters</div>", unsafe_allow_html=True)
+                for char in results['characters'][:30]: render_radix_row(char)
+            if results['phrases']:
+                st.markdown("<div class='lineage-header'>💬 Phrases</div>", unsafe_allow_html=True)
+                st.markdown("<div style='max-width:900px; margin:0 auto;'>", unsafe_allow_html=True)
+                for phrase_data in results['phrases']:
+                    st.markdown(f"<div class='compound-item' style='margin-bottom:15px;'><span class='cp-word' style='font-size:1.4em;'>{phrase_data['word']}</span><span class='cp-pinyin'>{phrase_data['pinyin']}</span><span class='cp-mean'>{pyhtml.escape(phrase_data['meanings'][:200] + ('...' if len(phrase_data['meanings']) > 200 else ''))}</span></div>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+            if not results['characters'] and not results['phrases']: st.info(f"No results found for '{st.session_state.definition_search_query}'. Try different search terms.")
+        else:
+            sel = st.session_state.selected_comp
+            info = component_map.get(sel, {})
+            decomp = info.get("meta", {}).get("decomposition", "")
+            parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
+            parents = apply_script_filter(parents, st.session_state.script_filter)
+            p_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px;'>{p}</span>" for p in parents])
+            
+            rel = info.get("related_characters", [])
+            children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
+            children_preview = apply_script_filter(children, st.session_state.script_filter)[:50]
+            c_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px; opacity: 0.8;'>{c}</span>" for c in children_preview])
 
-        st.markdown("<div class='lineage-header'>🎯 Selection</div>", unsafe_allow_html=True)
-        render_radix_row(sel)
+            st.markdown(f"<div class='status-line'><div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'><div><div style='font-weight: 800; font-size: 1.2em;'> {sel}</div><div style='margin-top:4px; font-size:0.85em;'><b>Components</b> {p_html if parents else 'Basic Root'}</div></div><div style='text-align: left; font-size: 1.0em; opacity: 0.7;'><b>Derivatives</b><br/>{c_html}{'...' if len(children) > 50 else ''}</div></div></div>", unsafe_allow_html=True)
 
-        rel = [c for c in info.get("related_characters", []) if c in component_map and len(c)==1 and c != sel]
-        children = apply_script_filter(rel, st.session_state.script_filter)
-        if children:
-            st.markdown(f"<div class='lineage-header'>🌲 Derivatives ({len(children)})</div>", unsafe_allow_html=True)
-            for c in children[:120]: render_radix_row(c)
-            if len(children) > 120:
-                st.markdown(f"<div style='text-align:center'>...and {len(children)-120} more</div>", unsafe_allow_html=True)
-                for c in children[120:]: render_radix_row(c, is_static=True)
+            if parents:
+                st.markdown("<div class='lineage-header'>🧱 Components (How it's built)</div>", unsafe_allow_html=True)
+                for p in parents: render_radix_row(p)
+
+            st.markdown("<div class='lineage-header'>🎯 Current Selection</div>", unsafe_allow_html=True)
+            focus_group = [sel]
+            if cc_t2s and cc_s2t:
+                s_cand = cc_t2s.convert(sel); t_cand = cc_s2t.convert(sel)
+                variant = s_cand if s_cand != sel else t_cand
+                if variant != sel and variant in component_map: focus_group.append(variant)
+            
+            for f in apply_script_filter(focus_group, st.session_state.script_filter): render_radix_row(f)
+
+            if children:
+                children_sorted = sorted(children, key=sort_key_usage_primary)
+                visible_children = apply_script_filter(children_sorted, st.session_state.script_filter)    
+                unique_visible = []
+                seen = set()
+                for child in visible_children:
+                    if child not in seen: unique_visible.append(child); seen.add(child)
+                
+                st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {len(unique_visible)} characters)</div>", unsafe_allow_html=True)
+                for child in unique_visible[:120]: render_radix_row(child)
+                if len(unique_visible) > 120:
+                    remaining = len(unique_visible) - 120
+                    st.markdown("---\n" + f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>⬇️ {remaining} More Derivatives ⬇️</div>", unsafe_allow_html=True)
+                    for c in unique_visible[120:]: render_radix_row(c, context="static_derivative", is_static=True)
 
 if __name__ == "__main__":
     main()
