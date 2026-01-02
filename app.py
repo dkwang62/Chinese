@@ -1,5 +1,35 @@
 # app.py
+# Claude 2 Jan 10AM 
 # Main Streamlit app for Radix - with definition search and commonality ranking
+
+"""
+STATE MANAGEMENT ARCHITECTURE (The Three Traps Fixed)
+
+This app handles complex state persistence across file uploads and UI navigation.
+Three critical patterns prevent "phantom state" bugs:
+
+TRAP #1: Browser Refresh Trap
+- Problem: HTML links (<a href="">) cause full browser reload, killing session_state
+- Solution: All navigation uses st.button() with st.rerun() to preserve session
+- Location: render_splash() entrance button (line ~1020)
+
+TRAP #2: Zombie State Trap  
+- Problem: Widget keys from old configs persist in session_state after upload
+- Solution: Nuclear clear of ALL derived keys before importing new config
+- Location: _apply_uploaded_profile_bytes() (line ~720)
+- Keys cleared: prompt_task_cb_*, pt_title_*, pt_tpl_*, fav_chk_*, selections
+
+TRAP #3: Execution Loop Trap
+- Problem: Default initialization runs before upload handler can set flags
+- Solution: _manual_config_active lock prevents defaults from overwriting uploads
+- Location: Auto-load section (line ~530) and main() check (line ~1150)
+- Flow: Upload sets lock → next run skips defaults → UI rebuilds from upload
+
+Critical Invariant: Session state has ONE source of truth at any moment:
+- Either: server defaults (if no upload)  
+- Or: uploaded file (if _manual_config_active=True)
+Never both. normalize_prompt_state() rebuilds UI from this single source.
+"""
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -37,6 +67,8 @@ from radix_core import (
     sort_key_usage_primary,
     sort_key_frequency_primary,
 )
+
+
 
 # -----------------------------
 # Profile (single-file) storage
@@ -76,8 +108,14 @@ st.set_page_config(layout="wide", page_title="Radix", page_icon="🈑")
 
 
 # --- Dynamic CSS ---
+
+
+
 def normalize_prompt_state() -> None:
     """Ensure prompt_config/tasks and prompt selection UI state are internally consistent."""
+    # TRAP #2 FIX: If manual config is active, we trust the imported data more than derived state
+    manual_config_active = st.session_state.get("_manual_config_active", False)
+    
     cfg = st.session_state.get("prompt_config") or {}
     if not isinstance(cfg, dict):
         cfg = {}
@@ -299,19 +337,6 @@ def apply_dynamic_css():
         align-items: center;
         box-shadow: 0 2px 6px rgba(0,0,0,0.06);
     }
-    .preview-count-line {
-        font-size: 1.4em;
-        text-align: center;
-        color: #2c3e50;
-        margin: 25px 0 30px 0;
-        font-weight: 600;
-    }
-    .preview-count-line .char {
-        font-size: 1.5em;
-        font-weight: 800;
-        color: #e74c3c;
-        text-shadow: 0 2px 4px rgba(231, 76, 60, 0.1);
-    }
     .jump-footer {
         margin-top: 50px;
         padding: 25px;
@@ -366,6 +391,22 @@ def apply_dynamic_css():
         flex: 1;
         line-height: 1.5;
     }
+    .char-btn-hint {
+        margin-top: 6px;
+        text-align: center;
+        font-size: 0.86em;
+        color: #6c757d;
+        font-weight: 700;
+    }
+    .char-btn-hint.previewing {
+        color: #c0392b;
+    }
+    .status-line {
+        line-height: 1.4;
+    }
+    .status-line span {
+        color: #0f5132; /* Ensure the text inside remains the dark green */
+    }
 
 /* PALACE ENTRANCE STYLING */
     .splash-wrap {
@@ -397,60 +438,16 @@ def apply_dynamic_css():
     }
     .grand-torii {
         font-size: 250px !important; /* Palace Scale */
-        cursor: pointer;
         line-height: 1;
-        transition: transform 0.4s ease;
         filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));
-    }
-    .grand-torii:hover {
-        transform: scale(1.1);
     }
     .entrance-text {
         color: #2c3e50;
         font-size: 24px;
         font-weight: 700;
         margin-top: 20px;
+        margin-bottom: 30px;
         letter-spacing: 2px;
-    }
-    
-    
-    /* --- List View Interaction Banner + Button Hints --- */
-    .interaction-banner {
-        padding: 12px 14px;
-        border-radius: 14px;
-        border: 1px solid #e9ecef;
-        background: #f8f9fa;
-        margin: 10px 0 18px 0;
-        color: #2c3e50;
-        font-weight: 600;
-        line-height: 1.25;
-    }
-    .interaction-banner .k {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 999px;
-        border: 1px solid #dee2e6;
-        background: #ffffff;
-        font-weight: 800;
-        margin: 0 6px 0 0;
-        font-size: 0.92em;
-    }
-    .interaction-banner .muted { color: #6c757d; font-weight: 600; }
-    .char-btn-hint {
-        margin-top: 6px;
-        text-align: center;
-        font-size: 0.86em;
-        color: #6c757d;
-        font-weight: 700;
-    }
-    .char-btn-hint.previewing {
-        color: #c0392b;
-    }
-    .status-line {
-        line-height: 1.4;
-    }
-    .status-line span {
-        color: #0f5132; /* Ensure the text inside remains the dark green */
     }
 
 </style>
@@ -531,28 +528,32 @@ for k, v in DEFAULTS.items():
         st.session_state[k] = v
 
 # Auto-load server-side user data on startup (will be used if user chooses not to upload)
+# TRAP #3 FIX: Only load defaults if no manual upload has been applied
 if "server_data_loaded" not in st.session_state:
     st.session_state.server_data_loaded = True
     st.session_state.server_data_available = False
-    try:
-        with open("radix_user_data.json", "r", encoding="utf-8") as f:
-            obj = json.load(f)
+    
+    # Check if user has manually uploaded config - if so, skip server defaults
+    if not st.session_state.get("_manual_config_active", False):
+        try:
+            with open("radix_user_data.json", "r", encoding="utf-8") as f:
+                obj = json.load(f)
 
-        # strict schema only (no legacy)
-        if (
-            isinstance(obj, dict)
-            and obj.get("schema_version") == 1
-            and isinstance(obj.get("favourites_list"), list)
-            and isinstance(obj.get("prompt_config"), dict)
-            and isinstance(obj.get("prompt_ui"), dict)
-        ):
-            # Store server data but don't apply yet - wait for user choice
-            st.session_state.server_data = obj
-            st.session_state.server_data_available = True
-    except FileNotFoundError:
-        pass
-    except Exception as e:
-        st.error(f"Error loading server radix_user_data.json: {e}")
+            # strict schema only (no legacy)
+            if (
+                isinstance(obj, dict)
+                and obj.get("schema_version") == 1
+                and isinstance(obj.get("favourites_list"), list)
+                and isinstance(obj.get("prompt_config"), dict)
+                and isinstance(obj.get("prompt_ui"), dict)
+            ):
+                # Store server data but don't apply yet - wait for user choice
+                st.session_state.server_data = obj
+                st.session_state.server_data_available = True
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            st.error(f"Error loading server radix_user_data.json: {e}")
 
 
 st.session_state.prompt_config = normalize_prompt_config(
@@ -635,6 +636,12 @@ def sync_sidebar_text():
     st.session_state.display_mode = "2-Characters"
     st.session_state.definition_search_mode = False
     st.session_state.definition_search_results = None
+
+def sync_splash_text():
+    # Copy from splash_search to sb_search, then use standard flow
+    st.session_state.sb_search = st.session_state.get("splash_search", "")
+    st.session_state.onboarding_done = True
+    sync_sidebar_text()
 
 def tile_click(c):
     if st.session_state.show_inputs:
@@ -733,25 +740,35 @@ def _apply_uploaded_profile_bytes(file_bytes: bytes) -> None:
         return
 
     try:
-        import_profile_dict(obj)
-        
-        # CRITICAL FIX: Clear ALL prompt-related widget keys to prevent conflicts
+        # TRAP #2 FIX: Nuclear option - clear ALL derived state before importing
+        # This prevents "zombie state" from old configs
         keys_to_clear = []
         for k in list(st.session_state.keys()):
+            # Clear all prompt-related widget keys
             if (k == "fav_bulk_editor" or 
                 k.startswith("pt_title_") or 
                 k.startswith("pt_tpl_") or 
-                k.startswith("prompt_task_cb_")):
+                k.startswith("prompt_task_cb_") or
+                k == "prompt_selected_task_ids" or
+                k == "prompt_default_sel_editor" or
+                k.startswith("fav_chk_")):
                 keys_to_clear.append(k)
         
         for k in keys_to_clear:
             st.session_state.pop(k, None)
         
-        # Normalize state AFTER clearing widgets
+        # Now import the new data
+        import_profile_dict(obj)
+        
+        # TRAP #3 FIX: Set a lock to prevent default initialization on next run
+        st.session_state["_upload_applied"] = True
+        st.session_state["_manual_config_active"] = True
+        st.session_state.pop("_upload_error", None)
+        
+        # Normalize state AFTER clearing widgets and importing
         normalize_prompt_state()
         
-        st.session_state["_upload_applied"] = True
-        st.session_state.pop("_upload_error", None)
+        # Force immediate rerun to rebuild UI with new state
         st.session_state["_post_apply_rerun"] = True
         
     except Exception as e:
@@ -835,6 +852,7 @@ def render_startup_file_choice():
                 st.session_state.favourites_list = obj["favourites_list"]
                 st.session_state.prompt_config = obj["prompt_config"]
                 st.session_state.prompt_ui = obj["prompt_ui"]
+                # Don't set _manual_config_active - allow server defaults
             st.session_state.startup_file_choice_made = True
             st.rerun()
     
@@ -856,20 +874,26 @@ def render_startup_file_choice():
                 file_bytes = uploaded_file.getvalue()
                 obj = json.loads(file_bytes.decode("utf-8"))
                 
-                # Validate and apply
-                import_profile_dict(obj)
-                
-                # Clear all widget keys
+                # TRAP #2 FIX: Clear ALL derived state before importing
                 keys_to_clear = []
                 for k in list(st.session_state.keys()):
                     if (k == "fav_bulk_editor" or 
                         k.startswith("pt_title_") or 
                         k.startswith("pt_tpl_") or 
-                        k.startswith("prompt_task_cb_")):
+                        k.startswith("prompt_task_cb_") or
+                        k == "prompt_selected_task_ids" or
+                        k == "prompt_default_sel_editor" or
+                        k.startswith("fav_chk_")):
                         keys_to_clear.append(k)
                 
                 for k in keys_to_clear:
                     st.session_state.pop(k, None)
+                
+                # Validate and apply
+                import_profile_dict(obj)
+                
+                # Set the lock
+                st.session_state["_manual_config_active"] = True
                 
                 normalize_prompt_state()
                 
@@ -901,25 +925,42 @@ def render_splash():
         unsafe_allow_html=True,
     )
 
-    # 2. ENLARGED ENTRANCE: The Torii gate scaled to palace proportions
+    # 2. ENTRANCE: Clickable torii gate - now using columns for centering with button
     st.markdown(
         """
         <div class="palace-entrance-container">
-            <a href="/?onboarding=done" target="_self" style="text-decoration:none;">
-                <div class="grand-torii">⛩️</div>
-                <div class="entrance-text">Grand Hall of Radix 🈑 Components</div>
-            </a>
+            <div class="grand-torii">⛩️</div>
         </div>
         """, 
         unsafe_allow_html=True
     )
-
-    # Handling the entrance logic via query parameters
-    if st.query_params.get("onboarding") == "done":
-        st.session_state.onboarding_done = True
-        st.query_params.clear() 
-        st.rerun()
     
+    # Entrance button centered below the torii
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        if st.button("Grand Hall of 🈑 Components", key="entrance_btn", use_container_width=True, type="primary"):
+            st.session_state.onboarding_done = True
+            st.rerun()
+    
+    # Quick search on landing page
+    st.markdown("<div style='max-width: 600px; margin: 40px auto;'>", unsafe_allow_html=True)
+    with st.expander("🔍 Search", expanded=False):
+        st.markdown("**Character Search**")
+        st.text_input("Paste or type a character to explore", key="splash_search", on_change=sync_splash_text,
+                     placeholder="e.g., 水", label_visibility="collapsed")
+        st.caption("Enter one Chinese character to jump directly to its details")
+        
+        st.markdown("---")
+        st.markdown("**English Definition Search**")
+        st.text_input("Search definitions", key="splash_def_search", placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
+        if st.button("Search Definitions", use_container_width=True, type="primary", key="splash_def_btn"):
+            # Copy the search term to the main widget before triggering search
+            st.session_state.w_def_search = st.session_state.splash_def_search
+            search_by_definition()
+            st.session_state.onboarding_done = True
+            st.rerun()
+        st.caption("Search across character definitions and phrase meanings")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     demos = st.session_state.favourites_list
     if demos:
@@ -929,6 +970,14 @@ def render_splash():
             
             with st.expander("📂 User Data (Save/Load/Review & Edit)", expanded=False):
                 st.caption("Single JSON file for **Favourites** + **AI Prompt Tasks (Tasks)**. Upload applies immediately in-app; download is your backup/export.")
+                
+                # Show config source for transparency
+                if st.session_state.get("_manual_config_active"):
+                    st.info("🔒 Using uploaded configuration (overrides server defaults)")
+                elif st.session_state.get("server_data_available"):
+                    st.info("☁️ Using server default configuration")
+                else:
+                    st.info("🆕 Using app default configuration")
 
                 # --- Save / Load ---
                 c_dl, c_ul = st.columns(2)
@@ -964,6 +1013,7 @@ def render_splash():
                                         key="apply_upload_btn"):
                                 st.session_state["_last_upload_hash"] = file_hash
                                 _apply_uploaded_profile_bytes(file_bytes)
+                                # TRAP #3 FIX: Force immediate rerun to rebuild with new state
                                 st.rerun()
                         else:
                             st.success("✓ Current file is active")
@@ -1277,6 +1327,11 @@ def main():
         st.stop()
 
     apply_dynamic_css()
+    
+    # TRAP #3 FIX: Check if we just applied an upload and need to rebuild UI
+    if st.session_state.get("_post_apply_rerun"):
+        st.session_state["_post_apply_rerun"] = False
+        # State is now clean - continue to normal flow
 
     # Step 1: Ask user about local file vs server data (only once at startup)
     if not st.session_state.get("startup_file_choice_made", False):
@@ -1289,13 +1344,46 @@ def main():
         st.stop()
 
     with st.sidebar:
+        # 1) NAVIGATION AND BREADCRUMBS (Always at top for visibility)
+        current_main_char = (
+            st.session_state.stroke_view_char if st.session_state.stroke_view_active
+            else st.session_state.selected_comp
+        )
+        
+        # Show breadcrumb when viewing a character
+        if current_main_char:
+            path_items = ["🏠 Root"] + st.session_state.history
+            if st.session_state.stroke_view_active:
+                path_items += [f"<i>{current_main_char}</i> (🧠)"]
+            else:
+                path_items += [f"<b>{current_main_char}</b>"]
+            path_str = " → ".join(path_items)
+            st.markdown(
+                f"""<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>
+                {path_str}
+                </div>""",
+                unsafe_allow_html=True,
+            )
+        
+        # Show navigation buttons when not in root view
+        if not st.session_state.show_inputs:
+            nav_col1, nav_col2 = st.columns(2)
+            with nav_col1:
+                if st.session_state.stroke_view_active:
+                    st.button("← Back", on_click=end_stroke_view, use_container_width=True, type="primary")
+                else:
+                    st.button("← Back", on_click=go_back, use_container_width=True, type="primary")
+            with nav_col2:
+                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
+            
+            st.markdown("---")
 
+        # 2) CHARACTER PREVIEW (Stroke order and info)
         current_char_for_sidebar = (
             st.session_state.stroke_view_char if st.session_state.stroke_view_active
             else (st.session_state.preview_comp or st.session_state.selected_comp)
         )
 
-        # 1) Stroke/drawing preview stays at the top
         if current_char_for_sidebar:
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
             if sidebar_html:
@@ -1340,36 +1428,6 @@ def main():
                 )
                 st.markdown(generate_clean_card_html(current_char_for_sidebar), unsafe_allow_html=True)
 
-        # 2) Breadcrumb and navigation (breadcrumb should be above nav buttons)
-
-
-        current_main_char = (
-            st.session_state.stroke_view_char if st.session_state.stroke_view_active
-            else st.session_state.selected_comp
-        )
-        if current_main_char:
-            path_items = ["🏠 Root"] + st.session_state.history
-            if st.session_state.stroke_view_active:
-                path_items += [f"<i>{current_main_char}</i> (🧠)"]
-            else:
-                path_items += [f"<b>{current_main_char}</b>"]
-            path_str = " → ".join(path_items)
-            st.markdown(
-                f"""<div style='font-size:0.85em; margin:8px 0 10px; color:#444; text-align:center; font-weight:500;'>
-                {path_str}
-                </div>""",
-                unsafe_allow_html=True,
-            )
-        if not st.session_state.show_inputs:
-            nav_col1, nav_col2 = st.columns(2)
-            with nav_col1:
-                if st.session_state.stroke_view_active:
-                    st.button("← Back", on_click=end_stroke_view, use_container_width=True)
-                else:
-                    st.button("← Back", on_click=go_back, use_container_width=True)
-            with nav_col2:
-                st.button("🏠 Root", on_click=go_to_root, use_container_width=True)
-
         # 3) Display phrases does not filter, so keep it outside the filter expander
         if not st.session_state.show_inputs:
             with st.expander("Display Phrases", expanded=False):
@@ -1386,7 +1444,19 @@ def main():
                     st.session_state.display_mode = new_mode
                     st.rerun()
 
-        st.text_input("Shortcut: Paste/Type characters", key="sb_search", on_change=sync_sidebar_text)
+        with st.expander("🔍 Search", expanded=False):
+            st.markdown("**Character Search**")
+            st.text_input("Paste or type a character", key="sb_search", on_change=sync_sidebar_text, 
+                         placeholder="e.g., 水", label_visibility="collapsed")
+            
+            st.markdown("---")
+            st.markdown("**English Definition Search**")
+            st.text_input("Search definitions", key="sb_def_search", placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
+            if st.button("Search Definitions", use_container_width=True, type="primary", key="sb_def_btn"):
+                st.session_state.w_def_search = st.session_state.sb_def_search
+                search_by_definition()
+                st.rerun()
+            st.caption("Search across character definitions and phrase meanings")
 
         # 2) All filtering / hiding / showing controls live under one expander
         with st.expander("🔎 Filters", expanded=False):
@@ -1485,6 +1555,7 @@ def main():
                         on_change=update_grid_script,
                         horizontal=True,
                     )
+    
     if st.session_state.stroke_view_active:
         st.markdown("### Stroke Order Animation")
         main_html, phrases_html = get_stroke_order_view_html(st.session_state.stroke_view_char, st.session_state.display_mode)
@@ -1654,26 +1725,25 @@ def main():
                               on_click=tile_click, args=(ch,), use_container_width=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
-            st.markdown("<div class='jump-footer'>", unsafe_allow_html=True)
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                if st.session_state.text_input_warning:
-                    st.warning(st.session_state.text_input_warning)
-                st.text_input("Go to component/character", value=st.session_state.text_input_comp, key="w_text",
-                              on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
-                st.caption("Enter one Chinese character to jump directly to its details")
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            st.markdown("<div class='jump-footer' style='margin-top:20px;'>", unsafe_allow_html=True)
-            st.markdown("<h4 style='text-align:center; color:#2c3e50; margin-bottom:15px;'>🔍 Search by English Definition</h4>", unsafe_allow_html=True)
-            col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
-            with col_s2:
-                st.text_input("Search definitions", key="w_def_search", placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
-                if st.button("Search Definitions", use_container_width=True, type="primary"):
-                    search_by_definition()
-                    st.rerun()
-                st.caption("Search across character definitions and phrase meanings")
-            st.markdown("</div>", unsafe_allow_html=True)
+            with st.expander("🔍 Search", expanded=False):
+                st.markdown("**Character Search**")
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    if st.session_state.text_input_warning:
+                        st.warning(st.session_state.text_input_warning)
+                    st.text_input("Go to component/character", value=st.session_state.text_input_comp, key="w_text",
+                                  on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
+                    st.caption("Enter one Chinese character to jump directly to its details")
+                
+                st.markdown("---")
+                st.markdown("**English Definition Search**")
+                col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
+                with col_s2:
+                    st.text_input("Search definitions", key="w_def_search", placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
+                    if st.button("Search Definitions", use_container_width=True, type="primary"):
+                        search_by_definition()
+                        st.rerun()
+                    st.caption("Search across character definitions and phrase meanings")
 
     else:
         if st.session_state.definition_search_mode and st.session_state.definition_search_results:
