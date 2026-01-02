@@ -1,4 +1,4 @@
-# app.py
+# app.py modified by Gemini
 # Main Streamlit app for Radix - with definition search and commonality ranking
 
 """
@@ -52,6 +52,7 @@ from radix_core import (
     apply_script_filter,
     normalize_single_hanzi,
     resolve_to_known_variant,
+    build_chatgpt_prompt,
     get_default_prompt_config,
     normalize_prompt_config,
     render_combined_prompt,
@@ -322,10 +323,88 @@ def apply_dynamic_css():
         border-radius: 12px;
         margin: 20px 0 30px 0;
         box-shadow: 0 3px 10px rgba(15, 81, 50, 0.08);
+    }
+    .status-tag {
+        background: linear-gradient(135deg, #ffffff 0%, #f1f3f5 100%);
+        color: #2c3e50;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.9em;
+        border: 2px solid #dee2e6;
+        display: inline-flex;
+        align-items: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+    .jump-footer {
+        margin-top: 50px;
+        padding: 25px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-top: 3px solid #dee2e6;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 -3px 10px rgba(0,0,0,0.04);
+    }
+    .lineage-header {
+        font-size: 1.4em;
+        font-weight: 800;
+        color: #2c3e50;
+        margin: 30px 0 20px 0;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border-left: 5px solid #1976d2;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(25, 118, 210, 0.1);
+    }
+    .compound-item {
+        display: flex;
+        align-items: baseline;
+        margin-bottom: 10px;
+        padding: 12px;
+        border-bottom: 2px solid #e9ecef;
+        border-radius: 8px;
+        background: #ffffff;
+        transition: all 0.2s ease;
+    }
+    .compound-item:hover {
+        background: #f8f9fa;
+        transform: translateX(4px);
+    }
+    .cp-word {
+        font-weight: 700;
+        font-size: 1.2em;
+        color: #2c3e50;
+        min-width: 85px;
+        margin-right: 15px;
+    }
+    .cp-pinyin {
+        color: #d35400;
+        font-family: 'Monaco', 'Menlo', monospace;
+        margin-right: 15px;
+        font-weight: 600;
+        font-size: 1.5em;
+    }
+    .cp-mean {
+        color: #495057;
+        font-size: 1em;
+        flex: 1;
+        line-height: 1.5;
+    }
+    .char-btn-hint {
+        margin-top: 6px;
+        text-align: center;
+        font-size: 0.86em;
+        color: #6c757d;
+        font-weight: 700;
+    }
+    .char-btn-hint.previewing {
+        color: #c0392b;
+    }
+    .status-line {
         line-height: 1.4;
     }
     .status-line span {
-        color: #0f5132;
+        color: #0f5132; /* Ensure the text inside remains the dark green */
     }
 
 /* PALACE ENTRANCE STYLING */
@@ -375,133 +454,7 @@ def apply_dynamic_css():
     st.markdown(css, unsafe_allow_html=True)
 
 
-def render_search_ui(key_prefix: str, on_char_change_callback, on_def_search_callback):
-    """Render combined character + definition search UI."""
-    st.markdown("**Character Search**")
-    st.text_input("Paste or type a character", key=f"{key_prefix}_search", 
-                 on_change=on_char_change_callback, placeholder="e.g., 水", label_visibility="collapsed")
-    
-    st.markdown("---")
-    st.markdown("**English Definition Search**")
-    st.text_input("Search definitions", key=f"{key_prefix}_def_search", 
-                 placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
-    if st.button("Search Definitions", use_container_width=True, type="primary", key=f"{key_prefix}_def_btn"):
-        st.session_state.w_def_search = st.session_state[f"{key_prefix}_def_search"]
-        on_def_search_callback()
-        st.rerun()
-    st.caption("Search across character definitions and phrase meanings")
-
-def render_grid_view():
-    """Render the component grid with filters and pagination."""
-    cur_min, cur_max = st.session_state.stroke_range
-    filter_parts = []
-    
-    sort_label = "Component frequency" if st.session_state.grid_sort_mode == "usage" else "Character frequency"
-    filter_parts.append(f"<span class='status-tag'>Sort: {sort_label}</span>")
-    
-    max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
-    if not (cur_min == 1 and cur_max == max_s_val):
-        if cur_min == cur_max:
-            filter_parts.append(f"<span class='status-tag'>{cur_min} strokes</span>")
-        elif cur_min == 1:
-            filter_parts.append(f"<span class='status-tag'>≤ {cur_max} strokes</span>")
-        elif cur_max == max_s_val:
-            filter_parts.append(f"<span class='status-tag'>≥ {cur_min} strokes</span>")
-        else:
-            filter_parts.append(f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>")
-    
-    if st.session_state.radical != "none":
-        filter_parts.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
-    if st.session_state.component_idc != "none":
-        filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
-    
-    force_components_only = (st.session_state.grid_sort_mode == "usage")
-    if force_components_only:
-        filter_parts.append("<span class='status-tag'>View: Components only</span>")
-    if st.session_state.grid_sort_mode == "frequency":
-        filter_parts.append(f"<span class='status-tag'>Script: {st.session_state.grid_script_filter}</span>")
-    
-    filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
-    
-    st.markdown(
-        f"""<div class='status-line' style='display: flex; flex-direction: column; gap: 8px;'>
-            <div style='display: flex; justify-content: space-between; align-items: center;'>
-                <div style='display: flex; flex-wrap: wrap; gap: 8px;'>
-                    <span style='font-weight: 800; margin-right: 5px;'>🔍 Filters:</span> {filter_summary}
-                </div>
-                <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>
-                    Click once to preview in the sidebar; click the same button again to drill down.
-                </div>
-            </div>
-        </div>""", 
-        unsafe_allow_html=True
-    )
-    
-    filtered = [
-        c for c in component_map
-        if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max
-        and (st.session_state.radical == "none" or component_map[c]["meta"].get("radical") == st.session_state.radical)
-        and (st.session_state.component_idc == "none" or component_map[c]["meta"].get("decomposition", "").startswith(st.session_state.component_idc))
-        and (not force_components_only or c in stats_cache["used_components"])
-    ]
-    
-    if st.session_state.grid_sort_mode == "frequency":
-        filtered = apply_script_filter(filtered, st.session_state.grid_script_filter)
-    
-    sorted_comps = sorted(filtered, key=sort_key_frequency_primary if st.session_state.grid_sort_mode == "frequency" else sort_key_usage_primary)
-    
-    if not sorted_comps:
-        st.info("No components match current filters.")
-        return
-    
-    PAGE_SIZE, GRID_COLS = 120, 10
-    total = len(sorted_comps)
-    max_page = max(1, math.ceil(total / PAGE_SIZE))
-    st.session_state.page = max(1, min(st.session_state.page, max_page))
-    
-    p1, p2, p3 = st.columns([1, 3, 1])
-    with p1:
-        if st.button("◀ Prev", disabled=st.session_state.page <= 1, use_container_width=True):
-            st.session_state.page -= 1
-            st.rerun()
-    with p2:
-        start = (st.session_state.page - 1) * PAGE_SIZE + 1
-        end = min(st.session_state.page * PAGE_SIZE, total)
-        st.markdown(f"<div style='text-align:center; padding:10px 0; color:#555;'><div style='font-size:1.1em; font-weight:bold;'>{start}–{end} of {total}</div></div>", unsafe_allow_html=True)
-    with p3:
-        if st.button("Next ▶", disabled=st.session_state.page >= max_page, use_container_width=True):
-            st.session_state.page += 1
-            st.rerun()
-    
-    page = sorted_comps[(st.session_state.page - 1) * PAGE_SIZE : st.session_state.page * PAGE_SIZE]
-    st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
-    cols = st.columns(GRID_COLS)
-    for i, ch in enumerate(page):
-        with cols[i % GRID_COLS]:
-            is_preview = st.session_state.preview_comp == ch
-            st.button(ch, key=f"b_{ch}_{st.session_state.page}", type="primary" if is_preview else "secondary",
-                      on_click=tile_click, args=(ch,), use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    with st.expander("🔍 Search", expanded=False):
-        st.markdown("**Character Search**")
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if st.session_state.text_input_warning:
-                st.warning(st.session_state.text_input_warning)
-            st.text_input("Go to component/character", value=st.session_state.text_input_comp, key="w_text",
-                          on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
-            st.caption("Enter one Chinese character to jump directly to its details")
-        
-        st.markdown("---")
-        st.markdown("**English Definition Search**")
-        col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
-        with col_s2:
-            st.text_input("Search definitions", key="w_def_search", placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
-            if st.button("Search Definitions", use_container_width=True, type="primary"):
-                search_by_definition()
-                st.rerun()
-            st.caption("Search across character definitions and phrase meanings")
+def render_copy_to_clipboard(prompt_text: str, widget_id: str):
     safe_text = json.dumps(prompt_text, ensure_ascii=False)
     st_html(
         f"""
@@ -692,7 +645,17 @@ def sync_splash_text():
 def tile_click(c):
     if st.session_state.show_inputs:
         if st.session_state.preview_comp == c:
-            reset_to_character_view(c)
+            st.session_state.script_filter = "Any"
+            st.session_state.history = []
+            st.session_state.selected_comp = c
+            st.session_state.last_valid_selected_comp = c
+            st.session_state.show_inputs = False
+            st.session_state.preview_comp = None
+            st.session_state.text_input_comp = c
+            st.session_state.stroke_view_active = False
+            st.session_state.display_mode = "2-Characters"
+            st.session_state.definition_search_mode = False
+            st.session_state.definition_search_results = None
         else:
             st.session_state.preview_comp = c
 
@@ -763,37 +726,9 @@ def toggle_favourite(char):
         if char in st.session_state.favourites_list:
             st.session_state.favourites_list.remove(char)
 
-def clear_prompt_widget_keys():
-    """Clear all prompt-related widget keys to prevent zombie state."""
-    keys_to_clear = []
-    for k in list(st.session_state.keys()):
-        if (k == "fav_bulk_editor" or 
-            k.startswith("pt_title_") or 
-            k.startswith("pt_tpl_") or 
-            k.startswith("prompt_task_cb_") or
-            k == "prompt_selected_task_ids" or
-            k == "prompt_default_sel_editor" or
-            k.startswith("fav_chk_")):
-            keys_to_clear.append(k)
-    
-    for k in keys_to_clear:
-        st.session_state.pop(k, None)
-
-def reset_to_character_view(char: str):
-    """Reset navigation state and navigate to a character."""
-    st.session_state.script_filter = "Any"
-    st.session_state.history = []
-    st.session_state.selected_comp = char
-    st.session_state.last_valid_selected_comp = char
-    st.session_state.text_input_comp = char
-    st.session_state.text_input_warning = None
-    st.session_state.show_inputs = False
-    st.session_state.preview_comp = None
-    st.session_state.stroke_view_active = False
-    st.session_state.stroke_view_char = ""
-    st.session_state.display_mode = "2-Characters"
-    st.session_state.definition_search_mode = False
-    st.session_state.definition_search_results = None
+def build_profile_payload() -> dict:
+    # Backing store for Save/Load actions; single file shared across the app.
+    return build_profile_dict()
 
 def _apply_uploaded_profile_bytes(file_bytes: bytes) -> None:
     """Apply uploaded profile bytes into session_state (safe across reruns)."""
@@ -805,7 +740,21 @@ def _apply_uploaded_profile_bytes(file_bytes: bytes) -> None:
 
     try:
         # TRAP #2 FIX: Nuclear option - clear ALL derived state before importing
-        clear_prompt_widget_keys()
+        # This prevents "zombie state" from old configs
+        keys_to_clear = []
+        for k in list(st.session_state.keys()):
+            # Clear all prompt-related widget keys
+            if (k == "fav_bulk_editor" or 
+                k.startswith("pt_title_") or 
+                k.startswith("pt_tpl_") or 
+                k.startswith("prompt_task_cb_") or
+                k == "prompt_selected_task_ids" or
+                k == "prompt_default_sel_editor" or
+                k.startswith("fav_chk_")):
+                keys_to_clear.append(k)
+        
+        for k in keys_to_clear:
+            st.session_state.pop(k, None)
         
         # Now import the new data
         import_profile_dict(obj)
@@ -925,7 +874,19 @@ def render_startup_file_choice():
                 obj = json.loads(file_bytes.decode("utf-8"))
                 
                 # TRAP #2 FIX: Clear ALL derived state before importing
-                clear_prompt_widget_keys()
+                keys_to_clear = []
+                for k in list(st.session_state.keys()):
+                    if (k == "fav_bulk_editor" or 
+                        k.startswith("pt_title_") or 
+                        k.startswith("pt_tpl_") or 
+                        k.startswith("prompt_task_cb_") or
+                        k == "prompt_selected_task_ids" or
+                        k == "prompt_default_sel_editor" or
+                        k.startswith("fav_chk_")):
+                        keys_to_clear.append(k)
+                
+                for k in keys_to_clear:
+                    st.session_state.pop(k, None)
                 
                 # Validate and apply
                 import_profile_dict(obj)
@@ -993,9 +954,10 @@ def render_splash():
         st.markdown("**English Definition Search**")
         st.text_input("Search definitions", key="splash_def_search", placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
         if st.button("Search Definitions", use_container_width=True, type="primary", key="splash_def_btn"):
+            # Copy the search term to the main widget before triggering search
             st.session_state.w_def_search = st.session_state.splash_def_search
-            st.session_state.onboarding_done = True
             search_by_definition()
+            st.session_state.onboarding_done = True
             st.rerun()
         st.caption("Search across character definitions and phrase meanings")
     st.markdown("</div>", unsafe_allow_html=True)
@@ -1084,7 +1046,7 @@ def render_splash():
 
                 # --- Review before download ---
                 with st.expander("🔎 Review current data snapshot (what will be downloaded)", expanded=False):
-                    st.json(build_profile_dict())
+                    st.json(build_profile_payload())
 
                 st.markdown("---")
                 st.subheader("Favourites")
@@ -1100,28 +1062,144 @@ def render_splash():
 
                 tokens = [t for t in re.split(r"\s+", (fav_text or "").strip()) if t]
                 valid = [t for t in tokens if isinstance(t, str) and len(t) == 1]
+                invalid = [t for t in tokens if not (isinstance(t, str) and len(t) == 1)]
+                # de-dup, preserve order
                 seen = set()
-                cleaned = [c for c in valid if c not in seen and not seen.add(c)]
+                cleaned = []
+                for c in valid:
+                    if c not in seen:
+                        cleaned.append(c)
+                        seen.add(c)
 
-                st.caption(f"Preview: {len(cleaned)} favourites ready to apply.")
+                st.caption(f"Preview: {len(cleaned)} favourites ready to apply. Ignoring {len(invalid)} token(s) that are not exactly 1 character.")
 
-                if st.button("Apply favourites", use_container_width=True, key="fav_apply"):
-                    st.session_state.favourites_list = cleaned
-                    st.session_state.fav_cursor = 0
-                    st.toast("Favourites updated.", icon="✅")
-                    st.rerun()
+                c1, c2, c3 = st.columns([1, 1, 2])
+                with c1:
+                    if st.button("Apply favourites", use_container_width=True, key="fav_apply"):
+                        st.session_state.favourites_list = cleaned
+                        st.session_state.fav_cursor = 0
+                        st.toast("Favourites updated.", icon="✅")
+                        st.rerun()
+                with c2:
+                    if st.button("Clear favourites", use_container_width=True, key="fav_clear"):
+                        st.session_state.favourites_list = []
+                        st.session_state.fav_cursor = 0
+                        st.toast("Cleared favourites.", icon="✅")
+                        st.rerun()
+                with c3:
+                    add_char = st.text_input("Add a character", value="", key="fav_add_one", placeholder="e.g., 我", label_visibility="collapsed")
+                    if st.button("Add", use_container_width=True, key="fav_add_btn"):
+                        c = (add_char or "").strip()
+                        if len(c) != 1:
+                            st.toast("Please enter exactly 1 character.", icon="⚠️")
+                        else:
+                            favs = st.session_state.get("favourites_list", [])
+                            if c not in favs:
+                                st.session_state.favourites_list = favs + [c]
+                                st.toast("Added.", icon="✅")
+                                st.rerun()
+
+                favs = st.session_state.get("favourites_list", [])
+                if favs:
+                    st.markdown("**Current favourites**")
+                    for i, c in enumerate(favs):
+                        cc1, cc2 = st.columns([6, 1])
+                        with cc1:
+                            st.write(c)
+                        with cc2:
+                            if st.button("✕", key=f"fav_rm_{i}", help="Remove"):
+                                st.session_state.favourites_list = [x for j, x in enumerate(favs) if j != i]
+                                st.toast("Removed.", icon="✅")
+                                st.rerun()
 
                 st.markdown("---")
-                st.subheader("AI Prompt Tasks")
-                
+                st.subheader("AI Prompt Tasks (Task 1–10)")
+
+                normalize_prompt_state()
                 cfg = st.session_state.get("prompt_config") or {}
                 tasks = cfg.get("tasks", []) or []
-                
-                st.caption(f"📝 {len(tasks)} tasks configured. To edit tasks, download the file, edit the JSON, and re-upload.")
-                
-                for t in tasks:
-                    with st.expander(f"📄 {t.get('title', '(untitled)')}", expanded=False):
-                        st.code(t.get('template', ''), language=None)
+                all_task_ids = [t.get("id") for t in tasks if t.get("id")]
+
+                # Default selection editor (applies when you first open a character prompt)
+                default_sel = st.multiselect(
+                    "Default selected tasks",
+                    options=all_task_ids,
+                    default=list(st.session_state.prompt_ui.get("default_selected_task_ids", all_task_ids)),
+                    key="prompt_default_sel_editor",
+                )
+                if st.button("Save default selection", key="save_default_task_sel"):
+                    st.session_state.prompt_ui["default_selected_task_ids"] = list(default_sel)
+                    normalize_prompt_state()
+                    st.toast("Default task selection updated.", icon="✅")
+                    st.rerun()
+
+                st.caption("Edit titles/templates below. Changes persist in-session and will be included in the next download.")
+                edited_tasks = []
+                for idx, t in enumerate(tasks):
+                    tid = t.get("id")
+                    if not tid:
+                        continue
+                    with st.expander(f"✏️ {t.get('title','(untitled)')}  —  {tid}", expanded=False):
+                        title = st.text_input("Title", value=t.get("title", ""), key=f"pt_title_{tid}")
+                        template = st.text_area("Template", value=t.get("template", ""), height=160, key=f"pt_tpl_{tid}")
+                        cA, cB = st.columns([1, 3])
+                        with cA:
+                            if st.button("Delete task", key=f"pt_del_{tid}"):
+                                # Delete is immediate (no need to click Apply). This avoids "delete then apply" races.
+                                cur = (st.session_state.get("prompt_config") or {}).get("tasks", []) or []
+                                st.session_state.prompt_config["tasks"] = [tt for tt in cur if tt.get("id") != tid]
+                                # Clean up UI/widget keys and selections/defaults
+                                st.session_state.pop(f"pt_title_{tid}", None)
+                                st.session_state.pop(f"pt_tpl_{tid}", None)
+                                st.session_state.pop(f"prompt_task_cb_{tid}", None)
+                                st.session_state.prompt_selected_task_ids = [x for x in (st.session_state.get("prompt_selected_task_ids") or []) if x != tid]
+                                st.session_state.setdefault("prompt_ui", {})
+                                st.session_state.prompt_ui["default_selected_task_ids"] = [x for x in (st.session_state.prompt_ui.get("default_selected_task_ids", []) or []) if x != tid]
+                                normalize_prompt_state()
+                                st.toast("Task deleted.", icon="✅")
+                                st.rerun()
+                        with cB:
+                            st.caption("Tip: Keep the template as plain instructions. The character and definition are inserted separately.")
+
+                    edited_tasks.append({"id": tid, "title": title, "template": template})
+                c_add, c_apply = st.columns([1, 1])
+                with c_add:
+                    if st.button("Add new task", key="pt_add_new_home", use_container_width=True):
+                        cfg = st.session_state.get("prompt_config") or {}
+                        tasks_cur = list(cfg.get("tasks", []) or [])
+
+                        # Prefer sequential ids like task4, task5... when existing tasks are task1..taskN
+                        existing_ids = [t.get("id") for t in tasks_cur if isinstance(t, dict)]
+                        nums = []
+                        for tid in existing_ids:
+                            if isinstance(tid, str):
+                                m = re.match(r"^task(\d+)$", tid)
+                                if m:
+                                    nums.append(int(m.group(1)))
+                        next_num = (max(nums) + 1) if nums else None
+                        new_id = f"task{next_num}" if next_num is not None else f"task_{uuid.uuid4().hex[:8]}"
+
+                        tasks_cur.append({
+                            "id": new_id,
+                            "title": "New task",
+                            "template": "Write your task instructions here.\n",
+                        })
+                        st.session_state.prompt_config["tasks"] = tasks_cur
+
+                        # Optionally include the new task in the current selection
+                        current_sel = list(st.session_state.get("prompt_selected_task_ids") or [])
+                        if new_id not in current_sel:
+                            current_sel.append(new_id)
+                        st.session_state.prompt_selected_task_ids = current_sel
+
+                        normalize_prompt_state()
+                        st.toast("Task added. Edit it below.", icon="✅")
+                with c_apply:
+                    if st.button("Apply task edits", key="pt_apply_home", use_container_width=True):
+                        st.session_state.prompt_config["tasks"] = edited_tasks
+                        normalize_prompt_state()
+                        st.toast("Tasks updated.", icon="✅")
+                        st.rerun()
 
 
         st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
@@ -1226,10 +1304,10 @@ def render_radix_row(c, context="detail", is_static=False):
                             raw_mean = entry.get('meanings', '')
                             p_mean = pyhtml.escape(raw_mean[:130] + ('...' if len(raw_mean) > 130 else ''))
                             items_html_list.append(
-                                f"<div class='compound-item'>"
-                                f"<span class='cp-word'>{word}</span>"
-                                f"<span class='cp-pinyin'>{entry.get('pinyin', '')}</span>"
-                                f"<span class='cp-mean'>{p_mean}</span>"
+                                f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'>"
+                                f"<span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span>"
+                                f"<span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span>"
+                                f"<span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span>"
                                 f"</div>"
                             )
                     
@@ -1368,7 +1446,18 @@ def main():
                     st.rerun()
 
         with st.expander("🔍 Search", expanded=False):
-            render_search_ui("sb", sync_sidebar_text, search_by_definition)
+            st.markdown("**Character Search**")
+            st.text_input("Paste or type a character", key="sb_search", on_change=sync_sidebar_text, 
+                         placeholder="e.g., 水", label_visibility="collapsed")
+            
+            st.markdown("---")
+            st.markdown("**English Definition Search**")
+            st.text_input("Search definitions", key="sb_def_search", placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
+            if st.button("Search Definitions", use_container_width=True, type="primary", key="sb_def_btn"):
+                st.session_state.w_def_search = st.session_state.sb_def_search
+                search_by_definition()
+                st.rerun()
+            st.caption("Search across character definitions and phrase meanings")
 
         # Only show filters when NOT in stroke view (since stroke view has no filterable content)
         if not st.session_state.stroke_view_active:
@@ -1537,7 +1626,127 @@ def main():
         st.stop()
 
     if st.session_state.show_inputs:
-        render_grid_view()
+        cur_min, cur_max = st.session_state.stroke_range
+
+        filter_parts = []
+
+        # Grid sort summary (shown in the top banner)
+        sort_label = (
+            "Component frequency" if st.session_state.grid_sort_mode == "usage" else "Character frequency"
+        )
+        filter_parts.append(f"<span class='status-tag'>Sort: {sort_label}</span>")
+        max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
+
+        if not (cur_min == 1 and cur_max == max_s_val):
+            if cur_min == cur_max:
+                filter_parts.append(f"<span class='status-tag'>{cur_min} strokes</span>")
+            elif cur_min == 1:
+                filter_parts.append(f"<span class='status-tag'>≤ {cur_max} strokes</span>")
+            elif cur_max == max_s_val:
+                filter_parts.append(f"<span class='status-tag'>≥ {cur_min} strokes</span>")
+            else:
+                filter_parts.append(f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>")
+
+        if st.session_state.radical != "none":
+            filter_parts.append(f"<span class='status-tag'>Rad. {st.session_state.radical}</span>")
+        if st.session_state.component_idc != "none":
+            filter_parts.append(f"<span class='status-tag'>{st.session_state.component_idc}</span>")
+
+        force_components_only = (st.session_state.grid_sort_mode == "usage")
+        if force_components_only:
+            filter_parts.append("<span class='status-tag'>View: Components only</span>")
+
+        if st.session_state.grid_sort_mode == "frequency":
+            filter_parts.append(f"<span class='status-tag'>Script: {st.session_state.grid_script_filter}</span>")
+
+        filter_summary = "".join(filter_parts) if filter_parts else "<span class='status-tag'>All characters</span>"
+
+
+        st.markdown(
+            f"""
+            <div class='status-line' style='display: flex; flex-direction: column; gap: 8px;'>
+                <div style='display: flex; justify-content: space-between; align-items: center;'>
+                    <div style='display: flex; flex-wrap: wrap; gap: 8px;'>
+                        <span style='font-weight: 800; margin-right: 5px;'>🔍 Filters:</span> {filter_summary}
+                    </div>
+                    <div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>Click once to preview in the sidebar; click the same button again to drill down. </div>
+                </div>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+
+        use_component_only = force_components_only
+
+        filtered = [
+            c for c in component_map
+            if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max
+            and (st.session_state.radical == "none" or component_map[c]["meta"].get("radical") == st.session_state.radical)
+            and (st.session_state.component_idc == "none" or component_map[c]["meta"].get("decomposition", "").startswith(st.session_state.component_idc))
+            and (not use_component_only or c in stats_cache["used_components"])
+        ]
+
+        if st.session_state.grid_sort_mode == "frequency":
+            filtered = apply_script_filter(filtered, st.session_state.grid_script_filter)
+
+        if st.session_state.grid_sort_mode == "frequency":
+            sorted_comps = sorted(filtered, key=sort_key_frequency_primary)
+        else:
+            sorted_comps = sorted(filtered, key=sort_key_usage_primary)
+
+        if not sorted_comps:
+            st.info("No components match current filters.")
+        else:
+            PAGE_SIZE = 120
+            GRID_COLS = 10
+            total = len(sorted_comps)
+            max_page = max(1, math.ceil(total / PAGE_SIZE))
+            st.session_state.page = max(1, min(st.session_state.page, max_page))
+
+            p1, p2, p3 = st.columns([1, 3, 1])
+            with p1:
+                if st.button("◀ Prev", disabled=st.session_state.page <= 1, use_container_width=True):
+                    st.session_state.page -= 1
+                    st.rerun()
+            with p2:
+                start = (st.session_state.page - 1) * PAGE_SIZE + 1
+                end = min(st.session_state.page * PAGE_SIZE, total)
+                st.markdown(f"<div style='text-align:center; padding:10px 0; color:#555;'><div style='font-size:1.1em; font-weight:bold;'>{start}–{end} of {total}</div></div>", unsafe_allow_html=True)
+            with p3:
+                if st.button("Next ▶", disabled=st.session_state.page >= max_page, use_container_width=True):
+                    st.session_state.page += 1
+                    st.rerun()
+
+            page = sorted_comps[(st.session_state.page - 1) * PAGE_SIZE : st.session_state.page * PAGE_SIZE]
+            st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+            cols = st.columns(GRID_COLS)
+            for i, ch in enumerate(page):
+                with cols[i % GRID_COLS]:
+                    is_preview = st.session_state.preview_comp == ch
+                    st.button(ch, key=f"b_{ch}_{st.session_state.page}", type="primary" if is_preview else "secondary",
+                              on_click=tile_click, args=(ch,), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            with st.expander("🔍 Search", expanded=False):
+                st.markdown("**Character Search**")
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    if st.session_state.text_input_warning:
+                        st.warning(st.session_state.text_input_warning)
+                    st.text_input("Go to component/character", value=st.session_state.text_input_comp, key="w_text",
+                                  on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
+                    st.caption("Enter one Chinese character to jump directly to its details")
+                
+                st.markdown("---")
+                st.markdown("**English Definition Search**")
+                col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
+                with col_s2:
+                    st.text_input("Search definitions", key="w_def_search", placeholder="e.g., water, fire, mountain", label_visibility="collapsed")
+                    if st.button("Search Definitions", use_container_width=True, type="primary"):
+                        search_by_definition()
+                        st.rerun()
+                    st.caption("Search across character definitions and phrase meanings")
+
     else:
         if st.session_state.definition_search_mode and st.session_state.definition_search_results:
             results = st.session_state.definition_search_results
@@ -1567,8 +1776,8 @@ def main():
                     pinyin = phrase_data['pinyin']
                     meanings = pyhtml.escape(phrase_data['meanings'][:200] + ('...' if len(phrase_data['meanings']) > 200 else ''))
                     st.markdown(f"""
-                        <div class='compound-item'>
-                            <span class='cp-word'>{word}</span>
+                        <div class='compound-item' style='margin-bottom:15px;'>
+                            <span class='cp-word' style='font-size:1.4em;'>{word}</span>
                             <span class='cp-pinyin'>{pinyin}</span>
                             <span class='cp-mean'>{meanings}</span>
                         </div>
