@@ -1,5 +1,4 @@
 # app.py
-# Claude 2 Jan 10AM 
 # Main Streamlit app for Radix - with definition search and commonality ranking
 
 """
@@ -930,6 +929,7 @@ def render_splash():
         """
         <div class="palace-entrance-container">
             <div class="grand-torii">⛩️</div>
+            <div class="entrance-text">Grand Hall of Radix 🈑 Components</div>
         </div>
         """, 
         unsafe_allow_html=True
@@ -938,7 +938,7 @@ def render_splash():
     # Entrance button centered below the torii
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
-        if st.button("Grand Hall of 🈑 Components", key="entrance_btn", use_container_width=True, type="primary"):
+        if st.button("🚪 Enter", key="entrance_btn", use_container_width=True, type="primary"):
             st.session_state.onboarding_done = True
             st.rerun()
     
@@ -1458,103 +1458,104 @@ def main():
                 st.rerun()
             st.caption("Search across character definitions and phrase meanings")
 
-        # 2) All filtering / hiding / showing controls live under one expander
-        with st.expander("🔎 Filters", expanded=False):
-            # Related-character script filter (applies to the drilldown list)
-            if not st.session_state.stroke_view_active and not st.session_state.show_inputs:
-                current_script = st.session_state.get("script_filter", st.session_state.grid_script_filter)
-                st.radio(
-                    "Filter Results",
-                    options=SCRIPT_FILTERS,
-                    index=SCRIPT_FILTERS.index(current_script),
-                    key="w_script_filter",
-                    on_change=sync_script_filter,
-                )
-
-            # Grid filters (root view)
-            if st.session_state.show_inputs:
-                max_s_val = max(
-                    (get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None),
-                    default=30,
-                )
-                st.slider(
-                    "Stroke count",
-                    min_value=1,
-                    max_value=max_s_val,
-                    value=st.session_state.stroke_range,
-                    key="w_stroke_range",
-                    on_change=sync_stroke_range,
-                )
-
-                all_radicals = sorted(
-                    set(
-                        info.get("meta", {}).get("radical")
-                        for info in component_map.values()
-                        if info.get("meta", {}).get("radical")
-                    )
-                )
-                radical_options = ["none"] + all_radicals
-                st.selectbox(
-                    "Radical",
-                    options=radical_options,
-                    index=radical_options.index(st.session_state.radical)
-                    if st.session_state.radical in radical_options
-                    else 0,
-                    key="w_radical",
-                    on_change=sync_radical,
-                )
-
-                idc_options = ["none"] + sorted(stats_cache.get("idc_counts", {}).keys())
-                st.selectbox(
-                    "Structure (IDC)",
-                    options=idc_options,
-                    index=idc_options.index(st.session_state.component_idc)
-                    if st.session_state.component_idc in idc_options
-                    else 0,
-                    key="w_idc",
-                    on_change=sync_idc,
-                )
-
-                # Most frequent components / characters preference (sorting mode)
-                st.markdown("### Sort Grid By")
-
-                def update_grid_sort_mode():
-                    selected = st.session_state.grid_sort_mode_radio
-                    if selected == "Component frequency":
-                        # (a) Component frequency: how often a component appears inside other characters
-                        st.session_state.grid_sort_mode = "usage"
-                        # Assumption: user wants to browse components only
-                        st.session_state.page = 1
-                    else:
-                        # (b) Character frequency: how often a character appears in everyday language usage
-                        st.session_state.grid_sort_mode = "frequency"
-                        # Assumption: user wants to browse all characters
-                        st.session_state.page = 1
-
-                st.radio(
-                    "Sort key",
-                    options=["Component frequency", "Character frequency"],
-                    index=0 if st.session_state.get("grid_sort_mode", "usage") == "usage" else 1,
-                    key="grid_sort_mode_radio",
-                    on_change=update_grid_sort_mode,
-                    help="Component frequency: how often this component appears inside other characters (components-only grid).\nCharacter frequency: how often this character appears in common use (all-characters grid).",
-                )
-
-                if st.session_state.grid_sort_mode == "frequency":
-
-                    def update_grid_script():
-                        st.session_state.grid_script_filter = st.session_state.grid_script_radio
-                        st.session_state.page = 1
-
-                    st.markdown("#### Script Preference (affects all views)")
+        # Only show filters when NOT in stroke view (since stroke view has no filterable content)
+        if not st.session_state.stroke_view_active:
+            with st.expander("🔎 Filters", expanded=False):
+                # Related-character script filter (applies to the drilldown list)
+                if not st.session_state.show_inputs:
+                    current_script = st.session_state.get("script_filter", st.session_state.grid_script_filter)
                     st.radio(
-                        "Show characters in:",
-                        options=["Simplified", "Traditional", "Any"],
-                        index=["Simplified", "Traditional", "Any"].index(st.session_state.grid_script_filter),
-                        key="grid_script_radio",
-                        on_change=update_grid_script,
-                        horizontal=True,
+                        "Filter Results",
+                        options=SCRIPT_FILTERS,
+                        index=SCRIPT_FILTERS.index(current_script),
+                        key="w_script_filter",
+                        on_change=sync_script_filter,
                     )
+
+                # Grid filters (root view)
+                if st.session_state.show_inputs:
+                    max_s_val = max(
+                        (get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None),
+                        default=30,
+                    )
+                    st.slider(
+                        "Stroke count",
+                        min_value=1,
+                        max_value=max_s_val,
+                        value=st.session_state.stroke_range,
+                        key="w_stroke_range",
+                        on_change=sync_stroke_range,
+                    )
+
+                    all_radicals = sorted(
+                        set(
+                            info.get("meta", {}).get("radical")
+                            for info in component_map.values()
+                            if info.get("meta", {}).get("radical")
+                        )
+                    )
+                    radical_options = ["none"] + all_radicals
+                    st.selectbox(
+                        "Radical",
+                        options=radical_options,
+                        index=radical_options.index(st.session_state.radical)
+                        if st.session_state.radical in radical_options
+                        else 0,
+                        key="w_radical",
+                        on_change=sync_radical,
+                    )
+
+                    idc_options = ["none"] + sorted(stats_cache.get("idc_counts", {}).keys())
+                    st.selectbox(
+                        "Structure (IDC)",
+                        options=idc_options,
+                        index=idc_options.index(st.session_state.component_idc)
+                        if st.session_state.component_idc in idc_options
+                        else 0,
+                        key="w_idc",
+                        on_change=sync_idc,
+                    )
+
+                    # Most frequent components / characters preference (sorting mode)
+                    st.markdown("### Sort Grid By")
+
+                    def update_grid_sort_mode():
+                        selected = st.session_state.grid_sort_mode_radio
+                        if selected == "Component frequency":
+                            # (a) Component frequency: how often a component appears inside other characters
+                            st.session_state.grid_sort_mode = "usage"
+                            # Assumption: user wants to browse components only
+                            st.session_state.page = 1
+                        else:
+                            # (b) Character frequency: how often a character appears in everyday language usage
+                            st.session_state.grid_sort_mode = "frequency"
+                            # Assumption: user wants to browse all characters
+                            st.session_state.page = 1
+
+                    st.radio(
+                        "Sort key",
+                        options=["Component frequency", "Character frequency"],
+                        index=0 if st.session_state.get("grid_sort_mode", "usage") == "usage" else 1,
+                        key="grid_sort_mode_radio",
+                        on_change=update_grid_sort_mode,
+                        help="Component frequency: how often this component appears inside other characters (components-only grid).\nCharacter frequency: how often this character appears in common use (all-characters grid).",
+                    )
+
+                    if st.session_state.grid_sort_mode == "frequency":
+
+                        def update_grid_script():
+                            st.session_state.grid_script_filter = st.session_state.grid_script_radio
+                            st.session_state.page = 1
+
+                        st.markdown("#### Script Preference (affects all views)")
+                        st.radio(
+                            "Show characters in:",
+                            options=["Simplified", "Traditional", "Any"],
+                            index=["Simplified", "Traditional", "Any"].index(st.session_state.grid_script_filter),
+                            key="grid_script_radio",
+                            on_change=update_grid_script,
+                            horizontal=True,
+                        )
     
     if st.session_state.stroke_view_active:
         st.markdown("### Stroke Order Animation")
