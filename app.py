@@ -349,6 +349,68 @@ def render_lineage_view():
             st.markdown(f"<div style='text-align:center; margin:20px;'>⬇️ {len(unique_children)-120} More ⬇️</div>", unsafe_allow_html=True)
             for c in unique_children[120:]: render_radix_row(c, is_static=True)
 
+def render_startup_file_choice():
+    """Prompt user to choose between local file or server-side data at startup."""
+    st.markdown(
+        """
+        <div class="splash-wrap">
+          <div class="splash-card">
+            <div class="splash-title">Radix 🈑 - Data Setup</div>
+            <div class="splash-sub" style="margin-top: 20px;">
+              Do you have a local Radix user data file you'd like to use?
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    
+    st.markdown("<div style='max-width: 600px; margin: 40px auto;'>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📱 Yes, upload my local file", use_container_width=True, type="primary"):
+            st.session_state.startup_choice = "upload"
+            st.rerun()
+    
+    with col2:
+        if st.button("☁️ No, use server defaults", use_container_width=True):
+            st.session_state.startup_choice = "server"
+            # Load server data if available
+            if st.session_state.get("server_data_available"):
+                obj = st.session_state.server_data
+                st.session_state.favourites_list = obj["favourites_list"]
+                st.session_state.prompt_config = obj["prompt_config"]
+                st.session_state.prompt_ui = obj["prompt_ui"]
+            st.session_state.startup_file_choice_made = True
+            st.rerun()
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Show upload interface if user chose to upload
+    if st.session_state.get("startup_choice") == "upload":
+        st.markdown("<div style='max-width: 600px; margin: 40px auto;'>", unsafe_allow_html=True)
+        st.markdown("### 📤 Upload Your Local File")
+        
+        uploaded_file = st.file_uploader(
+            "Choose your radix_user_data.json file",
+            type=["json"],
+            key="startup_uploader",
+        )
+        
+        if uploaded_file is not None:
+            _apply_uploaded_profile_bytes(uploaded_file.getvalue())
+            if st.session_state.get("_upload_applied"):
+                 st.success("✅ File loaded successfully!")
+                 if st.button("Continue to Radix", type="primary", use_container_width=True):
+                    st.session_state.startup_file_choice_made = True
+                    st.rerun()
+            elif st.session_state.get("_upload_error"):
+                 st.error(st.session_state["_upload_error"])
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+
 def render_splash():
     st.markdown("""<div class="palace-entrance-container"><div class="grand-torii">⛩️</div>
         <div class="entrance-text">Grand Hall of Radix 🈑 Components</div></div>""", unsafe_allow_html=True)
