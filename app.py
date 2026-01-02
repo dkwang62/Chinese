@@ -51,6 +51,10 @@ def build_profile_dict() -> dict:
         "prompt_ui": st.session_state.get("prompt_ui", {}),
     }
 
+def build_profile_payload() -> dict:
+    # Backing store for Save/Load actions
+    return build_profile_dict()
+
 def export_profile_str() -> str:
     return json.dumps(build_profile_dict(), ensure_ascii=False, indent=2)
 
@@ -71,14 +75,30 @@ def apply_dynamic_css():
     css = """
     <style>
     .main .block-container {padding-top: 2rem; padding-bottom: 3rem;}
+    
+    /* Card Styling */
     .char-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         padding: 24px; border-radius: 16px; margin-bottom: 0px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #e9ecef; transition: all 0.3s ease;
     }
     .char-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
+    
+    /* Typography & Tags */
     .meta-pinyin { font-weight: 700; font-size: 2.4em; color: #d35400; text-shadow: 0 2px 4px rgba(211, 84, 0, 0.1); }
-    .meta-tag { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 4px 12px; border-radius: 8px; font-size: 0.85em; color: #495057; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+    .meta-tag { 
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); 
+        padding: 4px 12px; border-radius: 8px; font-size: 0.85em; 
+        color: #495057; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        margin-bottom: 6px; /* Prevent overlap when wrapping */
+        display: inline-block;
+    }
+    
+    /* Sidebar Specific Fixes */
+    section[data-testid="stSidebar"] .meta-pinyin { font-size: 2.0em !important; }
+    section[data-testid="stSidebar"] .char-card { padding: 16px !important; }
+    
+    /* Interactive Elements */
     .comp-grid .stButton > button {
         width: 100% !important; font-size: 2.2em !important; height: 85px !important;
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
@@ -502,7 +522,7 @@ def render_splash():
                     if st.button("Dismiss", key="dismiss_success"): st.session_state["_upload_applied"] = False; st.rerun()
                 if st.session_state.get("_post_apply_rerun"): st.session_state["_post_apply_rerun"] = False; st.rerun()
 
-                with st.expander("🔎 Review current data snapshot (what will be downloaded)", expanded=False): st.json(build_profile_dict())
+                with st.expander("🔎 Review current data snapshot (what will be downloaded)", expanded=False): st.json(build_profile_payload())
 
                 st.markdown("---"); st.subheader("Favourites")
                 fav_txt = st.text_area("Favourites (space or newline separated)", value=" ".join(st.session_state.get("favourites_list", [])), height=90, key="fav_bulk_editor", label_visibility="collapsed")
@@ -593,6 +613,32 @@ def render_splash():
                         st.caption(f"used in {component_usage_count(ch)} characters")
         st.markdown("</div>", unsafe_allow_html=True)
 
+def _render_phrase_html(c: str) -> str:
+    """Consolidated logic to render the phrase table HTML for any character."""
+    n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
+    n = n_map.get(st.session_state.display_mode, 2)
+    compounds = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
+    
+    if compounds and (db := get_db_connection()):
+        phrases = batch_get_phrase_details(sorted(compounds), db)
+        items_html_list = []
+        for word in sorted(compounds):
+            entry = phrases.get(word)
+            if entry:
+                p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
+                items_html_list.append(f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span></div>")
+        
+        if items_html_list:
+            return f"""
+            <div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>
+                <div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>
+                    {st.session_state.display_mode} containing {c}
+                </div>
+                {''.join(items_html_list)}
+            </div>
+            """
+    return ""
+
 def render_radix_row(c, context="detail", is_static=False):
     col_char, col_details = st.columns([2, 10])
     is_preview = st.session_state.preview_comp == c
@@ -619,32 +665,6 @@ def render_radix_row(c, context="detail", is_static=False):
             if html := _render_phrase_html(c):
                 st.markdown(html, unsafe_allow_html=True)
     st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
-
-def _render_phrase_html(c: str) -> str:
-    """Consolidated logic to render the phrase table HTML for any character."""
-    n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
-    n = n_map.get(st.session_state.display_mode, 2)
-    compounds = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
-    
-    if compounds and (db := get_db_connection()):
-        phrases = batch_get_phrase_details(sorted(compounds), db)
-        items_html_list = []
-        for word in sorted(compounds):
-            entry = phrases.get(word)
-            if entry:
-                p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
-                items_html_list.append(f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span></div>")
-        
-        if items_html_list:
-            return f"""
-            <div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>
-                <div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>
-                    {st.session_state.display_mode} containing {c}
-                </div>
-                {''.join(items_html_list)}
-            </div>
-            """
-    return ""
 
 def main():
     if not component_map: st.error("Component dataset not loaded."); st.stop()
@@ -682,7 +702,7 @@ def main():
 
             if st.session_state.stroke_view_active:
                 st.markdown("### Character Info")
-                st.markdown(f"<div class='char-card'>{generate_clean_card_html(current_char_for_sidebar)}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='char-card'>{generate_clean_card_html(current_char_for_sidebar, usage_count=component_usage_count(current_char_for_sidebar), is_static=True)}</div>", unsafe_allow_html=True)
 
         if not st.session_state.show_inputs:
             with st.expander("Display Phrases", expanded=False):
@@ -723,7 +743,6 @@ def main():
         main_html, _ = get_stroke_order_view_html(st.session_state.stroke_view_char, st.session_state.display_mode)
         st_html(main_html, height=450)
         
-        # Explicitly render the phrase table using our reliable helper
         if st.session_state.display_mode != "Single Character":
             if phrase_html := _render_phrase_html(st.session_state.stroke_view_char):
                 st.markdown(phrase_html, unsafe_allow_html=True)
