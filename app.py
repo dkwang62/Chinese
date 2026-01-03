@@ -128,7 +128,7 @@ def apply_dynamic_css():
         border: 1px solid #81c784;
     }
 
-    /* Definition & Etymology (The Distinction You Requested) */
+    /* Definition & Etymology */
     .def-row {
         font-size: 1.15em;
         line-height: 1.6;
@@ -149,6 +149,7 @@ def apply_dynamic_css():
     /* Sidebar Specific Fixes */
     section[data-testid="stSidebar"] .meta-pinyin { font-size: 2.0em !important; }
     section[data-testid="stSidebar"] .char-card { padding: 16px !important; }
+    section[data-testid="stSidebar"] .def-row { font-size: 1.05em !important; }
     
     /* Interactive Elements */
     .comp-grid .stButton > button {
@@ -742,22 +743,32 @@ def main():
 
         current_char_for_sidebar = st.session_state.stroke_view_char if st.session_state.stroke_view_active else (st.session_state.preview_comp or st.session_state.selected_comp)
         if current_char_for_sidebar:
+            # 1. Stroke Order GIF
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
             if sidebar_html: st_html(sidebar_html, height=sidebar_height)
+
+            # 2. Standardized Enhanced Preview Card (Def, Ety, IDC)
+            info = component_map.get(current_char_for_sidebar, {})
+            decomp = info.get("meta", {}).get("decomposition", "")
+            idc = decomp[0] if decomp and decomp[0] in IDC_CHARS else None
+            idc_html = f"<div style='margin-top: 12px; padding-top: 12px; border-top: 1px solid #e9ecef; font-size: 0.95em; color: #555;'><b>Structure (IDC):</b> <span class='status-tag' style='font-family:monospace;'>{idc}</span></div>" if idc else ""
             
+            # Generate base card HTML (handles pinyin, radical, strokes, def, ety via radix_core)
+            card_base_html = generate_clean_card_html(current_char_for_sidebar, usage_count=component_usage_count(current_char_for_sidebar), is_static=True)
+            
+            # Render combined card
+            st.markdown(f"<div class='char-card' style='margin-top: 15px;'>{card_base_html}{idc_html}</div>", unsafe_allow_html=True)
+
+            # 3. Related usage count below card
             related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
             chars_filtered = apply_script_filter([c for c in related if c in component_map], st.session_state.script_filter)
-            if len(chars_filtered) > 0: st.markdown(f"<div style='font-size:0.75em; line-height:1.1; margin:0.15rem 0 0.35rem 0; opacity:0.8;'>{len(chars_filtered)} characters contain <span class='char'>{current_char_for_sidebar}</span></div>", unsafe_allow_html=True)
+            if len(chars_filtered) > 0: st.markdown(f"<div style='font-size:0.75em; line-height:1.1; margin:10px 0 0.35rem 0; opacity:0.8; text-align:center;'>Used in {len(chars_filtered)} other characters</div>", unsafe_allow_html=True)
             
-            st.checkbox("Show in Favourites", value=(current_char_for_sidebar in st.session_state.favourites_list), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
-            if st.button("Show Favourites", use_container_width=True): go_to_root(); st.session_state.onboarding_done = False; st.rerun()
+            st.markdown("---")
 
-            if st.session_state.stroke_view_active:
-                st.markdown("### Character Info")
-                # Updated: Use 'char-card' div wrapper + generate_clean_card_html with is_static=True 
-                # This ensures the card looks exactly like the "wide card" screenshot (Screenshot 2)
-                # with usage count, definition/etymology separation, and tip box.
-                st.markdown(f"<div class='char-card'>{generate_clean_card_html(current_char_for_sidebar, usage_count=component_usage_count(current_char_for_sidebar), is_static=True)}</div>", unsafe_allow_html=True)
+            # 4. Favourites & Tools
+            st.checkbox("Show in Favourites", value=(current_char_for_sidebar in st.session_state.favourites_list), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
+            if st.button("Show Favourites Manager", use_container_width=True): go_to_root(); st.session_state.onboarding_done = False; st.rerun()
 
         if not st.session_state.show_inputs:
             with st.expander("Display Phrases", expanded=False):
