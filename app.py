@@ -531,7 +531,7 @@ def render_startup_file_choice():
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_splash():
-    st.markdown("""<div class="splash-wrap"><div class="splash-card"><div class="splash-title">Radix 🈑 Components</div></div></div>""", unsafe_allow_html=True)
+#    st.markdown("""<div class="splash-wrap"><div class="splash-card"><div class="splash-title">Radix 🈑 Components</div></div></div>""", unsafe_allow_html=True)
     st.markdown("""<div class="palace-entrance-container"><div class="grand-torii">⛩️</div><div class="entrance-text">Grand Hall of Radix 🈑 Components</div></div>""", unsafe_allow_html=True)
     _, c, _ = st.columns([1,1,1])
     if c.button("🚪 Enter", key="entrance_btn", use_container_width=True, type="primary"): st.session_state.onboarding_done = True; st.rerun()
