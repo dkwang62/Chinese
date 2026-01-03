@@ -746,20 +746,13 @@ def main():
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
             if sidebar_html: st_html(sidebar_html, height=sidebar_height)
             
-            # --- Standardized Preview Card ---
-            info = component_map.get(current_char_for_sidebar, {})
-            decomp = info.get("meta", {}).get("decomposition", "")
-            
-            # Enhanced IDC logic: Show full structure string if it starts with an IDC char
-            idc_html = ""
-            if decomp and decomp[0] in IDC_CHARS:
-                idc_html = f"<div style='margin-top: 12px; padding-top: 12px; border-top: 1px solid #e9ecef; font-size: 0.95em; color: #555;'><b>Structure (IDC):</b> <span class='status-tag' style='font-family:monospace;'>{decomp}</span></div>"
-            
-            # Generate Base Card (Def/Ety/Stats)
+            # --- Standardized Preview Card (Grid, List, Stroke) ---
+            # Using basic clean card generation + tip text override + implicit duplication removal
             card_base_html = generate_clean_card_html(current_char_for_sidebar, usage_count=component_usage_count(current_char_for_sidebar), is_static=True)
+            # Correct the tip text: replace "search box at the top" with "search box"
+            card_base_html = card_base_html.replace("search box at the top", "search box")
             
-            # Render Unified Card
-            st.markdown(f"<div class='char-card' style='margin-top: 15px;'>{card_base_html}{idc_html}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='char-card' style='margin-top: 15px;'>{card_base_html}</div>", unsafe_allow_html=True)
             
             st.markdown("---")
             st.checkbox("Show in Favourites", value=(current_char_for_sidebar in st.session_state.favourites_list), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
