@@ -515,7 +515,7 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_stati
             discovery_tip = (
                 f"<div class='discovery-tip' style='margin-top:12px; padding:8px; background:#fff3e0; "
                 f"border-top:1px dashed #ffb74d; font-size:0.88em; color:#e65100; font-weight:600;'>"
-                f"💡 Tip: Copy and paste {c} into the search box at the top to drill down on this character."
+                f"💡 Tip: Alternatively, paste {c} into the search box to select it."
                 f"</div>"
             )
         else:
