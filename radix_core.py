@@ -400,8 +400,12 @@ def build_chatgpt_prompt(char: str) -> str:
     return render_combined_prompt(char, cfg, selected, definition_en=def_en)
 
 
-def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_static: bool = False) -> str:
-    """Generate clean HTML card with hover tooltips for tips and legends."""
+def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_static: bool = False, minimal: bool = False) -> str:
+    """
+    Generate clean HTML card.
+    Args:
+        minimal (bool): If True, renders lightweight badges (standard browser tooltips) instead of heavy HTML tooltips.
+    """
     if not c:
         return ""
     
@@ -433,23 +437,26 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_stati
     if decomp and decomp != "—":
         meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
     
-    # --- Usage Badge with Tooltip ---
+    # --- Usage Badge ---
     if usage_count is not None and usage_count > 0:
-        # Define the tip content based on context (Static vs Interactive)
-        if is_static:
-            tip_content = f"💡 <strong>Static View:</strong> Copy and paste <strong>{c}</strong> into the search box to explore related chars."
+        if minimal:
+            # Lightweight version
+            meta_items.append(f"<span class='meta-tag' title='Used in {usage_count} characters. Click to drill down.'>Used in {usage_count} chars</span>")
         else:
-            tip_content = f"✨ <strong>Interactive Tip:</strong><br>1. Click <strong>{c}</strong> once to preview in sidebar.<br>2. Click <strong>{c}</strong> again to drill down into the {usage_count} related characters."
+            # Full HTML tooltip version
+            if is_static:
+                tip_content = f"💡 <strong>Static View:</strong> Copy and paste <strong>{c}</strong> into the search box to explore related chars."
+            else:
+                tip_content = f"✨ <strong>Interactive Tip:</strong><br>1. Click <strong>{c}</strong> once to preview in sidebar.<br>2. Click <strong>{c}</strong> again to drill down into the {usage_count} related characters."
 
-        # Wrap in tooltip container
-        meta_items.append(
-            f"<div class='radix-tooltip'>"
-            f"   <span class='meta-tag' style='border-bottom: 2px dotted #aaa;'>Used in {usage_count} chars</span>"
-            f"   <span class='radix-tooltiptext'>{tip_content}</span>"
-            f"</div>"
-        )
+            meta_items.append(
+                f"<div class='radix-tooltip'>"
+                f"   <span class='meta-tag' style='border-bottom: 2px dotted #aaa;'>Used in {usage_count} chars</span>"
+                f"   <span class='radix-tooltiptext'>{tip_content}</span>"
+                f"</div>"
+            )
 
-    # --- Frequency Badge with Tooltip ---
+    # --- Frequency Badge ---
     freq = info.get('freq_per_million', 0.0)
     if freq > 0:
         if freq >= FREQ_PERCENTILES['p95']:
@@ -463,34 +470,44 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_stati
         else:
             label, color = "Bottom 25%", "#c62828"
             
-        # Legend content for the tooltip
-        legend_content = (
-            "<strong>📊 Frequency Guide</strong><br><br>"
-            "<strong>Top 5% (Essential):</strong> Core survival vocabulary.<br>"
-            "<strong>Top 25% (Common):</strong> Standard for news & business.<br>"
-            "<strong>Above Average:</strong> Topic-specific (e.g. Science).<br>"
-            "<strong>Below Average:</strong> Literary & enrichment words.<br>"
-            "<strong>Bottom 25%:</strong> Rare, archaic, or very specific names."
-        )
+        if minimal:
+            # Lightweight version - standard title attribute
+            meta_items.append(
+                f"<span class='meta-tag' title='Frequency: {label} ({freq:,.0f}/M)' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); color: {color}; border: 1px solid {color}40; font-weight:700; cursor: help;'>"
+                f"Freq: {label}"
+                f"</span>"
+            )
+        else:
+            # Full HTML tooltip version
+            legend_content = (
+                "<strong>📊 Frequency Guide</strong><br><br>"
+                "<strong>Top 5% (Essential):</strong> Core survival vocabulary.<br>"
+                "<strong>Top 25% (Common):</strong> Standard for news & business.<br>"
+                "<strong>Above Average:</strong> Topic-specific (e.g. Science).<br>"
+                "<strong>Below Average:</strong> Literary & enrichment words.<br>"
+                "<strong>Bottom 25%:</strong> Rare, archaic, or very specific names."
+            )
 
-        # Wrap in tooltip container
-        meta_items.append(
-            f"<div class='radix-tooltip'>"
-            f"   <span class='meta-tag' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); "
-            f"         color: {color}; border: 1px solid {color}40; font-weight:700; cursor: help;'>"
-            f"     Frequency: {label} ({freq:,.0f}/M)"
-            f"   </span>"
-            f"   <span class='radix-tooltiptext' style='width:250px;'>{legend_content}</span>"
-            f"</div>"
-        )
+            meta_items.append(
+                f"<div class='radix-tooltip'>"
+                f"   <span class='meta-tag' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); "
+                f"         color: {color}; border: 1px solid {color}40; font-weight:700; cursor: help;'>"
+                f"     Frequency: {label} ({freq:,.0f}/M)"
+                f"   </span>"
+                f"   <span class='radix-tooltiptext' style='width:250px;'>{legend_content}</span>"
+                f"</div>"
+            )
     else:
-        # No Data case (optional: still show badge but simpler tooltip)
-        meta_items.append(
-            f"<div class='radix-tooltip'>"
-            f"   <span class='meta-tag' style='color:#999;'>Freq: No Data</span>"
-            f"   <span class='radix-tooltiptext'>No frequency data available in SUBTLEX-CH for this character.</span>"
-            f"</div>"
-        )
+        # No Data case
+        if minimal:
+             meta_items.append(f"<span class='meta-tag' style='color:#999;'>Freq: No Data</span>")
+        else:
+            meta_items.append(
+                f"<div class='radix-tooltip'>"
+                f"   <span class='meta-tag' style='color:#999;'>Freq: No Data</span>"
+                f"   <span class='radix-tooltiptext'>No frequency data available in SUBTLEX-CH for this character.</span>"
+                f"</div>"
+            )
 
     # Script variant tags
     if cc_t2s:
@@ -502,7 +519,6 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_stati
         if traditional != c:
             meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. → {traditional}</span>")
 
-    # Assemble HTML (NO embedded CSS style block now)
     meta_html = f"<div class='meta-row' style='display:flex; flex-wrap:wrap; gap:8px; align-items:center;'>{''.join(meta_items)}</div>"
     def_html = f"<div class='def-row'>{definition}</div>" if definition and definition != "—" else ""
     ety_html = f"<div class='ety-row'>{etymology}</div>" if etymology else ""
