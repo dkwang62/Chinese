@@ -27,6 +27,14 @@ SCRIPT_FILTERS = ["Any", "Simplified", "Traditional"]
 # --- Global SUBTLEX-CH frequency dict ---
 SUBTLEX_FREQ: Dict[str, float] = {}  # simplified char -> freq per million
 
+# --- SUBTLEX-CH Frequency Badge (Percentile-Based) ---
+# Pre-defined percentile thresholds (based on distribution of SUBTLEX-CH data)
+FREQ_PERCENTILES = {
+    'p95': 8500,  # Top 5% of words
+    'p75': 3200,  # Top 25% of words
+    'p50': 800,   # Top 50% of words (median)
+    'p25': 150    # Bottom 25% of words
+}
 
 def load_subtlex_freq():
     """Load SUBTLEX-CH character frequencies from SUBTLEX-CH-CHR.txt (GBK encoded)"""
@@ -57,12 +65,31 @@ def load_subtlex_freq():
 # --- Data Loading & Augmentation ---
 def load_and_augment_map():
     try:
-        with open("enhanced_component_map_with_etymology.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
+        filename = "enhanced_component_map_with_etymology.json"
+        with open(filename, "r", encoding="utf-8") as f:
+            # We read the file content first to help with debugging if it fails
+            content = f.read()
+            data = json.loads(content)
+            
+    except json.JSONDecodeError as e:
+        # --- IMPROVED ERROR REPORTING ---
+        print(f"\n[Radix Critical Error] JSON Syntax Error in {filename}")
+        print(f"Error details: {e.msg}")
+        print(f"Location: Line {e.lineno}, Column {e.colno}")
+        
+        # Try to print the specific bad line
+        lines = content.split('\n')
+        if 0 <= e.lineno - 1 < len(lines):
+            bad_line = lines[e.lineno - 1]
+            print(f"The bad line looks like this:\n   >> {bad_line.strip()}")
+            print("Check for trailing commas or missing values right before this point.\n")
+        return {}
+        
     except FileNotFoundError:
+        print("[Radix] enhanced_component_map_with_etymology.json not found.")
         return {}
 
-    # Load SUBTLEX frequencies first
+    # Load SUBTLEX frequencies
     load_subtlex_freq()
 
     for char, info in data.items():
@@ -87,7 +114,6 @@ def load_and_augment_map():
 
     gc.collect()
     return data
-
 
 def get_component_stats(_component_map):
     r_groups = {}
@@ -383,6 +409,35 @@ def build_chatgpt_prompt(char: str) -> str:
     def_en = get_char_definition_en(char)
     return render_combined_prompt(char, cfg, selected, definition_en=def_en)
 
+
+def get_frequency_legend_html() -> str:
+    """Returns a collapsible HTML legend explaining the frequency badges."""
+    return """
+    <details style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; font-size: 0.9em; color: #666;">
+        <summary style="cursor: pointer; font-weight: 600; color: #888; margin-bottom: 5px;">
+            📊 What do these frequency labels mean?
+        </summary>
+        <div style="padding: 10px; background: #f9f9f9; border-radius: 8px; line-height: 1.5;">
+            <div style="margin-bottom: 8px;">
+                <strong style="color: #2e7d32;">Top 5% (Essential):</strong> The core "survival" vocabulary found in almost every conversation.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <strong style="color: #558b2f;">Top 25% (Common):</strong> Standard words for reading news, books, and working in professional environments.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <strong style="color: #ff8f00;">Above Average:</strong> Vocabulary for specific topics (e.g., 'science', 'policy')—useful but context-dependent.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <strong style="color: #f57c00;">Below Average:</strong> "Enrichment" words. These add nuance and literary depth but aren't strictly necessary for basic tasks.
+            </div>
+            <div>
+                <strong style="color: #c62828;">Bottom 25% (Rare):</strong> Highly specific nouns, archaic terms, or obscure variants.
+            </div>
+        </div>
+    </details>
+    """
+
+
 def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_static: bool = False) -> str:
     """Generate clean HTML card for a character with metadata."""
     if not c:
@@ -410,27 +465,36 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_stati
     if usage_count is not None and usage_count > 0:
         meta_items.append(f"<span class='meta-tag'>Used in {usage_count} chars</span>")
 
-    # --- SUBTLEX-CH Frequency Badge ---
+    # --- SUBTLEX-CH Frequency Badge (Percentile-Based) ---
     freq = info.get('freq_per_million', 0.0)
+    label = ""
+    color = ""
+    
     if freq > 0:
-        if freq >= 10000:
-            label = "Very Common"
+        if freq >= FREQ_PERCENTILES['p95']:
+            label = "Top 5%"
             color = "#2e7d32"  # dark green
-        elif freq >= 5000:
-            label = "Common"
+        elif freq >= FREQ_PERCENTILES['p75']:
+            label = "Top 25%"
             color = "#558b2f"  # light green
-        elif freq >= 1000:
-            label = "Uncommon"
+        elif freq >= FREQ_PERCENTILES['p50']:
+            label = "Above Average"
+            color = "#ff8f00"  # amber
+        elif freq >= FREQ_PERCENTILES['p25']:
+            label = "Below Average"
             color = "#f57c00"  # orange
         else:
-            label = "Rare"
+            label = "Bottom 25%"
             color = "#c62828"  # red
+    else:
+        label = "No Data"
+        color = "#9e9e9e"  # grey
 
-        meta_items.append(
-            f"<span class='meta-tag' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); color: {color}; border: 1px solid {color}40; font-weight:700;'>"
-            f"Frequency: {label} ({freq:,.0f}/M)"
-            f"</span>"
-        )
+    meta_items.append(
+        f"<span class='meta-tag' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); color: {color}; border: 1px solid {color}40; font-weight:700;'>"
+        f"Frequency: {label}" + (f" ({freq:,.0f}/M)" if freq > 0 else "") +
+        f"</span>"
+    )
 
     # Script variant tags
     if cc_t2s:
@@ -466,8 +530,10 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_stati
     def_html = f"<div class='def-row'>{definition}</div>" if definition and definition != "—" else ""
     ety_html = f"<div class='ety-row'>{etymology}</div>" if etymology else ""
     
-    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}{discovery_tip}</div>"
-
+    # --- NEW: Generate the legend ---
+    legend_html = get_frequency_legend_html()
+    
+    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}{discovery_tip}{legend_html}</div>"
 
 
 # --- iPad-Safe Download HTML ---
