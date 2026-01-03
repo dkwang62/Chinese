@@ -36,13 +36,16 @@
       "鼕"
     ],
     "meta": {
-      "pinyin": [],
+      "pinyin": ["liǎngdiǎndǐ"],
       "definition": "ice",
       "strokes": 2,
       "radical": "⺀",
       "IDC": "—",
       "compounds": [],
-      "etymology": {},
+      "etymology": {
+        "type": "ideographic",
+        "hint": "两点底 two dot bottom"
+      },
       "decomposition": ""
     }
   },
@@ -441,13 +444,16 @@
       "龟"
     ],
     "meta": {
-      "pinyin": [],
+      "pinyin": ["xiédāotóu"],
       "definition": "",
       "strokes": 2,
       "radical": "⺈",
       "IDC": "—",
       "compounds": [],
-      "etymology": {},
+      "etymology": {
+        "type": "ideographic",
+        "hint": "斜刀头 slanted knife top"
+      },
       "decomposition": ""
     }
   },
@@ -7551,7 +7557,7 @@
       "龌"
     ],
     "meta": {
-      "pinyin": [],
+      "pinyin": ["bǔ"],
       "definition": "",
       "strokes": 2,
       "radical": "⺊",
@@ -7559,7 +7565,7 @@
       "compounds": [],
       "etymology": {
         "type": "ideographic",
-        "hint": "A crack on an oracle bone; compare 卜"
+        "hint": "A crack on an oracle bone - to divine / to tell fortunes; ⺊ is the left-side variant of 卜"
       },
       "decomposition": "⿰丨"
     }
@@ -7667,13 +7673,16 @@
       "黨"
     ],
     "meta": {
-      "pinyin": [],
+      "pinyin": ["xiǎozìtóu"],
       "definition": "",
       "strokes": 3,
       "radical": "⺌",
       "IDC": "—",
       "compounds": [],
-      "etymology": {},
+      "etymology": {
+        "type": "ideographic",
+        "hint": "小字头 small character top"
+      },
       "decomposition": ""
     }
   },
@@ -7712,7 +7721,7 @@
       "黉"
     ],
     "meta": {
-      "pinyin": [],
+      "pinyin": ["xiǎozìtóu"],
       "definition": "",
       "strokes": 3,
       "radical": "⺍",
@@ -7734,7 +7743,7 @@
       "隳"
     ],
     "meta": {
-      "pinyin": [],
+      "pinyin": ["shùxīndǐ"],
       "definition": "heart; mind; soul",
       "strokes": 4,
       "radical": "⺗",
@@ -8487,7 +8496,7 @@
       "魍"
     ],
     "meta": {
-      "pinyin": [],
+      "pinyin": ["wǎngzìdǐ"],
       "definition": "net, network",
       "strokes": 4,
       "radical": "⺳",
