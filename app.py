@@ -743,32 +743,27 @@ def main():
 
         current_char_for_sidebar = st.session_state.stroke_view_char if st.session_state.stroke_view_active else (st.session_state.preview_comp or st.session_state.selected_comp)
         if current_char_for_sidebar:
-            # 1. Stroke Order GIF
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
             if sidebar_html: st_html(sidebar_html, height=sidebar_height)
-
-            # 2. Standardized Enhanced Preview Card (Def, Ety, IDC)
+            
+            # --- Standardized Preview Card ---
             info = component_map.get(current_char_for_sidebar, {})
             decomp = info.get("meta", {}).get("decomposition", "")
-            idc = decomp[0] if decomp and decomp[0] in IDC_CHARS else None
-            idc_html = f"<div style='margin-top: 12px; padding-top: 12px; border-top: 1px solid #e9ecef; font-size: 0.95em; color: #555;'><b>Structure (IDC):</b> <span class='status-tag' style='font-family:monospace;'>{idc}</span></div>" if idc else ""
             
-            # Generate base card HTML (handles pinyin, radical, strokes, def, ety via radix_core)
+            # Enhanced IDC logic: Show full structure string if it starts with an IDC char
+            idc_html = ""
+            if decomp and decomp[0] in IDC_CHARS:
+                idc_html = f"<div style='margin-top: 12px; padding-top: 12px; border-top: 1px solid #e9ecef; font-size: 0.95em; color: #555;'><b>Structure (IDC):</b> <span class='status-tag' style='font-family:monospace;'>{decomp}</span></div>"
+            
+            # Generate Base Card (Def/Ety/Stats)
             card_base_html = generate_clean_card_html(current_char_for_sidebar, usage_count=component_usage_count(current_char_for_sidebar), is_static=True)
             
-            # Render combined card
+            # Render Unified Card
             st.markdown(f"<div class='char-card' style='margin-top: 15px;'>{card_base_html}{idc_html}</div>", unsafe_allow_html=True)
-
-            # 3. Related usage count below card
-            related = component_map.get(current_char_for_sidebar, {}).get("related_characters", [])
-            chars_filtered = apply_script_filter([c for c in related if c in component_map], st.session_state.script_filter)
-            if len(chars_filtered) > 0: st.markdown(f"<div style='font-size:0.75em; line-height:1.1; margin:10px 0 0.35rem 0; opacity:0.8; text-align:center;'>Used in {len(chars_filtered)} other characters</div>", unsafe_allow_html=True)
             
             st.markdown("---")
-
-            # 4. Favourites & Tools
             st.checkbox("Show in Favourites", value=(current_char_for_sidebar in st.session_state.favourites_list), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
-            if st.button("Show Favourites Manager", use_container_width=True): go_to_root(); st.session_state.onboarding_done = False; st.rerun()
+            if st.button("Show Favourites", use_container_width=True): go_to_root(); st.session_state.onboarding_done = False; st.rerun()
 
         if not st.session_state.show_inputs:
             with st.expander("Display Phrases", expanded=False):
@@ -809,7 +804,6 @@ def main():
         main_html, _ = get_stroke_order_view_html(st.session_state.stroke_view_char, st.session_state.display_mode)
         st_html(main_html, height=450)
         
-        # Explicitly render the phrase table using our reliable helper
         if st.session_state.display_mode != "Single Character":
             if phrase_html := _render_phrase_html(st.session_state.stroke_view_char):
                 st.markdown(phrase_html, unsafe_allow_html=True)
