@@ -30,7 +30,7 @@
       {
         "id": "task1",
         "title": "Task 1 — Character Analysis",
-        "template": "Task 1 — Character Analysis\n\nFor the Hanzi below, provide:\n\t1.\tOriginal meaning — briefly note the ancient form or origin only if it helps understand modern usage.\n\t2.\tCore semantic concept — summarize the main idea in modern context.\n\t3.\tWhy it is used in compound characters — explain how it contributes meaning to words in everyday or contemporary Chinese.\n\t4.\tThree example words — include pinyin and natural English meanings, using modern common usage.\n\t5.\tOne modern usage sentence — show the character in real-life context; if the character is rare, use the modern equivalent and note it.\n\n⸻\n\n"
+        "template": "Task 1 — Character Analysis\n\nFor the Hanzi below, provide:\n\t1.\tAs a mnemonic aid, explain the character’s original meaning. Briefly describe its ancient form or etymological origin, including why its components were chosen. Indicate whether the character is semantic, phonetic, or a compound form, and explain how its structure or pictographic elements support memorisation.\n\t2.\tCore semantic concept — summarize the main idea in modern context.\n\t3.\tWhy it is used in compound characters — explain how it contributes meaning to words in everyday or contemporary Chinese.\n\t4.\tThree example words — include pinyin and natural English meanings, using modern common usage.\n\t5.\tOne modern usage sentence — show the character in real-life context; if the character is rare, use the modern equivalent and note it.\n\n⸻\n\n"
       },
       {
         "id": "task2",
