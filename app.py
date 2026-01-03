@@ -232,7 +232,7 @@ def apply_dynamic_css():
     .grand-torii { font-size: 250px !important; line-height: 1; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1)); }
     .entrance-text { color: #2c3e50; font-size: 24px; font-weight: 700; margin-top: 20px; margin-bottom: 30px; letter-spacing: 2px; }
 
-    /* TOOLTIP STYLES (Moved from core for safety) */
+    /* TOOLTIP STYLES */
     .radix-tooltip { position: relative; display: inline-block; cursor: help; }
     .radix-tooltip .radix-tooltiptext {
         visibility: hidden; width: 240px; background-color: #262626; color: #fff;
@@ -709,7 +709,7 @@ def _render_phrase_html(c: str) -> str:
             """
     return ""
 
-def render_radix_row(c, context="detail", is_static=False):
+def render_radix_row(c, context="detail", is_static=False, minimal=False):
     col_char, col_details = st.columns([2, 10])
     is_preview = st.session_state.preview_comp == c
     is_active_focus = is_preview or (st.session_state.preview_comp is None and c == st.session_state.selected_comp)
@@ -730,7 +730,7 @@ def render_radix_row(c, context="detail", is_static=False):
             st.markdown("</div></div>", unsafe_allow_html=True)
         
     with col_details:
-        st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c), is_static=is_static), unsafe_allow_html=True)
+        st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c), is_static=is_static, minimal=minimal), unsafe_allow_html=True)
         if not is_static and is_active_focus and st.session_state.display_mode != "Single Character":
             if html := _render_phrase_html(c):
                 st.markdown(html, unsafe_allow_html=True)
@@ -951,11 +951,11 @@ def main():
                     if child not in seen: unique_visible.append(child); seen.add(child)
                 
                 st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {len(unique_visible)} characters)</div>", unsafe_allow_html=True)
-                for child in unique_visible[:120]: render_radix_row(child)
+                for child in unique_visible[:120]: render_radix_row(child, minimal=True)
                 if len(unique_visible) > 120:
                     remaining = len(unique_visible) - 120
                     st.markdown("---\n" + f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>⬇️ {remaining} More Derivatives ⬇️</div>", unsafe_allow_html=True)
-                    for c in unique_visible[120:]: render_radix_row(c, context="static_derivative", is_static=True)
+                    for c in unique_visible[120:]: render_radix_row(c, context="static_derivative", is_static=True, minimal=True)
 
 if __name__ == "__main__":
     main()
