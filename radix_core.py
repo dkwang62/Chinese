@@ -67,29 +67,18 @@ def load_and_augment_map():
     try:
         filename = "enhanced_component_map_with_etymology.json"
         with open(filename, "r", encoding="utf-8") as f:
-            # We read the file content first to help with debugging if it fails
             content = f.read()
             data = json.loads(content)
             
     except json.JSONDecodeError as e:
-        # --- IMPROVED ERROR REPORTING ---
         print(f"\n[Radix Critical Error] JSON Syntax Error in {filename}")
         print(f"Error details: {e.msg}")
         print(f"Location: Line {e.lineno}, Column {e.colno}")
-        
-        # Try to print the specific bad line
-        lines = content.split('\n')
-        if 0 <= e.lineno - 1 < len(lines):
-            bad_line = lines[e.lineno - 1]
-            print(f"The bad line looks like this:\n   >> {bad_line.strip()}")
-            print("Check for trailing commas or missing values right before this point.\n")
         return {}
-        
     except FileNotFoundError:
-        print("[Radix] enhanced_component_map_with_etymology.json not found.")
         return {}
 
-    # Load SUBTLEX frequencies
+    # Load SUBTLEX frequencies first
     load_subtlex_freq()
 
     for char, info in data.items():
@@ -114,6 +103,7 @@ def load_and_augment_map():
 
     gc.collect()
     return data
+
 
 def get_component_stats(_component_map):
     r_groups = {}
@@ -410,36 +400,8 @@ def build_chatgpt_prompt(char: str) -> str:
     return render_combined_prompt(char, cfg, selected, definition_en=def_en)
 
 
-def get_frequency_legend_html() -> str:
-    """Returns a collapsible HTML legend explaining the frequency badges."""
-    return """
-    <details style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; font-size: 0.9em; color: #666;">
-        <summary style="cursor: pointer; font-weight: 600; color: #888; margin-bottom: 5px;">
-            📊 What do these frequency labels mean?
-        </summary>
-        <div style="padding: 10px; background: #f9f9f9; border-radius: 8px; line-height: 1.5;">
-            <div style="margin-bottom: 8px;">
-                <strong style="color: #2e7d32;">Top 5% (Essential):</strong> The core "survival" vocabulary found in almost every conversation.
-            </div>
-            <div style="margin-bottom: 8px;">
-                <strong style="color: #558b2f;">Top 25% (Common):</strong> Standard words for reading news, books, and working in professional environments.
-            </div>
-            <div style="margin-bottom: 8px;">
-                <strong style="color: #ff8f00;">Above Average:</strong> Vocabulary for specific topics (e.g., 'science', 'policy')—useful but context-dependent.
-            </div>
-            <div style="margin-bottom: 8px;">
-                <strong style="color: #f57c00;">Below Average:</strong> "Enrichment" words. These add nuance and literary depth but aren't strictly necessary for basic tasks.
-            </div>
-            <div>
-                <strong style="color: #c62828;">Bottom 25% (Rare):</strong> Highly specific nouns, archaic terms, or obscure variants.
-            </div>
-        </div>
-    </details>
-    """
-
-
 def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_static: bool = False) -> str:
-    """Generate clean HTML card for a character with metadata."""
+    """Generate clean HTML card with hover tooltips for tips and legends."""
     if not c:
         return ""
     
@@ -452,49 +414,83 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_stati
     definition = clean_field(meta.get("definition", ""))
     etymology = get_etymology_text(meta)
 
-    # Build meta items list
+    # --- 1. Build Meta Items (Badges) ---
     meta_items = []
+    
+    # Pinyin
     if pinyin and pinyin != "—":
         meta_items.append(f"<span class='meta-pinyin'>{pinyin}</span>")
+    
+    # Strokes
     if strokes:
         meta_items.append(f"<span class='meta-tag'>{strokes} strokes</span>")
+    
+    # Radical
     if radical and radical != "—":
         meta_items.append(f"<span class='meta-tag'>Rad. {radical}</span>")
+    
+    # Decomposition
     if decomp and decomp != "—":
         meta_items.append(f"<span class='meta-tag'>{decomp}</span>")
-    if usage_count is not None and usage_count > 0:
-        meta_items.append(f"<span class='meta-tag'>Used in {usage_count} chars</span>")
-
-    # --- SUBTLEX-CH Frequency Badge (Percentile-Based) ---
-    freq = info.get('freq_per_million', 0.0)
-    label = ""
-    color = ""
     
+    # --- Usage Badge with Tooltip ---
+    if usage_count is not None and usage_count > 0:
+        # Define the tip content based on context (Static vs Interactive)
+        if is_static:
+            tip_content = f"💡 <strong>Static View:</strong> Copy and paste <strong>{c}</strong> into the search box to explore related chars."
+        else:
+            tip_content = f"✨ <strong>Interactive Tip:</strong><br>1. Click <strong>{c}</strong> once to preview in sidebar.<br>2. Click <strong>{c}</strong> again to drill down into the {usage_count} related characters."
+
+        # Wrap in tooltip container
+        meta_items.append(
+            f"<div class='radix-tooltip'>"
+            f"   <span class='meta-tag' style='border-bottom: 2px dotted #aaa;'>Used in {usage_count} chars</span>"
+            f"   <span class='radix-tooltiptext'>{tip_content}</span>"
+            f"</div>"
+        )
+
+    # --- Frequency Badge with Tooltip ---
+    freq = info.get('freq_per_million', 0.0)
     if freq > 0:
         if freq >= FREQ_PERCENTILES['p95']:
-            label = "Top 5%"
-            color = "#2e7d32"  # dark green
+            label, color = "Top 5%", "#2e7d32"
         elif freq >= FREQ_PERCENTILES['p75']:
-            label = "Top 25%"
-            color = "#558b2f"  # light green
+            label, color = "Top 25%", "#558b2f"
         elif freq >= FREQ_PERCENTILES['p50']:
-            label = "Above Average"
-            color = "#ff8f00"  # amber
+            label, color = "Above Average", "#ff8f00"
         elif freq >= FREQ_PERCENTILES['p25']:
-            label = "Below Average"
-            color = "#f57c00"  # orange
+            label, color = "Below Average", "#f57c00"
         else:
-            label = "Bottom 25%"
-            color = "#c62828"  # red
-    else:
-        label = "No Data"
-        color = "#9e9e9e"  # grey
+            label, color = "Bottom 25%", "#c62828"
+            
+        # Legend content for the tooltip
+        legend_content = (
+            "<strong>📊 Frequency Guide</strong><br><br>"
+            "<strong>Top 5% (Essential):</strong> Core survival vocabulary.<br>"
+            "<strong>Top 25% (Common):</strong> Standard for news & business.<br>"
+            "<strong>Above Average:</strong> Topic-specific (e.g. Science).<br>"
+            "<strong>Below Average:</strong> Literary & enrichment words.<br>"
+            "<strong>Bottom 25%:</strong> Rare, archaic, or very specific names."
+        )
 
-    meta_items.append(
-        f"<span class='meta-tag' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); color: {color}; border: 1px solid {color}40; font-weight:700;'>"
-        f"Frequency: {label}" + (f" ({freq:,.0f}/M)" if freq > 0 else "") +
-        f"</span>"
-    )
+        # Wrap in tooltip container
+        meta_items.append(
+            f"<div class='radix-tooltip'>"
+            f"   <span class='meta-tag' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); "
+            f"         color: {color}; border: 1px solid {color}40; font-weight:700; cursor: help;'>"
+            f"     Frequency: {label} ({freq:,.0f}/M)"
+            f"   </span>"
+            f"   <span class='radix-tooltiptext' style='width:250px;'>{legend_content}</span>"
+            f"</div>"
+        )
+    else:
+        # No Data case (optional: still show badge but simpler tooltip)
+        meta_items.append(
+            f"<div class='radix-tooltip'>"
+            f"   <span class='meta-tag' style='color:#999;'>Freq: No Data</span>"
+            f"   <span class='radix-tooltiptext'>No frequency data available in SUBTLEX-CH for this character.</span>"
+            f"</div>"
+        )
 
     # Script variant tags
     if cc_t2s:
@@ -506,34 +502,12 @@ def generate_clean_card_html(c: str, usage_count: Optional[int] = None, is_stati
         if traditional != c:
             meta_items.append(f"<span class='meta-tag meta-tag-simp'>Simp. → {traditional}</span>")
 
-
-    # Discovery tip - conditional based on card type
-    discovery_tip = ""
-    if usage_count and usage_count > 0:
-        if is_static:
-            # For static cards (non-interactive): instruct to use search
-            discovery_tip = (
-                f"<div class='discovery-tip' style='margin-top:12px; padding:8px; background:#fff3e0; "
-                f"border-top:1px dashed #ffb74d; font-size:0.88em; color:#e65100; font-weight:600;'>"
-                f"💡 Tip: Alternatively, paste {c} into the search box to select it."
-                f"</div>"
-            )
-        else:
-            # For interactive cards: show the two-step click instruction
-            discovery_tip = (
-                f"<div class='discovery-tip' style='margin-top:12px; padding:8px; background:#f0fff4; "
-                f"border-top:1px dashed #c6f6d5; font-size:0.88em; color:#22543d; font-weight:600;'>"
-                f"✨ Tip: Click {c} once to preview it in the sidebar, then click {c} again to drill down into the {usage_count} related characters."
-                f"</div>"
-            )
-    meta_html = f"<div class='meta-row'>{''.join(meta_items)}</div>"
+    # Assemble HTML (NO embedded CSS style block now)
+    meta_html = f"<div class='meta-row' style='display:flex; flex-wrap:wrap; gap:8px; align-items:center;'>{''.join(meta_items)}</div>"
     def_html = f"<div class='def-row'>{definition}</div>" if definition and definition != "—" else ""
     ety_html = f"<div class='ety-row'>{etymology}</div>" if etymology else ""
     
-    # --- NEW: Generate the legend ---
-    legend_html = get_frequency_legend_html()
-    
-    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}{discovery_tip}{legend_html}</div>"
+    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}</div>"
 
 
 # --- iPad-Safe Download HTML ---
