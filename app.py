@@ -231,6 +231,23 @@ def apply_dynamic_css():
     .palace-entrance-container { text-align: center; margin: 60px 0; }
     .grand-torii { font-size: 250px !important; line-height: 1; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1)); }
     .entrance-text { color: #2c3e50; font-size: 24px; font-weight: 700; margin-top: 20px; margin-bottom: 30px; letter-spacing: 2px; }
+
+    /* TOOLTIP STYLES (Moved from core for safety) */
+    .radix-tooltip { position: relative; display: inline-block; cursor: help; }
+    .radix-tooltip .radix-tooltiptext {
+        visibility: hidden; width: 240px; background-color: #262626; color: #fff;
+        text-align: left; border-radius: 6px; padding: 12px;
+        position: absolute; z-index: 1000; bottom: 125%; left: 50%;
+        margin-left: -120px; opacity: 0; transition: opacity 0.3s;
+        font-size: 0.8rem; font-weight: normal; line-height: 1.4;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3); pointer-events: none;
+    }
+    .radix-tooltip .radix-tooltiptext::after {
+        content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
+        border-width: 5px; border-style: solid; border-color: #262626 transparent transparent transparent;
+    }
+    .radix-tooltip:hover .radix-tooltiptext { visibility: visible; opacity: 1; }
+    .radix-tooltiptext strong { color: #ffb74d; }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -752,7 +769,9 @@ def main():
             # Correct the tip text: replace "search box at the top" with "search box"
             card_base_html = card_base_html.replace("search box at the top", "search box")
             
-            st.markdown(f"<div class='char-card' style='margin-top: 15px;'>{card_base_html}</div>", unsafe_allow_html=True)
+            # ✅ FIX: No more double nesting of classes. 
+            # The function returns a <div class='char-card'>...</div>, so we just wrap it in a plain div for spacing.
+            st.markdown(f"<div style='margin-top: 15px;'>{card_base_html}</div>", unsafe_allow_html=True)
             
             st.markdown("---")
             st.checkbox("Show in Favourites", value=(current_char_for_sidebar in st.session_state.favourites_list), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
