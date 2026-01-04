@@ -551,119 +551,124 @@ def render_splash():
 #    st.markdown("""<div class="splash-wrap"><div class="splash-card"><div class="splash-title">Radix 🈑 Components</div></div></div>""", unsafe_allow_html=True)
     st.markdown("""<div class="palace-entrance-container"><div class="grand-torii">⛩️</div><div class="entrance-text">Grand Hall of Radix 🈑 Components</div></div>""", unsafe_allow_html=True)
     _, c, _ = st.columns([1,1,1])
-    if c.button("⛩️ Enter ⛩️", key="entrance_btn", use_container_width=True, type="primary"): st.session_state.onboarding_done = True; st.rerun()
+    if c.button("🚪 Enter", key="entrance_btn", use_container_width=True, type="primary"): st.session_state.onboarding_done = True; st.rerun()
 
-    st.markdown("<div style='max-width: 600px; margin: 40px auto;'>", unsafe_allow_html=True)
-    with st.expander("🔍 Search", expanded=False):
-        st.markdown("**Character Search**")
-        st.text_input("Paste or type a character to explore", key="splash_search", on_change=sync_splash_text, placeholder="e.g., 水", label_visibility="collapsed")
-        st.caption("Enter one Chinese character to jump directly to its details")
-        st.markdown("---")
-        render_definition_search_ui("splash")
+    st.markdown("<div style='margin: 40px auto;'>", unsafe_allow_html=True)
+    
+    # --- CHANGED: Two columns for Search and User Data side-by-side ---
+    col_search, col_data = st.columns([1, 1], gap="medium")
+    
+    with col_search:
+        with st.expander("🔍 Search", expanded=False):
+            st.markdown("**Character Search**")
+            st.text_input("Paste or type a character to explore", key="splash_search", on_change=sync_splash_text, placeholder="e.g., 水", label_visibility="collapsed")
+            st.caption("Enter one Chinese character to jump directly to its details")
+            st.markdown("---")
+            render_definition_search_ui("splash")
+            
+    with col_data:
+        with st.expander("📂 User Data (Save/Load/Review & Edit)", expanded=False):
+            st.caption("Single JSON file for **Favourites** + **AI Prompt Tasks (Tasks)**. Upload applies immediately in-app; download is your backup/export.")
+            if st.session_state.get("_manual_config_active"): st.info("🔒 Using uploaded configuration (overrides server defaults)")
+            elif st.session_state.get("server_data_available"): st.info("☁️ Using server default configuration")
+            else: st.info("🆕 Using app default configuration")
+
+            c_dl, c_ul = st.columns(2)
+            with c_dl: st.markdown(render_ipad_safe_download_html(export_profile_str(), PROFILE_FILENAME, "💾 Download user data"), unsafe_allow_html=True)
+            with c_ul: 
+                if uf := st.file_uploader("Upload user data (JSON)", type=["json"], key="profile_uploader_persistent", label_visibility="collapsed"):
+                    hash_val = hashlib.sha256(uf.getvalue()).hexdigest()
+                    if hash_val != st.session_state.get('_last_upload_hash', ''):
+                        st.warning("⚠️ New file detected - click Apply to use it")
+                        if st.button("✅ Apply uploaded file now", use_container_width=True, type="primary", key="apply_upload_btn"):
+                            st.session_state["_last_upload_hash"] = hash_val; _apply_uploaded_profile_bytes(uf.getvalue()); st.rerun()
+                    else: st.success("✓ Current file is active")
+                    if st.button("♻️ Upload different file", use_container_width=True, key="reset_uploader_btn"):
+                        st.session_state.pop("_last_upload_hash", None); st.session_state.pop("_upload_error", None)
+                        st.session_state.pop("_upload_applied", None); st.session_state.pop("profile_uploader_persistent", None); st.rerun()
+            
+            if st.session_state.get("_upload_error"): st.error(st.session_state["_upload_error"])
+            elif st.session_state.get("_upload_applied"):
+                st.success("✅ Upload applied successfully! Download to save changes.")
+                if st.button("Dismiss", key="dismiss_success"): st.session_state["_upload_applied"] = False; st.rerun()
+            if st.session_state.get("_post_apply_rerun"): st.session_state["_post_apply_rerun"] = False; st.rerun()
+
+            with st.expander("🔎 Review current data snapshot", expanded=False): st.json(build_profile_payload())
+
+            st.markdown("---"); st.subheader("Favourites")
+            fav_txt = st.text_area("Favourites (space or newline separated)", value=" ".join(st.session_state.get("favourites_list", [])), height=90, key="fav_bulk_editor", label_visibility="collapsed")
+            c1, c2, c3 = st.columns([1, 1, 2])
+            with c1:
+                if st.button("Apply favourites", use_container_width=True, key="fav_apply"):
+                    tokens = [t for t in re.split(r"\s+", (fav_txt or "").strip()) if t]
+                    cleaned = []
+                    seen = set()
+                    for c in [t for t in tokens if len(t)==1]:
+                        if c not in seen: cleaned.append(c); seen.add(c)
+                    st.session_state.favourites_list = cleaned; st.session_state.fav_cursor = 0
+                    st.toast("Favourites updated.", icon="✅"); st.rerun()
+            with c2: 
+                if st.button("Clear", use_container_width=True, key="fav_clear"): st.session_state.favourites_list = []; st.session_state.fav_cursor = 0; st.toast("Cleared favourites.", icon="✅"); st.rerun()
+            with c3:
+                add_char = st.text_input("Add a character", value="", key="fav_add_one", placeholder="e.g., 我", label_visibility="collapsed")
+                if st.button("Add", use_container_width=True, key="fav_add_btn"):
+                    c = (add_char or "").strip()
+                    if len(c) != 1: st.toast("Please enter exactly 1 character.", icon="⚠️")
+                    else:
+                        if c not in st.session_state.favourites_list: st.session_state.favourites_list.append(c); st.toast("Added.", icon="✅"); st.rerun()
+
+            favs = st.session_state.get("favourites_list", [])
+            if favs:
+                st.markdown("**Current favourites**")
+                for i, c in enumerate(favs):
+                    cc1, cc2 = st.columns([6, 1])
+                    with cc1: st.write(c)
+                    with cc2:
+                        if st.button("✕", key=f"fav_rm_{i}", help="Remove"): st.session_state.favourites_list.pop(i); st.toast("Removed.", icon="✅"); st.rerun()
+
+            st.markdown("---"); st.subheader("AI Prompt Tasks (Task 1–10)")
+            normalize_prompt_state()
+            cfg = st.session_state.get("prompt_config") or {}
+            tasks = cfg.get("tasks", []) or []
+            all_task_ids = [t.get("id") for t in tasks if t.get("id")]
+            
+            default_sel = st.multiselect("Default selected tasks", options=all_task_ids, default=list(st.session_state.prompt_ui.get("default_selected_task_ids", all_task_ids)), key="prompt_default_sel_editor")
+            if st.button("Save default selection", key="save_default_task_sel"):
+                st.session_state.prompt_ui["default_selected_task_ids"] = list(default_sel)
+                normalize_prompt_state(); st.toast("Default task selection updated.", icon="✅"); st.rerun()
+
+            st.caption("Edit titles/templates below. Changes persist in-session and will be included in the next download.")
+            edited_tasks = []
+            for idx, t in enumerate(tasks):
+                tid = t.get("id")
+                if not tid: continue
+                with st.expander(f"✏️ {t.get('title','(untitled)')}  —  {tid}", expanded=False):
+                    title = st.text_input("Title", value=t.get("title", ""), key=f"pt_title_{tid}")
+                    template = st.text_area("Template", value=t.get("template", ""), height=160, key=f"pt_tpl_{tid}")
+                    cA, cB = st.columns([1, 3])
+                    with cA:
+                        if st.button("Delete task", key=f"pt_del_{tid}"):
+                            st.session_state.prompt_config["tasks"] = [tt for tt in tasks if tt.get("id") != tid]
+                            st.session_state.pop(f"pt_title_{tid}", None); st.session_state.pop(f"pt_tpl_{tid}", None); st.session_state.pop(f"prompt_task_cb_{tid}", None)
+                            normalize_prompt_state(); st.toast("Task deleted.", icon="✅"); st.rerun()
+                    with cB: st.caption("Tip: Keep the template as plain instructions. The character and definition are inserted separately.")
+                edited_tasks.append({"id": tid, "title": title, "template": template})
+            
+            c_add, c_apply = st.columns([1, 1])
+            with c_add:
+                if st.button("Add new task", key="pt_add_new_home", use_container_width=True):
+                    new_id = f"task_{uuid.uuid4().hex[:8]}"
+                    tasks.append({"id": new_id, "title": "New task", "template": "Write your task instructions here.\n"})
+                    st.session_state.prompt_config["tasks"] = tasks
+                    normalize_prompt_state(); st.toast("Task added. Edit it below.", icon="✅")
+            with c_apply:
+                if st.button("Apply task edits", key="pt_apply_home", use_container_width=True):
+                    st.session_state.prompt_config["tasks"] = edited_tasks; normalize_prompt_state(); st.toast("Tasks updated.", icon="✅"); st.rerun()
+
     st.markdown("</div>", unsafe_allow_html=True)
 
     if demos := st.session_state.favourites_list:
         st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
-        lc1, lc2, lc3 = st.columns([1, 2, 1])
-        with lc2:
-            with st.expander("📂 User Data (Save/Load/Review & Edit)", expanded=False):
-                st.caption("Single JSON file for **Favourites** + **AI Prompt Tasks (Tasks)**. Upload applies immediately in-app; download is your backup/export.")
-                if st.session_state.get("_manual_config_active"): st.info("🔒 Using uploaded configuration (overrides server defaults)")
-                elif st.session_state.get("server_data_available"): st.info("☁️ Using server default configuration")
-                else: st.info("🆕 Using app default configuration")
-
-                c_dl, c_ul = st.columns(2)
-                with c_dl: st.markdown(render_ipad_safe_download_html(export_profile_str(), PROFILE_FILENAME, "💾 Download user data"), unsafe_allow_html=True)
-                with c_ul: 
-                    if uf := st.file_uploader("Upload user data (JSON)", type=["json"], key="profile_uploader_persistent", label_visibility="collapsed"):
-                        hash_val = hashlib.sha256(uf.getvalue()).hexdigest()
-                        if hash_val != st.session_state.get('_last_upload_hash', ''):
-                            st.warning("⚠️ New file detected - click Apply to use it")
-                            if st.button("✅ Apply uploaded file now", use_container_width=True, type="primary", key="apply_upload_btn"):
-                                st.session_state["_last_upload_hash"] = hash_val; _apply_uploaded_profile_bytes(uf.getvalue()); st.rerun()
-                        else: st.success("✓ Current file is active")
-                        if st.button("♻️ Upload different file", use_container_width=True, key="reset_uploader_btn"):
-                            st.session_state.pop("_last_upload_hash", None); st.session_state.pop("_upload_error", None)
-                            st.session_state.pop("_upload_applied", None); st.session_state.pop("profile_uploader_persistent", None); st.rerun()
-                
-                if st.session_state.get("_upload_error"): st.error(st.session_state["_upload_error"])
-                elif st.session_state.get("_upload_applied"):
-                    st.success("✅ Upload applied successfully! Download to save changes.")
-                    if st.button("Dismiss", key="dismiss_success"): st.session_state["_upload_applied"] = False; st.rerun()
-                if st.session_state.get("_post_apply_rerun"): st.session_state["_post_apply_rerun"] = False; st.rerun()
-
-                with st.expander("🔎 Review current data snapshot (what will be downloaded)", expanded=False): st.json(build_profile_payload())
-
-                st.markdown("---"); st.subheader("Favourites")
-                fav_txt = st.text_area("Favourites (space or newline separated)", value=" ".join(st.session_state.get("favourites_list", [])), height=90, key="fav_bulk_editor", label_visibility="collapsed")
-                c1, c2, c3 = st.columns([1, 1, 2])
-                with c1:
-                    if st.button("Apply favourites", use_container_width=True, key="fav_apply"):
-                        tokens = [t for t in re.split(r"\s+", (fav_txt or "").strip()) if t]
-                        cleaned = []
-                        seen = set()
-                        for c in [t for t in tokens if len(t)==1]:
-                            if c not in seen: cleaned.append(c); seen.add(c)
-                        st.session_state.favourites_list = cleaned; st.session_state.fav_cursor = 0
-                        st.toast("Favourites updated.", icon="✅"); st.rerun()
-                with c2: 
-                    if st.button("Clear favourites", use_container_width=True, key="fav_clear"): st.session_state.favourites_list = []; st.session_state.fav_cursor = 0; st.toast("Cleared favourites.", icon="✅"); st.rerun()
-                with c3:
-                    add_char = st.text_input("Add a character", value="", key="fav_add_one", placeholder="e.g., 我", label_visibility="collapsed")
-                    if st.button("Add", use_container_width=True, key="fav_add_btn"):
-                        c = (add_char or "").strip()
-                        if len(c) != 1: st.toast("Please enter exactly 1 character.", icon="⚠️")
-                        else:
-                            if c not in st.session_state.favourites_list: st.session_state.favourites_list.append(c); st.toast("Added.", icon="✅"); st.rerun()
-
-                favs = st.session_state.get("favourites_list", [])
-                if favs:
-                    st.markdown("**Current favourites**")
-                    for i, c in enumerate(favs):
-                        cc1, cc2 = st.columns([6, 1])
-                        with cc1: st.write(c)
-                        with cc2:
-                            if st.button("✕", key=f"fav_rm_{i}", help="Remove"): st.session_state.favourites_list.pop(i); st.toast("Removed.", icon="✅"); st.rerun()
-
-                st.markdown("---"); st.subheader("AI Prompt Tasks (Task 1–10)")
-                normalize_prompt_state()
-                cfg = st.session_state.get("prompt_config") or {}
-                tasks = cfg.get("tasks", []) or []
-                all_task_ids = [t.get("id") for t in tasks if t.get("id")]
-                
-                default_sel = st.multiselect("Default selected tasks", options=all_task_ids, default=list(st.session_state.prompt_ui.get("default_selected_task_ids", all_task_ids)), key="prompt_default_sel_editor")
-                if st.button("Save default selection", key="save_default_task_sel"):
-                    st.session_state.prompt_ui["default_selected_task_ids"] = list(default_sel)
-                    normalize_prompt_state(); st.toast("Default task selection updated.", icon="✅"); st.rerun()
-
-                st.caption("Edit titles/templates below. Changes persist in-session and will be included in the next download.")
-                edited_tasks = []
-                for idx, t in enumerate(tasks):
-                    tid = t.get("id")
-                    if not tid: continue
-                    with st.expander(f"✏️ {t.get('title','(untitled)')}  —  {tid}", expanded=False):
-                        title = st.text_input("Title", value=t.get("title", ""), key=f"pt_title_{tid}")
-                        template = st.text_area("Template", value=t.get("template", ""), height=160, key=f"pt_tpl_{tid}")
-                        cA, cB = st.columns([1, 3])
-                        with cA:
-                            if st.button("Delete task", key=f"pt_del_{tid}"):
-                                st.session_state.prompt_config["tasks"] = [tt for tt in tasks if tt.get("id") != tid]
-                                st.session_state.pop(f"pt_title_{tid}", None); st.session_state.pop(f"pt_tpl_{tid}", None); st.session_state.pop(f"prompt_task_cb_{tid}", None)
-                                normalize_prompt_state(); st.toast("Task deleted.", icon="✅"); st.rerun()
-                        with cB: st.caption("Tip: Keep the template as plain instructions. The character and definition are inserted separately.")
-                    edited_tasks.append({"id": tid, "title": title, "template": template})
-                
-                c_add, c_apply = st.columns([1, 1])
-                with c_add:
-                    if st.button("Add new task", key="pt_add_new_home", use_container_width=True):
-                        new_id = f"task_{uuid.uuid4().hex[:8]}"
-                        tasks.append({"id": new_id, "title": "New task", "template": "Write your task instructions here.\n"})
-                        st.session_state.prompt_config["tasks"] = tasks
-                        normalize_prompt_state(); st.toast("Task added. Edit it below.", icon="✅")
-                with c_apply:
-                    if st.button("Apply task edits", key="pt_apply_home", use_container_width=True):
-                        st.session_state.prompt_config["tasks"] = edited_tasks; normalize_prompt_state(); st.toast("Tasks updated.", icon="✅"); st.rerun()
-
         st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
         unique_demos = []
         seen = set()
