@@ -91,7 +91,8 @@ def list_tile_click(c):
         state.update(
             selected_comp=c,
             show_inputs=False,
-            preview_comp=None
+            preview_comp=None,
+            derivative_page=0 # Reset pagination on drill down
         )
     else:
         state.set("preview_comp", c)
@@ -729,15 +730,9 @@ def render_character_lineage_view():
     decomp = info.get("meta", {}).get("decomposition", "")
     parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
     parents = apply_script_filter(parents, state.get_script_filter())
-    p_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px;'>{p}</span>" for p in parents])
     
-    rel = info.get("related_characters", [])
-    children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
-    children_preview = apply_script_filter(children, state.get_script_filter())[:50]
-    c_html = "".join([f"<span class='status-tag' style='margin-right:5px; padding: 2px 8px; opacity: 0.8;'>{c}</span>" for c in children_preview])
-
-    st.markdown(f"<div class='status-line'><div style='display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;'><div><div style='font-weight: 800; font-size: 1.2em;'> {sel}</div><div style='margin-top:4px; font-size:0.85em;'><b>Components</b> {p_html if parents else 'Basic Root'}</div></div><div style='text-align: left; font-size: 1.0em; opacity: 0.7;'><b>Derivatives</b><br/>{c_html}{'...' if len(children) > 50 else ''}</div></div></div>", unsafe_allow_html=True)
-
+    # REMOVED GREEN STATUS BANNER HERE
+    
     if parents:
         st.markdown("<div class='lineage-header'>🧱 Components (How it's built)</div>", unsafe_allow_html=True)
         for p in parents:
@@ -755,20 +750,60 @@ def render_character_lineage_view():
     for f in apply_script_filter(focus_group, state.get_script_filter()):
         render_radix_row(f)
 
+    rel = info.get("related_characters", [])
+    children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
+
     if children:
         children_sorted = sorted(children, key=sort_key_usage_primary)
         visible_children = apply_script_filter(children_sorted, state.get_script_filter())
         unique_visible = list(dict.fromkeys(visible_children))
         
-        st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {len(unique_visible)} characters)</div>", unsafe_allow_html=True)
-        for child in unique_visible[:120]:
-            render_radix_row(child, minimal=True)
+        # --- ROLLING 25 CARDS PAGINATION with TOP NAV & BANNER ---
+        BATCH_SIZE = 25
+        total_derivs = len(unique_visible)
+        current_page = state.get("derivative_page", 0)
         
-        if len(unique_visible) > 120:
-            remaining = len(unique_visible) - 120
-            st.markdown("---\n" + f"<div style='text-align:center; color:#888; font-weight:bold; margin-bottom:20px;'>⬇️ {remaining} More Derivatives ⬇️</div>", unsafe_allow_html=True)
-            for c in unique_visible[120:]:
-                render_radix_row(c, context="static_derivative", is_static=True, minimal=True)
+        max_page = max(0, math.ceil(total_derivs / BATCH_SIZE) - 1)
+        if current_page > max_page:
+            current_page = max_page
+            state.set("derivative_page", current_page)
+        
+        start_idx = current_page * BATCH_SIZE
+        end_idx = min(start_idx + BATCH_SIZE, total_derivs)
+        current_batch = unique_visible[start_idx:end_idx]
+
+        st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {total_derivs} characters)</div>", unsafe_allow_html=True)
+
+        # Top Navigation
+        nav_c1, nav_c2, nav_c3 = st.columns([1, 2, 1])
+        with nav_c1:
+            if current_page > 0:
+                if st.button("⬅️ Previous 25", key="deriv_prev_top", use_container_width=True):
+                    state.set("derivative_page", current_page - 1)
+                    st.rerun()
+        with nav_c3:
+            if end_idx < total_derivs:
+                remaining = total_derivs - end_idx
+                if st.button(f"Next 25 ➡️", key="deriv_next_top", use_container_width=True, help=f"{remaining} more"):
+                    state.set("derivative_page", current_page + 1)
+                    st.rerun()
+        
+        # Quick-View Banner
+        chars_html = "".join([f"<span style='display:inline-block; margin: 2px 6px; font-size: 1.4em; font-weight: bold; color: #444;'>{c}</span>" for c in current_batch])
+        st.markdown(
+            f"""
+            <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: center;">
+                <div style="font-size: 0.85em; color: #888; margin-bottom: 8px; text-transform: uppercase; font-weight: 700;">
+                    Batch {current_page + 1} of {max_page + 1} &middot; Showing {start_idx + 1}–{end_idx}
+                </div>
+                <div style="line-height: 1.6;">{chars_html}</div>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+        
+        for child in current_batch:
+            render_radix_row(child, minimal=True)
 
 # ==================== MAIN ====================
 
