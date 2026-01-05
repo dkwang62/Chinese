@@ -62,6 +62,35 @@ def load_subtlex_freq():
         print(f"[Radix] Error loading SUBTLEX-CH frequencies: {e}")
 
 
+# Standard radical order based on Xinhua Zidian / GB stroke-shape sorting
+# (横 → 竖 → 撇 → 点 → 折 within each stroke count)
+XINHUA_RADICAL_ORDER = [
+    # 1 stroke
+    '一', '丨', '丿', '丶', '乙',
+    # 2 strokes
+    '二', '亠', '人', '儿', '入', '八', '冂', '冖', '冫', '几', '凵', '刀', '力', '勹', '匕', '匚', '卜', '卩', '厂', '厶', '又', '十', '讠', '阝', '刂',
+    # 3 strokes
+    '口', '囗', '土', '士', '夂', '夊', '夕', '大', '女', '子', '宀', '寸', '小', '尢', '尸', '屮', '山', '川', '工', '己', '巾', '干', '幺', '广', '廴', '廾', '弋', '弓', '彐', '彡', '彳', '扌', '艹', '艸',
+    # 4 strokes
+    '心', '戈', '戶', '手', '支', '攴', '文', '斗', '斤', '方', '无', '日', '曰', '月', '木', '欠', '止', '歹', '殳', '毋', '比', '毛', '氏', '气', '水', '火', '爪', '父', '爻', '片', '牙', '牛', '犬', '王', '玉', '田', '甘', '生', '用', '疋', '疒', '癶', '白', '皮', '皿', '目', '矛', '矢', '石', '示', '禸', '禾', '穴', '立',
+    # 5 strokes
+    '竹', '米', '糸', '缶', '网', '羊', '羽', '老', '而', '耒', '耳', '聿', '肉', '臣', '自', '至', '臼', '舌', '舟', '艮', '色', '虍', '虫', '血', '行', '衣', '西',
+    # 6 strokes
+    '臣', '見', '角', '言', '谷', '豆', '豕', '豸', '貝', '赤', '走', '足', '身', '車', '辛', '辰', '辵', '邑', '酉', '釆', '里',
+    # 7 strokes
+    '金', '長', '門', '阜', '隶', '隹', '雨', '青', '非',
+    # 8 strokes
+    '食', '首', '香', '馬', '骨', '高', '髟', '鬥', '鬯', '鬲', '鬼',
+    # 9 strokes
+    '魚', '鳥', '鹵', '鹿', '麥', '麻',
+    # 10+ strokes
+    '黃', '黍', '黑', '黹', '黽', '鼎', '鼓', '鼠',
+]
+
+# Dictionary for fast lookup of position in the standard order
+RADICAL_SORT_INDEX = {rad: idx for idx, rad in enumerate(XINHUA_RADICAL_ORDER)}
+
+
 # --- Data Loading & Augmentation ---
 def load_and_augment_map():
     try:
@@ -125,9 +154,19 @@ def get_component_stats(_component_map):
             if ch not in IDC_CHARS:
                 used_comps.add(ch)
 
-    for gs in r_groups:
-        r_groups[gs] = sorted(list(set(r_groups[gs])))
 
+    for gs in r_groups:
+        # Sort radicals within the same stroke count by standard stroke-shape order
+        r_groups[gs] = sorted(
+            list(set(r_groups[gs])),
+            key=lambda rad: (
+                RADICAL_SORT_INDEX.get(rad, len(XINHUA_RADICAL_ORDER) + 1000),  # unknown radicals go last
+                rad  # final tie-breaker: Unicode order
+            )
+        )
+
+
+    
     gc.collect()
     return {
         "rad_groups": r_groups,
