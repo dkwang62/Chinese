@@ -23,32 +23,33 @@
     "隹"
   ],
   "prompt_config": {
-    "version": 1,
-    "preamble": "You are a bilingual Chinese dictionary editor and teacher.\n\nExplain a single Chinese character in depth for language learners. Focus on modern usage, and if the character is rare, show its more widely used modern equivalent while noting the original character.\n\n⸻\n\n",
-    "epilogue": "Hanzi: {char}\n- English definition: {def_en}\n",
+    "version": 2,
+    "preamble": "You are a bilingual Chinese dictionary editor and teacher.\n\nExplain a single Chinese character in depth for language learners. Prioritise modern Mandarin usage.\n\nAccuracy rules:\n- Do not fabricate etymology. If you are unsure, say so explicitly.\n- If the character is rare/archaic, present the most widely used modern equivalent and clearly label it as an equivalent.\n- Use concise, learner-friendly explanations. Avoid heavy jargon; define any necessary terms.\n\n⸻\n\n",
+    "epilogue": "Hanzi: {char}\nEnglish definition: {def_en}\n",
     "tasks": [
       {
         "id": "task1",
         "title": "Task 1 — Character Analysis",
-        "template": "Task 1 — Character Analysis\n\nFor the Hanzi below, provide:\n\t1.\tAs a mnemonic aid, explain the character’s original meaning. Briefly describe its ancient form or etymological origin, including why its components were chosen. Indicate whether the character is semantic, phonetic, or a compound form, and explain how its structure or pictographic elements support memorisation.\n\t2.\tCore semantic concept — summarize the main idea in modern context.\n\t3.\tWhy it is used in compound characters — explain how it contributes meaning to words in everyday or contemporary Chinese.\n\t4.\tThree example words — include pinyin and natural English meanings, using modern common usage.\n\t5.\tOne modern usage sentence — show the character in real-life context; if the character is rare, use the modern equivalent and note it.\n\n⸻\n\n"
+        "template": "Task 1 — Character Analysis\n\nFor the Hanzi below, provide:\n\n1) Meaning & core concept (modern)\n- Summarise the core semantic idea in modern usage (1–2 lines).\n\n2) Structure & components (learning-focused)\n- Break the character into components (radical/components).\n- State whether it is mainly semantic, phonetic, or a compound (形声/会意 etc.).\n- Explain how the components support meaning and/or pronunciation.\n- If you mention ancient forms or etymology, keep it brief and mark uncertainty if not confident.\n\n3) Why it appears in compound words\n- Explain how the character contributes meaning in everyday modern compounds.\n\n4) Three example words (modern, common)\n- Provide 3 words/phrases that include the character (or its modern equivalent if rare).\n- For each: Simplified, Traditional (if different), pinyin (tone marks), and a natural English meaning.\n\n5) One natural usage sentence\n- Provide one modern sentence using the character (or its modern equivalent if rare).\n- Include Simplified, Traditional (if different), and a natural English translation.\n- Add read-aloud pinyin for the full sentence (tone marks; natural word grouping).\n\n6) Memory story (mnemonic)\nCreate a memorable story or visual mnemonic that:\n- Uses the component meanings to explain the character,\n- Links the pronunciation to something memorable (only if you are confident about the reading),\n- Helps long-term recall.\n\nExample: 休 (rest) = 亻(person) + 木(tree) → “A person leaning against a tree to rest.”\n\n⸻\n\n"
       },
       {
         "id": "task2",
         "title": "Task 2 — Example Sentences and Images",
-        "template": "Task 2 — Example Sentences and Images\n\nProvide two example sentences that best illustrate modern, everyday usage of the character (or its modern equivalent if the original is rare). For each sentence, include:\na) Traditional Chinese\nb) Simplified Chinese\nc) Natural English translation\nd) Target word/phrase (must include the character or its modern equivalent)\ne) Read-aloud pinyin of the full sentence (with tone marks and natural word grouping)\n\nImages:\n\t•\tIf the character represents a concrete object, generate a realistic image showing its material, context, and typical use.\n\t•\tIf the character represents an abstract concept, quality, or person, do not generate an image.\n\nNote: Only generate images in Task 2 to avoid overlap with analysis or conceptual comparisons.\n\n⸻\n\n"
+        "template": "Task 2 — Example Sentences and Images\n\nProvide two example sentences that best illustrate modern, everyday usage of the character (or its modern equivalent if the original is rare). For each sentence, include:\n\na) Traditional Chinese\nb) Simplified Chinese\nc) Natural English translation\nd) Target word/phrase (must include the character or its modern equivalent)\ne) Read-aloud pinyin of the full sentence (tone marks; natural word grouping)\n\nImages (prompts only):\n- If the character represents a concrete object, output ONE realistic IMAGE PROMPT describing its material, context, and typical use.\n- If the character is abstract (concept/quality/person), output: “No image prompt (abstract concept).”\n\nNote: Only include image prompts in Task 2 to avoid overlap.\n\n⸻\n\n"
       },
       {
         "id": "task3",
         "title": "Task 3 — Conceptual Contrast",
-        "template": "Task 3 — Conceptual Contrast\n\nCompare this character with 2–3 other characters of similar meaning or usage, including pinyin. Explain:\n\t•\tHow Chinese divides this concept into different semantic or conceptual systems in modern language usage.\n\t•\tHow the characters differ in real-life usage, highlighting subtle distinctions learners should know.\n\t•\tDo not repeat example sentences from Task 2; only discuss relationships and usage distinctions.\n\n⸻\n\n"
+        "template": "Task 3 — Conceptual Contrast\n\nCompare this character with 2–3 other characters of similar meaning or usage (include pinyin with tone marks). Explain:\n- How modern Chinese divides this concept into different semantic/conceptual categories.\n- Subtle real-life usage differences learners should know (collocations, tone, formality, context).\n- Do not repeat sentences from Task 2.\n\n⸻\n\n"
+      },
+      {
+        "id": "task4",
+        "title": "Task 4 — Logic & Pattern Tutor",
+        "template": "Task 4 — Logic & Pattern Tutor\n\nYou are a Chinese character structure tutor. Explain Radix’s “Character Logic & Patterns” panel clearly and conservatively (do not invent etymology; if uncertain, say so).\n\nINPUT (fields provided by the app):\n- char: {char}\n- def_en: {def_en}\n- decomposition: {decomposition}\n- semantic: {semantic}\n- phonetic: {phonetic}\n- phonetic_pinyin: {phonetic_pinyin}\n- is_sound_match: {is_sound_match}\n- pronunciation_family: {pronunciation_family}\n- semantic_family: {semantic_family}\n\nTASK:\nExplain (1) why semantic vs phonetic were assigned, and (2) what the two families mean, INCLUDING checking for false friends in pronunciation_family (e.g., visual matches caused by simplification).\n\nOUTPUT REQUIREMENTS:\n\n1) Component Roles\n- If semantic exists: explain what the radical/semantic component contributes (meaning cue).\n- If phonetic exists: explain what the phonetic component contributes (sound hint).\n- Interpret is_sound_match:\n  - If True: say it is a strong phonetic cue.\n  - If False: say it is a candidate phonetic component but the modern sound does not match; give 1–2 plausible reasons only if confident.\n\n2) Pronunciation Family (share {phonetic})\nFor each character in pronunciation_family, produce ONE line:\n- Character: Classification (Likely true member / Visual only / Simplification artefact / Uncertain) — short reason (<= 15 words).\nThen add ONE summary sentence: whether this should be labelled “Sound family” or safer as “Component family.”\n\n3) Meaning Family (share {semantic})\n- Provide a 1–2 sentence theme for what {semantic} typically signals.\n- For each character in semantic_family: ONE short line on how the theme plausibly applies (no overclaiming).\n\n4) Learner Takeaway (max 2 bullets)\n- One rule-of-thumb about radicals (meaning cues).\n- One rule-of-thumb about phonetics (sound cues + why false friends occur).\n\n5) UI Tooltip Copy\n- Tooltip for “Meaning (Radical)” (<= 18 words)\n- Tooltip for “Sound Match / Sound Component” (<= 18 words)\n\n⸻\n\n"
       }
     ]
   },
   "prompt_ui": {
-    "default_selected_task_ids": [
-      "task1",
-      "task2",
-      "task3"
-    ]
+    "default_selected_task_ids": ["task1", "task2", "task3", "task4"]
   }
 }
