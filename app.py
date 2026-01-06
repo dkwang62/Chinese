@@ -13,7 +13,7 @@ from radix_core import (
     apply_script_filter, get_char_definition_en, render_combined_prompt,
     get_stroke_order_view_html, SCRIPT_FILTERS, IDC_CHARS,
     sort_key_usage_primary, sort_key_frequency_primary, stats_cache,
-    cc_t2s, cc_s2t
+    cc_t2s, cc_s2t, analyze_component_structure
 )
 from radix_state import (
     StateManager, ConfigManager, InputValidator,
@@ -22,7 +22,8 @@ from radix_state import (
 from radix_ui import (
     apply_styles, generate_clean_card_html, render_ipad_safe_download_html,
     render_copy_to_clipboard, get_stroke_order_sidebar_html,
-    render_definition_search_ui
+    render_definition_search_ui,
+    render_learning_insights_html 
 )
 
 # Configure Streamlit
@@ -493,6 +494,21 @@ def render_sidebar():
             card_html = generate_clean_card_html(current_char_for_sidebar, usage_count=component_usage_count(current_char_for_sidebar), is_static=True)
             card_html = card_html.replace("search box at the top", "search box")
             st.markdown(f"<div style='margin-top: 15px;'>{card_html}</div>", unsafe_allow_html=True)
+
+           # === INSERT COMPACT INSIGHT ===
+            analysis = analyze_component_structure(current_char_for_sidebar)
+            if analysis['semantic'] or analysis['phonetic']:
+                s_txt = f"💡 {analysis['semantic']} (Meaning)" if analysis['semantic'] else ""
+                p_txt = f"🔊 {analysis['phonetic']} (Sound)" if analysis['phonetic'] else ""
+                st.markdown(f"""
+                <div style='background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); padding:10px; border-radius:8px; margin-top:10px; font-size:0.85em; color:#fff;'>
+                    <div style='font-weight:bold; margin-bottom:4px; opacity:0.8'>🧠 Logic Breakdown</div>
+                    <div>{s_txt}</div>
+                    <div>{p_txt}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            # ==============================
+
             
             st.markdown("---")
             st.checkbox("Show in Favourites", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
@@ -749,6 +765,9 @@ def render_character_lineage_view():
     
     for f in apply_script_filter(focus_group, state.get_script_filter()):
         render_radix_row(f)
+
+    st.markdown(render_learning_insights_html(sel), unsafe_allow_html=True)
+    
 
     rel = info.get("related_characters", [])
     children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
