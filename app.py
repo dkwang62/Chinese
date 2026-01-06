@@ -22,8 +22,7 @@ from radix_state import (
 from radix_ui import (
     apply_styles, generate_clean_card_html, render_ipad_safe_download_html,
     render_copy_to_clipboard, get_stroke_order_sidebar_html,
-    render_definition_search_ui,
-    render_learning_insights_html 
+    render_definition_search_ui, render_learning_insights_html
 )
 
 # Configure Streamlit
@@ -93,7 +92,7 @@ def list_tile_click(c):
             selected_comp=c,
             show_inputs=False,
             preview_comp=None,
-            derivative_page=0 # Reset pagination on drill down
+            derivative_page=0
         )
     else:
         state.set("preview_comp", c)
@@ -112,7 +111,6 @@ def search_by_definition():
         st.toast(error_msg)
         return
     
-    # Search characters
     char_results = []
     query_lower = query.lower()
     for char, info in component_map.items():
@@ -120,7 +118,6 @@ def search_by_definition():
         if isinstance(definition, str) and query_lower in definition.lower():
             char_results.append(char)
     
-    # Search phrases
     db_conn = get_db_connection()
     phrase_results = search_phrases_by_definition(query, db_conn, limit=200) if db_conn else []
     
@@ -136,7 +133,6 @@ def search_by_definition():
 # ==================== UI RENDERING HELPERS ====================
 
 def _render_phrase_html(c: str) -> str:
-    """Render phrase table HTML for character."""
     n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
     n = n_map.get(state.get_display_mode(), 2)
     compounds = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
@@ -155,7 +151,6 @@ def _render_phrase_html(c: str) -> str:
     return ""
 
 def render_radix_row(c, context="detail", is_static=False, minimal=False):
-    """Render a character row with button and card."""
     col_char, col_details = st.columns([2, 10])
     is_preview = state.get_preview_component() == c
     is_active_focus = is_preview or (state.get_preview_component() is None and c == state.get_selected_component())
@@ -193,7 +188,6 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
 # ==================== PAGE RENDERERS ====================
 
 def render_startup_file_choice():
-    """Render startup file choice screen."""
     st.markdown("""
     <div class="splash-wrap">
         <div class="splash-card">
@@ -242,7 +236,6 @@ def render_startup_file_choice():
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_splash():
-    """Render splash/onboarding screen."""
     st.markdown("""<div class="palace-entrance-container"><div class="grand-torii">⛩️</div><div class="entrance-text">Grand Hall of Radix 🈑 Components</div></div>""", unsafe_allow_html=True)
     
     _, c, _ = st.columns([1, 1, 1])
@@ -252,7 +245,6 @@ def render_splash():
 
     st.markdown("<div style='margin: 40px auto;'>", unsafe_allow_html=True)
     
-    # Search and User Data side-by-side
     col_search, col_data = st.columns([1, 1], gap="medium")
     
     with col_search:
@@ -319,13 +311,7 @@ def render_splash():
 
             st.markdown("---")
             st.subheader("Favourites")
-            fav_txt = st.text_area(
-                "Favourites (space or newline separated)",
-                value=" ".join(state.get_favourites()),
-                height=90,
-                key="fav_bulk_editor",
-                label_visibility="collapsed"
-            )
+            fav_txt = st.text_area("Favourites (space or newline separated)", value=" ".join(state.get_favourites()), height=90, key="fav_bulk_editor", label_visibility="collapsed")
             c1, c2, c3 = st.columns([1, 1, 2])
             with c1:
                 if st.button("Apply favourites", use_container_width=True, key="fav_apply"):
@@ -347,13 +333,7 @@ def render_splash():
                     st.toast("Cleared favourites.", icon="✅")
                     st.rerun()
             with c3:
-                add_char = st.text_input(
-                    "Add a character",
-                    value="",
-                    key="fav_add_one",
-                    placeholder="e.g., 我",
-                    label_visibility="collapsed"
-                )
+                add_char = st.text_input("Add a character", value="", key="fav_add_one", placeholder="e.g., 我", label_visibility="collapsed")
                 if st.button("Add", use_container_width=True, key="fav_add_btn"):
                     c = (add_char or "").strip()
                     if len(c) != 1:
@@ -371,8 +351,7 @@ def render_splash():
                 st.markdown("**Current favourites**")
                 for i, c in enumerate(favs):
                     cc1, cc2 = st.columns([6, 1])
-                    with cc1:
-                        st.write(c)
+                    with cc1: st.write(c)
                     with cc2:
                         if st.button("✕", key=f"fav_rm_{i}", help="Remove"):
                             favs.pop(i)
@@ -387,12 +366,7 @@ def render_splash():
             tasks = cfg.get("tasks", []) or []
             all_task_ids = [t.get("id") for t in tasks if t.get("id")]
             
-            default_sel = st.multiselect(
-                "Default selected tasks",
-                options=all_task_ids,
-                default=list(state.get("prompt_ui").get("default_selected_task_ids", all_task_ids)),
-                key="prompt_default_sel_editor"
-            )
+            default_sel = st.multiselect("Default selected tasks", options=all_task_ids, default=list(state.get("prompt_ui").get("default_selected_task_ids", all_task_ids)), key="prompt_default_sel_editor")
             if st.button("Save default selection", key="save_default_task_sel"):
                 pui = state.get("prompt_ui")
                 pui["default_selected_task_ids"] = list(default_sel)
@@ -405,8 +379,7 @@ def render_splash():
             edited_tasks = []
             for idx, t in enumerate(tasks):
                 tid = t.get("id")
-                if not tid:
-                    continue
+                if not tid: continue
                 with st.expander(f"✏️ {t.get('title','(untitled)')} — {tid}", expanded=False):
                     title = st.text_input("Title", value=t.get("title", ""), key=f"pt_title_{tid}")
                     template = st.text_area("Template", value=t.get("template", ""), height=160, key=f"pt_tpl_{tid}")
@@ -445,12 +418,10 @@ def render_splash():
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Quick access favourites
     if demos := state.get_favourites():
         st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
         st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
         unique_demos = list(dict.fromkeys(demos))
-        
         for r in range((len(unique_demos) + 5 - 1) // 5):
             cols = st.columns(5)
             for j in range(5):
@@ -466,7 +437,6 @@ def render_splash():
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_sidebar():
-    """Render sidebar content."""
     with st.sidebar:
         current_main_char = state.get("stroke_view_char") if state.is_stroke_view_active() else state.get_selected_component()
         
@@ -495,19 +465,21 @@ def render_sidebar():
             card_html = card_html.replace("search box at the top", "search box")
             st.markdown(f"<div style='margin-top: 15px;'>{card_html}</div>", unsafe_allow_html=True)
 
-           # === INSERT COMPACT INSIGHT ===
+            # Compact Analysis for Sidebar
             analysis = analyze_component_structure(current_char_for_sidebar)
             if analysis['semantic'] or analysis['phonetic']:
-                s_txt = f"💡 {analysis['semantic']} (Meaning)" if analysis['semantic'] else ""
-                p_txt = f"🔊 {analysis['phonetic']} (Sound)" if analysis['phonetic'] else ""
+                s_txt = f"💡 <b>{analysis['semantic']}</b> = Meaning" if analysis['semantic'] else ""
+                p_txt = f"🔊 <b>{analysis['phonetic']}</b> = Sound" if analysis['phonetic'] else ""
+                
                 st.markdown(f"""
-                <div style='background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); padding:10px; border-radius:8px; margin-top:10px; font-size:0.85em; color:#fff;'>
-                    <div style='font-weight:bold; margin-bottom:4px; opacity:0.8'>🧠 Logic Breakdown</div>
-                    <div>{s_txt}</div>
-                    <div>{p_txt}</div>
+                <div style='background-color: #f0f2f6; padding: 12px; border-radius: 10px; margin-top: 15px; border: 1px solid #dce0e6;'>
+                    <div style='font-weight:bold; margin-bottom:6px; color: #31333F; font-size: 0.9em;'>🧠 Logic Breakdown</div>
+                    <div style='font-size: 0.85em; color: #31333F; margin-bottom: 4px; line-height: 1.4;'>{s_txt}</div>
+                    <div style='font-size: 0.85em; color: #31333F; line-height: 1.4;'>{p_txt}</div>
                 </div>
                 """, unsafe_allow_html=True)
-            # ==============================
+
+
 
             
             st.markdown("---")
@@ -543,38 +515,24 @@ def render_sidebar():
                 if state.is_showing_inputs():
                     st.slider("Stroke count", 1, 30, value=state.get_stroke_range(), key="w_stroke_range", on_change=sync_stroke_range)
                     
-                    # Build radical dropdown grouped by stroke count
                     rad_groups = stats_cache.get("rad_groups", {})
                     radical_options = ["none"]
-                    
                     for stroke_count in sorted(rad_groups.keys()):
                         rads_in_group = rad_groups[stroke_count]
                         if rads_in_group:
-                            # Add radicals in this group with stroke count prefix
                             for rad in rads_in_group:
                                 radical_options.append(rad)
                     
-                    # Format function to show stroke counts
                     def format_radical(rad):
-                        if rad == "none":
-                            return "none"
+                        if rad == "none": return "none"
                         rad_info = component_map.get(rad, {})
                         strokes = rad_info.get('stroke_count')
-                        if strokes:
-                            return f"{rad} ({strokes} strokes)"
+                        if strokes: return f"{rad} ({strokes} strokes)"
                         return rad
                     
                     current_rad = state.get("radical")
                     current_index = radical_options.index(current_rad) if current_rad in radical_options else 0
-                    
-                    st.selectbox(
-                        "Radical",
-                        options=radical_options,
-                        format_func=format_radical,
-                        index=current_index,
-                        key="w_radical",
-                        on_change=sync_radical
-                    )
+                    st.selectbox("Radical", options=radical_options, format_func=format_radical, index=current_index, key="w_radical", on_change=sync_radical)
                     
                     idcs = sorted(stats_cache.get("idc_counts", {}).keys())
                     idc = state.get("component_idc")
@@ -592,10 +550,13 @@ def render_sidebar():
                         st.radio("Show characters in:", options=["Simplified", "Traditional", "Any"], index=["Simplified", "Traditional", "Any"].index(gsf), key="grid_script_radio", on_change=lambda: state.update(grid_script_filter=state.get("grid_script_radio"), page=1), horizontal=True)
 
 def render_stroke_view():
-    """Render stroke order and prompt generation view."""
     st.markdown("### Stroke Order Animation")
     main_html, _ = get_stroke_order_view_html(state.get("stroke_view_char"), state.get_display_mode())
     st_html(main_html, height=450)
+    
+    # --- INSIGHTS PANEL ADDED HERE ---
+    st.markdown(render_learning_insights_html(state.get("stroke_view_char")), unsafe_allow_html=True)
+    # ---------------------------------
     
     if state.get_display_mode() != "Single Character":
         if phrase_html := _render_phrase_html(state.get("stroke_view_char")):
@@ -639,7 +600,6 @@ def render_stroke_view():
     render_copy_to_clipboard(prompt_text, str(hash(state.get("stroke_view_char"))))
 
 def render_definition_search_results():
-    """Render definition search results."""
     results = state.get("definition_search_results")
     st.markdown(f"<div class='status-line'><div style='font-size:1.2em; font-weight:700;'>Search Results for \"{pyhtml.escape(state.get('definition_search_query'))}\"</div><div class='status-text' style='font-size:0.85em; color:#666; margin-top:8px;'>Found {len(results['characters'])} characters and {len(results['phrases'])} phrases</div></div>", unsafe_allow_html=True)
     
@@ -659,37 +619,24 @@ def render_definition_search_results():
         st.info(f"No results found for '{state.get('definition_search_query')}'. Try different search terms.")
 
 def render_grid_view():
-    """Render main grid view with filters and pagination."""
     cur_min, cur_max = state.get_stroke_range()
     filter_parts = [f"<span class='status-tag'>Sort: {'Component' if state.get_grid_sort_mode() == 'usage' else 'Character'} frequency</span>"]
-    
     max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
     if not (cur_min == 1 and cur_max == max_s_val):
-        if cur_min == cur_max:
-            filter_parts.append(f"<span class='status-tag'>{cur_min} strokes</span>")
-        elif cur_min == 1:
-            filter_parts.append(f"<span class='status-tag'>≤ {cur_max} strokes</span>")
-        elif cur_max == max_s_val:
-            filter_parts.append(f"<span class='status-tag'>≥ {cur_min} strokes</span>")
-        else:
-            filter_parts.append(f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>")
+        if cur_min == cur_max: filter_parts.append(f"<span class='status-tag'>{cur_min} strokes</span>")
+        elif cur_min == 1: filter_parts.append(f"<span class='status-tag'>≤ {cur_max} strokes</span>")
+        elif cur_max == max_s_val: filter_parts.append(f"<span class='status-tag'>≥ {cur_min} strokes</span>")
+        else: filter_parts.append(f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>")
     
-    if state.get("radical") != "none":
-        filter_parts.append(f"<span class='status-tag'>Rad. {state.get('radical')}</span>")
-    if state.get("component_idc") != "none":
-        filter_parts.append(f"<span class='status-tag'>{state.get('component_idc')}</span>")
-    if state.get_grid_sort_mode() == "usage":
-        filter_parts.append("<span class='status-tag'>View: Components only</span>")
-    if state.get_grid_sort_mode() == "frequency":
-        filter_parts.append(f"<span class='status-tag'>Script: {state.get('grid_script_filter')}</span>")
+    if state.get("radical") != "none": filter_parts.append(f"<span class='status-tag'>Rad. {state.get('radical')}</span>")
+    if state.get("component_idc") != "none": filter_parts.append(f"<span class='status-tag'>{state.get('component_idc')}</span>")
+    if state.get_grid_sort_mode() == "usage": filter_parts.append("<span class='status-tag'>View: Components only</span>")
+    if state.get_grid_sort_mode() == "frequency": filter_parts.append(f"<span class='status-tag'>Script: {state.get('grid_script_filter')}</span>")
     
     st.markdown(f"<div class='status-line' style='display: flex; flex-direction: column; gap: 8px;'><div style='display: flex; justify-content: space-between; align-items: center;'><div style='display: flex; flex-wrap: wrap; gap: 8px;'><span style='font-weight: 800; margin-right: 5px;'>📎 Filters:</span> {''.join(filter_parts)}</div><div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>Click once to preview in the sidebar; click the same button again to drill down.</div></div></div>", unsafe_allow_html=True)
 
     filtered = [c for c in component_map if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max and (state.get("radical") == "none" or component_map[c]["meta"].get("radical") == state.get("radical")) and (state.get("component_idc") == "none" or component_map[c]["meta"].get("decomposition", "").startswith(state.get("component_idc"))) and (state.get_grid_sort_mode() != "usage" or c in stats_cache["used_components"])]
-    
-    if state.get_grid_sort_mode() == "frequency":
-        filtered = apply_script_filter(filtered, state.get("grid_script_filter"))
-    
+    if state.get_grid_sort_mode() == "frequency": filtered = apply_script_filter(filtered, state.get("grid_script_filter"))
     sorted_comps = sorted(filtered, key=sort_key_frequency_primary if state.get_grid_sort_mode() == "frequency" else sort_key_usage_primary)
 
     if not sorted_comps:
@@ -723,8 +670,7 @@ def render_grid_view():
             st.markdown("**Character Search**")
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
-                if state.get("text_input_warning"):
-                    st.warning(state.get("text_input_warning"))
+                if state.get("text_input_warning"): st.warning(state.get("text_input_warning"))
                 st.text_input("Go to component/character", value=state.get("text_input_comp"), key="w_text", on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
                 st.caption("Enter one Chinese character to jump directly to its details")
             st.markdown("---")
@@ -738,16 +684,12 @@ def render_grid_view():
                 st.caption("Search across character definitions and phrase meanings")
 
 def render_character_lineage_view():
-    """Render character lineage breakdown."""
     from radix_core import IDC_CHARS
-    
     sel = state.get_selected_component()
     info = component_map.get(sel, {})
     decomp = info.get("meta", {}).get("decomposition", "")
     parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
     parents = apply_script_filter(parents, state.get_script_filter())
-    
-    # REMOVED GREEN STATUS BANNER HERE
     
     if parents:
         st.markdown("<div class='lineage-header'>🧱 Components (How it's built)</div>", unsafe_allow_html=True)
@@ -766,9 +708,6 @@ def render_character_lineage_view():
     for f in apply_script_filter(focus_group, state.get_script_filter()):
         render_radix_row(f)
 
-    st.markdown(render_learning_insights_html(sel), unsafe_allow_html=True)
-    
-
     rel = info.get("related_characters", [])
     children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
 
@@ -777,7 +716,6 @@ def render_character_lineage_view():
         visible_children = apply_script_filter(children_sorted, state.get_script_filter())
         unique_visible = list(dict.fromkeys(visible_children))
         
-        # --- ROLLING 25 CARDS PAGINATION with TOP NAV & BANNER ---
         BATCH_SIZE = 25
         total_derivs = len(unique_visible)
         current_page = state.get("derivative_page", 0)
@@ -793,7 +731,6 @@ def render_character_lineage_view():
 
         st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {total_derivs} characters)</div>", unsafe_allow_html=True)
 
-        # Top Navigation
         nav_c1, nav_c2, nav_c3 = st.columns([1, 2, 1])
         with nav_c1:
             if current_page > 0:
@@ -807,19 +744,8 @@ def render_character_lineage_view():
                     state.set("derivative_page", current_page + 1)
                     st.rerun()
         
-        # Quick-View Banner
         chars_html = "".join([f"<span style='display:inline-block; margin: 2px 6px; font-size: 1.4em; font-weight: bold; color: #444;'>{c}</span>" for c in current_batch])
-        st.markdown(
-            f"""
-            <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: center;">
-                <div style="font-size: 0.85em; color: #888; margin-bottom: 8px; text-transform: uppercase; font-weight: 700;">
-                    Batch {current_page + 1} of {max_page + 1} &middot; Showing {start_idx + 1}–{end_idx}
-                </div>
-                <div style="line-height: 1.6;">{chars_html}</div>
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
+        st.markdown(f"""<div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: center;"><div style="font-size: 0.85em; color: #888; margin-bottom: 8px; text-transform: uppercase; font-weight: 700;">Batch {current_page + 1} of {max_page + 1} &middot; Showing {start_idx + 1}–{end_idx}</div><div style="line-height: 1.6;">{chars_html}</div></div>""", unsafe_allow_html=True)
         
         for child in current_batch:
             render_radix_row(child, minimal=True)
@@ -827,12 +753,10 @@ def render_character_lineage_view():
 # ==================== MAIN ====================
 
 def main():
-    """Main application entry point with routing."""
     if not component_map:
         st.error("Component dataset not loaded.")
         st.stop()
     
-    # Route to appropriate page
     if not state.is_startup_complete():
         render_startup_file_choice()
         st.stop()
@@ -841,10 +765,8 @@ def main():
         render_splash()
         st.stop()
     
-    # Render sidebar (always present after onboarding)
     render_sidebar()
     
-    # Route main content
     if state.is_stroke_view_active():
         render_stroke_view()
     elif state.is_definition_search_active():
