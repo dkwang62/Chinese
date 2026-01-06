@@ -687,7 +687,98 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
     """
     return html_content, h
 
+# radix_core.py - Append this to the end of the file
 
+def analyze_component_structure(char: str) -> dict:
+    """
+    Analyze character to identify Semantic (Radical) and Phonetic components.
+    Returns dict with 'semantic', 'phonetic', and 'is_phonetic_match' boolean.
+    """
+    info = component_map.get(char, {})
+    meta = info.get("meta", {})
+    
+    # 1. Identify Semantic (Radical)
+    radical = clean_field(meta.get("radical", ""))
+    if radical == "—": radical = None
+    
+    # 2. Identify Phonetic Candidate
+    # Logic: Look at decomposition. If one part is the radical, the other is likely phonetic.
+    decomp_str = meta.get("decomposition", "")
+    parts = [c for c in decomp_str if c not in IDC_CHARS and c != char]
+    
+    phonetic = None
+    phonetic_pinyin = ""
+    is_match = False
+    
+    if radical and parts:
+        # Try to find the part that ISN'T the radical
+        potential_phonetics = [p for p in parts if p != radical]
+        
+        # Heuristic: If multiple parts remain, take the one with highest stroke count (often the body)
+        # or simply the first one if unsure.
+        if potential_phonetics:
+            phonetic = potential_phonetics[0] 
+            
+            # Check for sound similarity
+            char_pinyin = clean_field(meta.get("pinyin", ""))
+            phonetic_data = component_map.get(phonetic, {})
+            phonetic_pinyin = clean_field(phonetic_data.get("meta", {}).get("pinyin", ""))
+            
+            if char_pinyin and phonetic_pinyin and char_pinyin != "—" and phonetic_pinyin != "—":
+                # Clean tones for comparison (e.g., qing1 vs qing3)
+                import re
+                cp_plain = re.sub(r'[0-9]', '', char_pinyin).lower()
+                pp_plain = re.sub(r'[0-9]', '', phonetic_pinyin).lower()
+                
+                # Loose match: Exact match OR partial match (sharing rhyme/initial)
+                # For MVP, we stick to exact syllable match (ignoring tone)
+                if cp_plain == pp_plain:
+                    is_match = True
+    
+    return {
+        "char": char,
+        "semantic": radical,
+        "phonetic": phonetic,
+        "phonetic_pinyin": phonetic_pinyin,
+        "is_sound_match": is_match
+    }
+
+def get_pronunciation_family(char: str, limit: int = 8) -> list:
+    """Find other characters that share the same phonetic component/sound."""
+    analysis = analyze_component_structure(char)
+    phonetic = analysis.get("phonetic")
+    
+    if not phonetic:
+        return []
+        
+    family = []
+    # Scan map for characters containing this phonetic
+    # Note: In a full DB, we'd query via SQL. Here we iterate the map (fast enough for <10k items)
+    for c, info in component_map.items():
+        if c == char: continue
+        
+        d = info.get("meta", {}).get("decomposition", "")
+        if phonetic in d:
+            family.append(c)
+            
+    # Sort by frequency (most common first)
+    family.sort(key=lambda x: component_map.get(x, {}).get("freq_per_million", 0), reverse=True)
+    return family[:limit]
+
+def get_semantic_family(char: str, limit: int = 8) -> list:
+    """Find other characters with the same radical."""
+    radical = component_map.get(char, {}).get("meta", {}).get("radical")
+    if not radical or radical == "—":
+        return []
+        
+    family = []
+    for c, info in component_map.items():
+        if c == char: continue
+        if info.get("meta", {}).get("radical") == radical:
+            family.append(c)
+            
+    family.sort(key=lambda x: component_map.get(x, {}).get("freq_per_million", 0), reverse=True)
+    return family[:limit]
 
 # --- Full Stroke Order View HTML ---
 def get_stroke_order_view_html(primary_char: str, display_mode: str) -> tuple[str, Optional[str]]:
