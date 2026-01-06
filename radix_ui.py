@@ -204,6 +204,9 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
 
 def render_learning_insights_html(char: str) -> str:
     """Render the Logic/Analysis box for the character view."""
+    # We need to import the analysis functions from core here to avoid circular imports at module level
+    from radix_core import analyze_component_structure, get_pronunciation_family, get_semantic_family
+    
     if not char: return ""
     
     analysis = analyze_component_structure(char)
@@ -212,6 +215,7 @@ def render_learning_insights_html(char: str) -> str:
     pho_pinyin = analysis.get("phonetic_pinyin", "")
     is_match = analysis.get("is_sound_match")
     
+    # If no analysis found, return empty
     if not sem and not pho:
         return ""
 
@@ -243,6 +247,13 @@ def render_learning_insights_html(char: str) -> str:
         if s_fam:
             fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in s_fam])
             html_parts.append(f"<div><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {sem}):</div><div class='family-list'>{fam_str}</div></div>")
+
+    # 4. DISCLAIMER (New)
+    html_parts.append("""
+        <div style='margin-top:15px; padding-top:10px; border-top:1px solid #eee; font-size:0.75em; color:#999; font-style:italic; line-height:1.3;'>
+            ⚠️ <b>Note:</b> Component roles are identified algorithmically based on structure. For some characters (especially those containing simple strokes like 丨 or 一), these associations may be visual rather than functional.
+        </div>
+    """)
 
     return f"""
     <div class='insight-box'>
