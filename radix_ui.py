@@ -10,8 +10,9 @@ import hashlib
 import uuid
 from radix_core import (
     component_map, clean_field, format_decomposition, get_etymology_text,
-    cc_t2s, cc_s2t, get_char_definition_en, component_usage_count
+    cc_t2s, cc_s2t, get_char_definition_en, component_usage_count, analyze_component_structure, get_pronunciation_family, get_semantic_family
 )
+
 
 # ==================== STYLES ====================
 
@@ -61,6 +62,13 @@ def apply_styles():
     .radix-tooltip .radix-tooltiptext::after {content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #262626 transparent transparent transparent;}
     .radix-tooltip:hover .radix-tooltiptext {visibility: visible; opacity: 1;}
     .radix-tooltiptext strong {color: #ffb74d;}
+    .insight-box {background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 20px; margin-top: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);}
+    .insight-title {font-weight: 800; color: #37474f; font-size: 1.1em; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;}
+    .role-badge {display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; font-size: 0.9em; font-weight: 600; margin-right: 10px; margin-bottom: 8px;}
+    .role-semantic {background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9;}
+    .role-phonetic {background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb;}
+    .family-list {display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px;}
+    .family-char {font-size: 1.4em; color: #333; cursor: pointer; padding: 2px 8px; background: #f5f5f5; border-radius: 6px; border: 1px solid #eee;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -193,6 +201,60 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
     html_content = f"""<div style="display:flex; flex-direction:column; align-items:center; margin:20px 0;"><div style="text-align:center; font-size:2.5rem; font-weight:bold; color:#e67e22; margin-bottom:10px;">{pinyin}</div><div id="sb-hw-{hash(char)}" style="width:{size}px; height:{size}px;"></div><div style="font-size:11px; color:#666; text-align:center; margin-top:5px;">🔄 Continuous animation (keeps session alive)</div></div><script>(function() {{const char = {json.dumps(char, ensure_ascii=False)}; const target = "sb-hw-{hash(char)}"; async function loadScript(src) {{return new Promise((resolve, reject) => {{const s = document.createElement('script'); s.src = src; s.async = true; s.onload = resolve; s.onerror = reject; document.head.appendChild(s);}});}} async function ensureLib() {{if (window.HanziWriter) return; const sources = ['https://cdn.jsdelivr.net/npm/hanzi-writer@3/dist/hanzi-writer.min.js','https://unpkg.com/hanzi-writer@3/dist/hanzi-writer.min.js']; for (const src of sources) {{try {{await loadScript(src); if (window.HanziWriter) return;}} catch(e) {{}}}}}} function speak(text) {{if ('speechSynthesis' in window) {{window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'zh-CN'; const voices = window.speechSynthesis.getVoices(); const zhVoice = voices.find(v => v.lang.replace('_', '-').toLowerCase().startsWith('zh')); if (zhVoice) u.voice = zhVoice; window.speechSynthesis.speak(u);}}}} async function init() {{try {{await ensureLib(); const writer = window.HanziWriter.create(target, char, {{width: {size}, height: {size}, padding: 8, showOutline: true, showCharacter: false, strokeAnimationSpeed: 1.5, delayBetweenStrokes: 80}}); async function continuousAnimation() {{while (true) {{writer.hideCharacter(); await writer.animateCharacter(); writer.showCharacter(); if (Math.random() < 0.2) {{speak(char);}} await new Promise(r => setTimeout(r, 2000));}}}} continuousAnimation().catch(console.error); const el = document.getElementById(target); el.style.cursor = 'pointer'; const trigger = (e) => {{e.preventDefault(); speak(char); writer.hideCharacter(); writer.animateCharacter();}}; el.addEventListener('click', trigger); el.addEventListener('touchend', trigger);}} catch(e) {{console.error("HanziWriter init failed:", e); document.getElementById(target).innerHTML = `<div style="font-size:${{size*0.7}}px; line-height:${{size}}px; text-align:center;">${{char}}</div>`;}}}};init();}})();</script>"""
     
     return html_content, h
+
+def render_learning_insights_html(char: str) -> str:
+    """Render the Logic/Analysis box for the character view."""
+    if not char: return ""
+    
+    analysis = analyze_component_structure(char)
+    sem = analysis.get("semantic")
+    pho = analysis.get("phonetic")
+    pho_pinyin = analysis.get("phonetic_pinyin", "")
+    is_match = analysis.get("is_sound_match")
+    
+    if not sem and not pho:
+        return ""
+
+    html_parts = []
+    
+    # 1. Component Roles
+    roles_html = []
+    if sem:
+        roles_html.append(f"<div class='role-badge role-semantic'>💡 {sem} : Meaning (Radical)</div>")
+    
+    if pho:
+        match_icon = "🔊" if is_match else "🗣️"
+        match_text = "Sound Match" if is_match else "Sound Component"
+        pinyin_display = f"({pho_pinyin})" if pho_pinyin else ""
+        roles_html.append(f"<div class='role-badge role-phonetic'>{match_icon} {pho} {pinyin_display} : {match_text}</div>")
+        
+    html_parts.append(f"<div style='margin-bottom:20px;'>{''.join(roles_html)}</div>")
+    
+    # 2. Pronunciation Family
+    if pho:
+        p_fam = get_pronunciation_family(char)
+        if p_fam:
+            fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in p_fam])
+            html_parts.append(f"<div style='margin-bottom:15px;'><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>🔊 SOUND FAMILY (share {pho}):</div><div class='family-list'>{fam_str}</div></div>")
+
+    # 3. Semantic Family
+    if sem:
+        s_fam = get_semantic_family(char)
+        if s_fam:
+            fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in s_fam])
+            html_parts.append(f"<div><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {sem}):</div><div class='family-list'>{fam_str}</div></div>")
+
+    return f"""
+    <div class='insight-box'>
+        <div class='insight-title'>🧠 Character Logic & Patterns</div>
+        {''.join(html_parts)}
+    </div>
+    """
+
+
+
+
+
 
 # ==================== UI COMPONENTS ====================
 
