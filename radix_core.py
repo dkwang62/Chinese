@@ -263,18 +263,33 @@ def get_char_definition_en(char: str) -> str:
 def analyze_component_structure(char: str) -> dict:
     """
     Analyze character to identify Semantic (Radical) and Phonetic components.
-    Returns dict with 'semantic', 'phonetic', and 'is_phonetic_match' boolean.
+    RESTRICTION: Only analyzes Left-Right (⿰) or Top-Bottom (⿱) structures 
+    to avoid false positives in complex or single-body characters.
     """
     info = component_map.get(char, {})
     meta = info.get("meta", {})
     
-    # 1. Identify Semantic (Radical)
+    # 1. VALIDATE STRUCTURE FIRST
+    # We only want to guess logic for clear binary compounds.
+    # ⿰ = Left-Right, ⿱ = Top-Bottom
+    ALLOWED_IDCS = {'⿰', '⿱'}
+    decomp_str = meta.get("decomposition", "")
+    
+    # If decomposition is missing or doesn't start with allowed IDC, skip analysis.
+    if not decomp_str or decomp_str[0] not in ALLOWED_IDCS:
+        return {
+            "char": char,
+            "semantic": None,
+            "phonetic": None,
+            "phonetic_pinyin": None,
+            "is_sound_match": False
+        }
+    
+    # 2. Identify Semantic (Radical)
     radical = clean_field(meta.get("radical", ""))
     if radical == "—": radical = None
     
-    # 2. Identify Phonetic Candidate
-    # Logic: Look at decomposition. If one part is the radical, the other is likely phonetic.
-    decomp_str = meta.get("decomposition", "")
+    # 3. Identify Phonetic Candidate
     parts = [c for c in decomp_str if c not in IDC_CHARS and c != char]
     
     phonetic = None
@@ -296,6 +311,7 @@ def analyze_component_structure(char: str) -> dict:
             
             if char_pinyin and phonetic_pinyin and char_pinyin != "—" and phonetic_pinyin != "—":
                 # Clean tones for comparison
+                import re
                 cp_plain = re.sub(r'[0-9]', '', char_pinyin).lower()
                 pp_plain = re.sub(r'[0-9]', '', phonetic_pinyin).lower()
                 if cp_plain == pp_plain:
