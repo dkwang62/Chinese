@@ -574,8 +574,9 @@ def render_stroke_view():
             # Add copy button using Streamlit's working method
             if prompt_text:
                 st.markdown("---")
+                st.markdown("**🤖 Verify Logic & Patterns Analysis with AI**")
+                st.caption("Copy this prompt to ChatGPT to verify the semantic/phonetic analysis shown above")
                 render_copy_to_clipboard(prompt_text, f"verify_{char}")
-    # -----------------------
     
     if state.get_display_mode() != "Single Character":
         if phrase_html := _render_phrase_html(state.get("stroke_view_char")):
