@@ -216,13 +216,13 @@ def render_learning_insights_html(char: str) -> str:
     if not sem and not pho:
         return ""
 
-    # Get additional data for the prompt
+    # Get additional data
     decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "None")
     def_en = get_char_definition_en(char)
     p_fam = get_pronunciation_family(char)
     s_fam = get_semantic_family(char)
 
-    # Hardcoded verification prompt template (mirroring Task 4)
+    # Hardcoded verification prompt template
     VERIFY_PROMPT_TEMPLATE = """Task 4 — Logic & Pattern Tutor (From App Fields)
 
 You are a Chinese character structure tutor. Explain Radix’s “Character Logic & Patterns” panel clearly and conservatively.
@@ -271,7 +271,6 @@ Then add ONE summary sentence: label as “Sound family” or safer “Component
 
 ⸻"""
 
-    # Build the fully formatted prompt in Python (reliable, no JS interpolation issues)
     full_prompt = VERIFY_PROMPT_TEMPLATE.format(
         char=char,
         def_en=def_en or "None",
@@ -284,15 +283,13 @@ Then add ONE summary sentence: label as “Sound family” or safer “Component
         semantic_family=", ".join(s_fam) if s_fam else "None"
     ).strip()
 
-    # Safe JSON-encoded prompt for JS
     safe_prompt = json.dumps(full_prompt, ensure_ascii=False)
 
-    # Unique ID based on character (consistent for same char)
     unique_id = hashlib.md5(char.encode()).hexdigest()[:8]
 
     html_parts = []
 
-    # 1. Component Roles
+    # Component Roles
     roles_html = []
     if sem:
         roles_html.append(f"<div class='role-badge role-semantic'>💡 {sem} : Meaning (Radical)</div>")
@@ -303,17 +300,17 @@ Then add ONE summary sentence: label as “Sound family” or safer “Component
         roles_html.append(f"<div class='role-badge role-phonetic'>{match_icon} {pho} {pinyin_display} : {match_text}</div>")
     html_parts.append(f"<div style='margin-bottom:20px;'>{''.join(roles_html)}</div>")
 
-    # 2. Pronunciation Family
+    # Pronunciation Family
     if pho and p_fam:
         fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in p_fam])
         html_parts.append(f"<div style='margin-bottom:15px;'><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>🔊 SOUND FAMILY (share {pho}):</div><div class='family-list'>{fam_str}</div></div>")
 
-    # 3. Semantic Family
+    # Semantic Family
     if sem and s_fam:
         fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in s_fam])
         html_parts.append(f"<div><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {sem}):</div><div class='family-list'>{fam_str}</div></div>")
 
-    # 4. Verify with AI button (automatic copy, no prompt shown)
+    # Verify button + JS (now guaranteed to run when rendered with st_html)
     html_parts.append(f"""
     <div style='margin-top:20px; text-align:center;'>
         <button id='verify-btn-{unique_id}' 
@@ -326,7 +323,6 @@ Then add ONE summary sentence: label as “Sound family” or safer “Component
         <div id='verify-msg-{unique_id}' 
              style='margin-top:10px; color:#2e7d32; font-weight:600; font-size:0.9em; min-height:24px;'>
         </div>
-        <!-- Hidden textarea for reliable fallback copy -->
         <textarea id='clipboard-target-{unique_id}' 
                   style='position:absolute; left:-9999px; opacity:0;' readonly></textarea>
     </div>
@@ -340,41 +336,37 @@ Then add ONE summary sentence: label as “Sound family” or safer “Component
 
         if (!btn || !msg || !ta) return;
 
+        // Temporary test: prove JS is running
+        msg.textContent = "JS active – click button to copy";
+
         btn.addEventListener('click', async () => {{
             let copied = false;
 
-            // Try modern clipboard API first (works on HTTPS/deployed)
+            // Modern clipboard API (HTTPS/deployed)
             if (navigator.clipboard && navigator.clipboard.writeText) {{
                 try {{
                     await navigator.clipboard.writeText(text);
                     copied = true;
-                }} catch (e) {{
-                    console.log('Clipboard API failed:', e);
-                }}
+                }} catch (e) {{}}
             }}
 
-            // Fallback: execCommand (works reliably on local HTTP/Streamlit)
+            // execCommand fallback (local HTTP)
             if (!copied) {{
                 try {{
                     ta.value = text;
                     ta.select();
                     ta.setSelectionRange(0, text.length);
                     copied = document.execCommand('copy');
-                }} catch (e) {{
-                    console.log('execCommand failed:', e);
-                }}
+                }} catch (e) {{}}
             }}
 
             if (copied) {{
-                msg.textContent = '✅ Copied to clipboard! Paste into ChatGPT to verify.';
-                setTimeout(() => {{ msg.textContent = ''; }}, 3500);
+                msg.textContent = '✅ Copied! Paste into ChatGPT to verify.';
+                setTimeout(() => {{ msg.textContent = 'JS active – click button to copy'; }}, 4000);
             }} else {{
-                msg.textContent = '❌ Copy failed — please refresh and try again.';
+                msg.textContent = 'Copy failed – try in deployed app';
                 msg.style.color = '#c62828';
-                setTimeout(() => {{ 
-                    msg.textContent = ''; 
-                    msg.style.color = '#2e7d32'; 
-                }}, 5000);
+                setTimeout(() => {{ msg.textContent = 'JS active – click button to copy'; msg.style.color = '#2e7d32'; }}, 5000);
             }}
         }});
     }})();
