@@ -315,41 +315,87 @@ def render_learning_insights_html(char: str) -> tuple[str, int]:
     html_parts.append(f'<div id="vmsg{unique_id}" style="margin-top:10px; color:#2e7d32; font-weight:600; font-size:0.9em;"></div>')
     html_parts.append('</div>')
     
-    # JavaScript - simpler version with better error handling
+    # JavaScript - with fallback method
     script = f"""<script>
 (function() {{
     var promptText = {prompt_json};
     var btnId = 'vbtn{unique_id}';
     var msgId = 'vmsg{unique_id}';
     
+    function copyToClipboardFallback(text) {{
+        var textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {{
+            var successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            return successful;
+        }} catch (err) {{
+            document.body.removeChild(textArea);
+            return false;
+        }}
+    }}
+    
     function setupButton() {{
         var btn = document.getElementById(btnId);
         var msg = document.getElementById(msgId);
         
         if (!btn || !msg) {{
+            console.log('Button or message element not found, retrying...');
             setTimeout(setupButton, 100);
             return;
         }}
         
+        console.log('Button setup complete for {unique_id}');
+        
         btn.onclick = function() {{
+            console.log('Button clicked, attempting copy...');
+            msg.style.display = 'block';
+            
+            // Try modern clipboard API first
             if (navigator.clipboard && navigator.clipboard.writeText) {{
+                console.log('Using clipboard API');
                 navigator.clipboard.writeText(promptText)
                     .then(function() {{
+                        console.log('Copy successful via clipboard API');
                         msg.textContent = '✅ Copied! Paste into ChatGPT.';
-                        msg.style.display = 'block';
                         setTimeout(function() {{
                             msg.textContent = '';
                             msg.style.display = 'none';
                         }}, 3500);
                     }})
                     .catch(function(err) {{
-                        msg.textContent = '❌ Copy failed: ' + err.message;
-                        msg.style.display = 'block';
-                        console.error('Copy error:', err);
+                        console.log('Clipboard API failed, trying fallback:', err);
+                        // Try fallback
+                        if (copyToClipboardFallback(promptText)) {{
+                            msg.textContent = '✅ Copied! Paste into ChatGPT.';
+                            setTimeout(function() {{
+                                msg.textContent = '';
+                                msg.style.display = 'none';
+                            }}, 3500);
+                        }} else {{
+                            msg.textContent = '❌ Copy failed. Please check console.';
+                            console.error('Both methods failed:', err);
+                        }}
                     }});
             }} else {{
-                msg.textContent = '❌ Clipboard not supported';
-                msg.style.display = 'block';
+                console.log('Clipboard API not available, using fallback');
+                // Use fallback directly
+                if (copyToClipboardFallback(promptText)) {{
+                    msg.textContent = '✅ Copied! Paste into ChatGPT.';
+                    setTimeout(function() {{
+                        msg.textContent = '';
+                        msg.style.display = 'none';
+                    }}, 3500);
+                }} else {{
+                    msg.textContent = '❌ Copy failed. Try manually.';
+                }}
             }}
         }};
     }}
