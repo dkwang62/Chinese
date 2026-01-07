@@ -202,11 +202,59 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
     
     return html_content, h
 
+
+# Hardcoded template mirroring Task 4 (directly in code, no dependency on JSON)
+VERIFY_PROMPT_TEMPLATE = """Task 4 — Logic & Pattern Tutor (From App Fields)
+
+You are a Chinese character structure tutor. Explain Radix’s “Character Logic & Patterns” panel clearly and conservatively.
+Do not invent etymology; if uncertain, say so. Do not assume any prior tasks have been run.
+
+INPUT (fields provided by the app):
+- char: {char}
+- def_en: {def_en}
+- decomposition: {decomposition}
+- semantic: {semantic}
+- phonetic: {phonetic}
+- phonetic_pinyin: {phonetic_pinyin}
+- is_sound_match: {is_sound_match}
+- pronunciation_family: {pronunciation_family}
+- semantic_family: {semantic_family}
+
+TASK:
+Explain (1) why semantic vs phonetic were assigned, and (2) what the two families mean,
+INCLUDING checking for false friends in pronunciation_family (e.g., visual matches caused by simplification).
+
+OUTPUT:
+
+1) Component Roles
+- If semantic exists: what meaning cue it suggests (1–2 lines).
+- If phonetic exists: what sound cue it suggests (1–2 lines).
+- Interpret is_sound_match:
+  - True: strong phonetic cue in modern Mandarin.
+  - False: candidate phonetic component but modern sound mismatch; give 1–2 plausible reasons only if confident.
+
+2) Pronunciation Family (share {phonetic})
+For each character in pronunciation_family, output ONE line:
+- Character: Classification (Likely true member / Visual only / Simplification artefact / Uncertain) — reason (<= 15 words).
+Then add ONE summary sentence: label as “Sound family” or safer “Component family.”
+
+3) Meaning Family (share {semantic})
+- 1–2 sentence theme of what {semantic} often signals in modern characters.
+- For each character in semantic_family: one short line on how the theme plausibly applies (no overclaiming).
+
+4) Learner Takeaway (max 2 bullets)
+- One rule-of-thumb about radicals (meaning cues).
+- One rule-of-thumb about phonetics (sound cues + why false friends occur).
+
+5) UI Tooltip Copy
+- Tooltip for “Meaning (Radical)” (<= 18 words)
+- Tooltip for “Sound Match / Sound Component” (<= 18 words)
+
+⸻
+"""
+
 def render_learning_insights_html(char: str) -> str:
     """Render the Logic/Analysis box for the character view."""
-    # We need to import the analysis functions from core here to avoid circular imports at module level
-    from radix_core import analyze_component_structure, get_pronunciation_family, get_semantic_family
-    
     if not char: return ""
     
     analysis = analyze_component_structure(char)
@@ -215,7 +263,6 @@ def render_learning_insights_html(char: str) -> str:
     pho_pinyin = analysis.get("phonetic_pinyin", "")
     is_match = analysis.get("is_sound_match")
     
-    # If no analysis found, return empty
     if not sem and not pho:
         return ""
 
@@ -248,12 +295,50 @@ def render_learning_insights_html(char: str) -> str:
             fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in s_fam])
             html_parts.append(f"<div><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {sem}):</div><div class='family-list'>{fam_str}</div></div>")
 
-    # 4. DISCLAIMER (New)
-    html_parts.append("""
-        <div style='margin-top:15px; padding-top:10px; border-top:1px solid #eee; font-size:0.75em; color:#999; font-style:italic; line-height:1.3;'>
-            ⚠️ <b>Note:</b> Component roles are identified algorithmically based on structure. For some characters (especially those containing simple strokes like 丨 or 一), these associations may be visual rather than functional.
-        </div>
-    """)
+    # NEW: Build the verification prompt using the hardcoded template
+    decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "None")
+    prompt = VERIFY_PROMPT_TEMPLATE.format(
+        char=char,
+        def_en=get_char_definition_en(char),
+        decomposition=decomposition,
+        semantic=sem or "None",
+        phonetic=pho or "None",
+        phonetic_pinyin=pho_pinyin or "None",
+        is_sound_match=str(is_match),
+        pronunciation_family=", ".join(p_fam) if p_fam else "None",
+        semantic_family=", ".join(s_fam) if s_fam else "None"
+    )
+
+    widget_id = str(uuid.uuid4())[:8]  # Unique ID for JS elements
+    safe_text = json.dumps(prompt, ensure_ascii=False)
+
+    # NEW: HTML + JS for the "Copy AI Verification Prompt" button
+    verify_html = f"""
+    <div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px; text-align:center;'>
+        <button id="verify-btn-{widget_id}" style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Copy AI Verification Prompt</button>
+    </div>
+    <div id="verify-msg-{widget_id}" style="text-align:center; margin-top:8px; color:#333; font-weight:500;"></div>
+    <script>
+    (function() {{
+        const text = {safe_text};
+        const btn = document.getElementById("verify-btn-{widget_id}");
+        const msg = document.getElementById("verify-msg-{widget_id}");
+        if (!btn) return;
+        async function copy() {{
+            try {{
+                await navigator.clipboard.writeText(text);
+                msg.textContent = "Copied! Paste into AI to verify families.";
+            }} catch (e) {{
+                msg.textContent = "Copy failed. Please try again.";
+            }}
+            setTimeout(() => {{msg.textContent = "";}}, 3000);
+        }}
+        btn.addEventListener("click", copy);
+    }})();
+    </script>
+    """
+
+    html_parts.append(verify_html)
 
     return f"""
     <div class='insight-box'>
@@ -261,10 +346,6 @@ def render_learning_insights_html(char: str) -> str:
         {''.join(html_parts)}
     </div>
     """
-
-
-
-
 
 
 # ==================== UI COMPONENTS ====================
