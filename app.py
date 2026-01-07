@@ -555,18 +555,14 @@ def render_stroke_view():
     st_html(main_html, height=450)
     
     # --- INSIGHTS PANEL ---
-    try:
-        result = render_learning_insights_html(state.get("stroke_view_char"))
-        if result and len(result) == 2:
-            insights_html, insights_height = result
+    char = state.get("stroke_view_char")
+    if char:
+        insights_result = render_learning_insights_html(char)
+        if isinstance(insights_result, tuple) and len(insights_result) == 2:
+            insights_html, insights_height = insights_result
             if insights_html:
                 st_html(insights_html, height=insights_height)
-        else:
-            st.error(f"Unexpected return from render_learning_insights_html: {result}")
-    except Exception as e:
-        st.error(f"Error rendering insights: {e}")
-        import traceback
-        st.code(traceback.format_exc())
+    # -----------------------
     # -----------------------
     
     if state.get_display_mode() != "Single Character":
