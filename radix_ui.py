@@ -346,7 +346,6 @@ Then add ONE summary sentence: label as "Sound family" or safer "Component famil
         {''.join(html_parts)}
     </div>
     """
-
 # ==================== UI COMPONENTS ====================
 
 def render_definition_search_ui(key_prefix: str):
