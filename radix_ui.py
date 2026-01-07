@@ -203,7 +203,7 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
     return html_content, h
 
 def render_learning_insights_html(char: str) -> tuple[str, int, str]:
-    """Render the Logic/Analysis box for the character view. Returns (html, height, prompt_text)."""
+    """Render the Logic/Analysis box. Returns (html, height, prompt_text)."""
     if not char: 
         return "", 0, ""
     
@@ -258,7 +258,7 @@ def render_learning_insights_html(char: str) -> tuple[str, int, str]:
         html_parts.append('</div>')
         html_parts.append('</div>')
 
-    # Build prompt text
+    # Build prompt text  
     lines = [
         "Task 4 — Logic & Pattern Tutor (From App Fields)",
         "",
