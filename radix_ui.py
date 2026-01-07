@@ -331,10 +331,11 @@ def render_learning_insights_html(char: str) -> str:
     ).strip()
 
     widget_id = f"verify-{uuid.uuid4().hex[:8]}"
+    safe_text = json.dumps(prompt, ensure_ascii=False)
 
     verify_html = f"""
     <div style='margin-top:24px; padding-top:16px; border-top:2px solid #e0e0e0; text-align:center;'>
-        <button id="action-btn-{widget_id}" 
+        <button id="copy-btn-{widget_id}" 
                 style="padding:12px 28px; 
                        background:#2e7d32; 
                        color:white; 
@@ -347,59 +348,83 @@ def render_learning_insights_html(char: str) -> str:
                        transition:all 0.3s ease;">
             📋 Copy Verification Prompt
         </button>
-        <div id="prompt-box-{widget_id}" style="display:none; margin-top:20px; padding:16px; background:#f8fff8; border:1px solid #a5d6a7; border-radius:8px;">
-            <div style="font-weight:600; color:#2e7d32; margin-bottom:12px; text-align:center;">
-                Prompt is selected below — press Ctrl+C (⌘+C on Mac) to copy
-            </div>
+        <div id="msg-{widget_id}" 
+             style="margin-top:12px; 
+                    font-weight:600; 
+                    color:#2e7d32; 
+                    min-height:28px;
+                    font-size:0.95em;">
+        </div>
+
+        <!-- Hidden elements for copy fallback -->
+        <div id="prompt-box-{widget_id}" style="display:none;">
             <pre id="prompt-text-{widget_id}" 
                  style="white-space:pre-wrap; word-wrap:break-word; font-family:monospace; 
-                        font-size:0.95em; background:transparent; padding:0; margin:0; 
-                        max-height:300px; overflow-y:auto;">
+                        font-size:0.95em; margin:0; padding:0;">
 {prompt}
             </pre>
         </div>
-        <div id="msg-{widget_id}" 
-             style="margin-top:12px; font-weight:600; color:#2e7d32; min-height:24px; font-size:0.95em;">
-        </div>
+        <textarea id="hidden-text-{widget_id}" 
+                  style="position:absolute; left:-9999px; opacity:0;"></textarea>
     </div>
 
     <script>
     (function() {{
-        const btn = document.getElementById("action-btn-{widget_id}");
-        const box = document.getElementById("prompt-box-{widget_id}");
-        const textEl = document.getElementById("prompt-text-{widget_id}");
+        const btn = document.getElementById("copy-btn-{widget_id}");
         const msg = document.getElementById("msg-{widget_id}");
-        let shown = false;
+        const promptBox = document.getElementById("prompt-box-{widget_id}");
+        const promptText = document.getElementById("prompt-text-{widget_id}");
+        const hiddenText = document.getElementById("hidden-text-{widget_id}");
+        const text = {safe_text};
 
-        if (!btn || !box || !textEl) return;
+        if (!btn) return;
 
         btn.addEventListener("click", function() {{
-            if (shown) {{
-                // Hide again if clicked twice
-                box.style.display = "none";
-                btn.textContent = "📋 Copy Verification Prompt";
-                msg.textContent = "";
+            let copied = false;
+
+            // Try execCommand first (most reliable in Streamlit/local)
+            try {{
+                hiddenText.value = text;
+                hiddenText.select();
+                hiddenText.setSelectionRange(0, 99999);
+                copied = document.execCommand("copy");
+            }} catch (e) {{}}
+
+            // Try modern clipboard API second
+            if (!copied && navigator.clipboard) {{
+                navigator.clipboard.writeText(text).then(() => {{
+                    copied = true;
+                }}).catch(() => {{}});
+            }}
+
+            // Final fallback: show + auto-select
+            if (!copied && promptText) {{
+                promptBox.style.display = "block";
+                const range = document.createRange();
+                range.selectNodeContents(promptText);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+                msg.textContent = "Text selected — press Ctrl+C (⌘+C) to copy";
+                msg.style.color = "#2e7d32";
+                btn.textContent = "Selected — Ctrl+C to copy";
                 return;
             }}
 
-            box.style.display = "block";
-            btn.textContent = "✅ Selected — Ctrl+C to copy (click again to hide)";
-
-            // Auto-select the text
-            const range = document.createRange();
-            range.selectNodeContents(textEl);
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
-
-            msg.textContent = "Text automatically selected — just press Ctrl+C / ⌘+C";
-            msg.style.color = "#2e7d32";
-            shown = true;
-
-            // Optional: reset message after a few seconds
-            setTimeout(() => {{
-                if (shown) msg.textContent = "Ready — Ctrl+C to copy";
-            }}, 4000);
+            // Success path
+            if (copied) {{
+                btn.textContent = "✅ Copied!";
+                btn.style.background = "#1b5e20";
+                msg.textContent = "Verification prompt copied to clipboard";
+                setTimeout(() => {{
+                    btn.textContent = "📋 Copy Verification Prompt";
+                    btn.style.background = "#2e7d32";
+                    msg.textContent = "";
+                }}, 3000);
+            }} else {{
+                msg.textContent = "Copy failed — please refresh and try again";
+                msg.style.color = "#c62828";
+            }}
         }});
     }})();
     </script>
