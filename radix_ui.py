@@ -224,39 +224,39 @@ def render_learning_insights_html(char: str) -> tuple[str, int]:
     
     unique_id = hashlib.md5(char.encode()).hexdigest()[:8]
 
-    # Build HTML components piece by piece with explicit closing
-    html_pieces = []
+    # Build HTML components piece by piece
+    html_parts = []
     
     # 1. Component Roles section
-    html_pieces.append("<div style='margin-bottom:20px;'>")
+    html_parts.append('<div style="margin-bottom:20px;">')
     if sem:
-        html_pieces.append(f"<div class='role-badge role-semantic'>💡 {pyhtml.escape(sem)} : Meaning (Radical)</div>")
+        html_parts.append(f'<div class="role-badge role-semantic">💡 {pyhtml.escape(sem)} : Meaning (Radical)</div>')
     if pho:
         match_icon = "📊" if is_match else "🗣️"
         match_text = "Sound Match" if is_match else "Sound Component"
         pinyin_display = f" ({pyhtml.escape(pho_pinyin)})" if pho_pinyin else ""
-        html_pieces.append(f"<div class='role-badge role-phonetic'>{match_icon} {pyhtml.escape(pho)}{pinyin_display} : {match_text}</div>")
-    html_pieces.append("</div>")
+        html_parts.append(f'<div class="role-badge role-phonetic">{match_icon} {pyhtml.escape(pho)}{pinyin_display} : {match_text}</div>')
+    html_parts.append('</div>')
     
     # 2. Sound Family section
     if pho and p_fam:
-        html_pieces.append("<div style='margin-bottom:15px;'>")
-        html_pieces.append(f"<div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>📊 SOUND FAMILY (share {pyhtml.escape(pho)}):</div>")
-        html_pieces.append("<div class='family-list'>")
+        html_parts.append('<div style="margin-bottom:15px;">')
+        html_parts.append(f'<div style="font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;">📊 SOUND FAMILY (share {pyhtml.escape(pho)}):</div>')
+        html_parts.append('<div class="family-list">')
         for c in p_fam:
-            html_pieces.append(f"<span class='family-char'>{pyhtml.escape(c)}</span>")
-        html_pieces.append("</div>")
-        html_pieces.append("</div>")
+            html_parts.append(f'<span class="family-char">{pyhtml.escape(c)}</span>')
+        html_parts.append('</div>')
+        html_parts.append('</div>')
     
     # 3. Meaning Family section
     if sem and s_fam:
-        html_pieces.append("<div style='margin-bottom:15px;'>")
-        html_pieces.append(f"<div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {pyhtml.escape(sem)}):</div>")
-        html_pieces.append("<div class='family-list'>")
+        html_parts.append('<div style="margin-bottom:15px;">')
+        html_parts.append(f'<div style="font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;">💡 MEANING FAMILY (share {pyhtml.escape(sem)}):</div>')
+        html_parts.append('<div class="family-list">')
         for c in s_fam:
-            html_pieces.append(f"<span class='family-char'>{pyhtml.escape(c)}</span>")
-        html_pieces.append("</div>")
-        html_pieces.append("</div>")
+            html_parts.append(f'<span class="family-char">{pyhtml.escape(c)}</span>')
+        html_parts.append('</div>')
+        html_parts.append('</div>')
 
     # Build prompt text
     lines = [
@@ -310,44 +310,47 @@ def render_learning_insights_html(char: str) -> tuple[str, int]:
     prompt_json = json.dumps(prompt_full, ensure_ascii=False)
 
     # 4. Button section
-    html_pieces.append("<div style='margin-top:20px; text-align:center;'>")
-    html_pieces.append(f"<button id='vbtn{unique_id}' style='padding:10px 20px; border-radius:10px; border:1px solid #ddd; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; cursor:pointer; font-weight:700; font-size:0.9em; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>🤖 Verify with AI</button>")
-    html_pieces.append(f"<div id='vmsg{unique_id}' style='margin-top:10px; color:#2e7d32; font-weight:600; font-size:0.9em;'></div>")
-    html_pieces.append("</div>")
+    html_parts.append('<div style="margin-top:20px; text-align:center;">')
+    html_parts.append(f'<button id="vbtn{unique_id}" style="padding:10px 20px; border-radius:10px; border:1px solid #ddd; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; cursor:pointer; font-weight:700; font-size:0.9em; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);">🤖 Verify with AI</button>')
+    html_parts.append(f'<div id="vmsg{unique_id}" style="margin-top:10px; color:#2e7d32; font-weight:600; font-size:0.9em;"></div>')
+    html_parts.append('</div>')
     
     # JavaScript
-    html_pieces.append(f"""<script>
-(function() {{
+    script = f"""<script>
+(function() {{{{
     var txt = {prompt_json};
     var b = document.getElementById('vbtn{unique_id}');
     var m = document.getElementById('vmsg{unique_id}');
-    if (b) {{
-        b.onclick = function() {{
-            navigator.clipboard.writeText(txt).then(function() {{
+    if (b) {{{{
+        b.onclick = function() {{{{
+            navigator.clipboard.writeText(txt).then(function() {{{{
                 m.textContent = '✅ Copied! Paste into ChatGPT.';
-                setTimeout(function() {{ m.textContent = ''; }}, 3500);
-            }}).catch(function() {{
+                setTimeout(function() {{{{ m.textContent = ''; }}}}, 3500);
+            }}}}).catch(function() {{{{
                 m.textContent = '❌ Copy failed.';
-                setTimeout(function() {{ m.textContent = ''; }}, 3500);
-            }});
-        }};
-    }}
+                setTimeout(function() {{{{ m.textContent = ''; }}}}, 3500);
+            }}}});
+        }}}};
+    }}}}
 }})();
-</script>""")
+</script>"""
+    html_parts.append(script)
 
     # Assemble final HTML
+    content = ''.join(html_parts)
+    
     full_html = f"""<style>
-.insight-box {{background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);}}
-.insight-title {{font-weight: 800; color: #37474f; font-size: 1.1em; margin-bottom: 15px;}}
-.role-badge {{display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; font-size: 0.9em; font-weight: 600; margin-right: 10px; margin-bottom: 8px;}}
-.role-semantic {{background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9;}}
-.role-phonetic {{background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb;}}
-.family-list {{display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px;}}
-.family-char {{font-size: 1.4em; color: #333; padding: 2px 8px; background: #f5f5f5; border-radius: 6px; border: 1px solid #eee;}}
+.insight-box {{{{background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);}}}}
+.insight-title {{{{font-weight: 800; color: #37474f; font-size: 1.1em; margin-bottom: 15px;}}}}
+.role-badge {{{{display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; font-size: 0.9em; font-weight: 600; margin-right: 10px; margin-bottom: 8px;}}}}
+.role-semantic {{{{background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9;}}}}
+.role-phonetic {{{{background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb;}}}}
+.family-list {{{{display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px;}}}}
+.family-char {{{{font-size: 1.4em; color: #333; padding: 2px 8px; background: #f5f5f5; border-radius: 6px; border: 1px solid #eee;}}}}
 </style>
-<div class='insight-box'>
-<div class='insight-title'>🧠 Character Logic & Patterns</div>
-{''.join(html_pieces)}
+<div class="insight-box">
+<div class="insight-title">🧠 Character Logic & Patterns</div>
+{content}
 </div>"""
     
     base_height = 200
