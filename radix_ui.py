@@ -355,6 +355,9 @@ def render_learning_insights_html(char: str) -> str:
                     min-height:24px;
                     font-size:0.95em;">
         </div>
+        <!-- Fallback textarea (hidden) for execCommand copy -->
+        <textarea id="fallback-textarea-{widget_id}" 
+                  style="position:absolute; left:-9999px; opacity:0; height:1px; width:1px;">{pyhtml.escape(prompt)}</textarea>
     </div>
 
     <script>
@@ -362,34 +365,54 @@ def render_learning_insights_html(char: str) -> str:
         const text = {safe_text};
         const btn = document.getElementById("verify-btn-{widget_id}");
         const msg = document.getElementById("verify-msg-{widget_id}");
+        const fallbackTextarea = document.getElementById("fallback-textarea-{widget_id}");
         if (!btn || !msg) return;
 
         async function copyToClipboard() {{
-            try {{
-                await navigator.clipboard.writeText(text);
-                // Success feedback
-                msg.innerHTML = "✅ Copied successfully! Paste into ChatGPT or any AI to verify the families.";
-                btn.style.background = "#1b5e20";
-                btn.style.transform = "scale(0.98)";
-                
-                setTimeout(() => {{
-                    msg.innerHTML = "";
-                    btn.style.background = "#2e7d32";
-                    btn.style.transform = "scale(1)";
-                }}, 4000);
-            }} catch (err) {{
-                // Error feedback
-                msg.innerHTML = "❌ Copy failed — please select and copy the text manually.";
-                msg.style.color = "#c62828";
-                setTimeout(() => {{ msg.innerHTML = ""; msg.style.color = "#2e7d32"; }}, 5000);
+            // Try modern clipboard API first
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+                try {{
+                    await navigator.clipboard.writeText(text);
+                    showSuccess();
+                    return;
+                }} catch (err) {{
+                    console.log("Modern clipboard failed, falling back...");
+                }}
             }}
+
+            // Fallback: select hidden textarea and use execCommand (works in Streamlit iframes)
+            try {{
+                fallbackTextarea.value = text;
+                fallbackTextarea.select();
+                fallbackTextarea.setSelectionRange(0, 99999); // For mobile
+                document.execCommand("copy");
+                showSuccess();
+            }} catch (err) {{
+                showFailure();
+            }}
+        }}
+
+        function showSuccess() {{
+            msg.innerHTML = "✅ Copied successfully! Paste into your AI tool to verify.";
+            btn.style.background = "#1b5e20";
+            btn.style.transform = "scale(0.98)";
+            setTimeout(() => {{
+                msg.innerHTML = "";
+                btn.style.background = "#2e7d32";
+                btn.style.transform = "scale(1)";
+            }}, 4000);
+        }}
+
+        function showFailure() {{
+            msg.innerHTML = "❌ Copy failed — please select &amp; copy the prompt manually.";
+            msg.style.color = "#c62828";
+            setTimeout(() => {{ msg.innerHTML = ""; msg.style.color = "#2e7d32"; }}, 6000);
         }}
 
         btn.addEventListener("click", copyToClipboard);
     }})();
     </script>
     """
-
     html_parts.append(verify_html)
 
     return f"""
