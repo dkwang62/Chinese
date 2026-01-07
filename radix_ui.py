@@ -230,21 +230,21 @@ def render_learning_insights_html(char: str) -> tuple[str, int]:
     # Component Roles
     roles_html = []
     if sem:
-        roles_html.append(f"<div class='role-badge role-semantic'>💡 {sem} : Meaning (Radical)</div>")
+        roles_html.append(f"<div class='role-badge role-semantic'>💡 {pyhtml.escape(sem)} : Meaning (Radical)</div>")
     if pho:
         match_icon = "📊" if is_match else "🗣️"
         match_text = "Sound Match" if is_match else "Sound Component"
-        pinyin_display = f"({pho_pinyin})" if pho_pinyin else ""
-        roles_html.append(f"<div class='role-badge role-phonetic'>{match_icon} {pho} {pinyin_display} : {match_text}</div>")
+        pinyin_display = f"({pyhtml.escape(pho_pinyin)})" if pho_pinyin else ""
+        roles_html.append(f"<div class='role-badge role-phonetic'>{match_icon} {pyhtml.escape(pho)} {pinyin_display} : {match_text}</div>")
     display_parts.append(f"<div style='margin-bottom:20px;'>{''.join(roles_html)}</div>")
     
     # Families
     if pho and p_fam:
-        fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in p_fam])
-        display_parts.append(f"<div style='margin-bottom:15px;'><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>📊 SOUND FAMILY (share {pho}):</div><div class='family-list'>{fam_str}</div></div>")
+        fam_str = "".join([f"<span class='family-char'>{pyhtml.escape(c)}</span>" for c in p_fam])
+        display_parts.append(f"<div style='margin-bottom:15px;'><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>📊 SOUND FAMILY (share {pyhtml.escape(pho)}):</div><div class='family-list'>{fam_str}</div></div>")
     if sem and s_fam:
-        fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in s_fam])
-        display_parts.append(f"<div><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {sem}):</div><div class='family-list'>{fam_str}</div></div>")
+        fam_str = "".join([f"<span class='family-char'>{pyhtml.escape(c)}</span>" for c in s_fam])
+        display_parts.append(f"<div style='margin-bottom:15px;'><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {pyhtml.escape(sem)}):</div><div class='family-list'>{fam_str}</div></div>")
 
     # Build the complete prompt as a Python string
     lines = [
