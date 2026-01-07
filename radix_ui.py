@@ -334,85 +334,86 @@ def render_learning_insights_html(char: str) -> str:
     safe_text = json.dumps(prompt, ensure_ascii=False)
 
     verify_html = f"""
-    <div style='margin-top:24px; padding-top:16px; border-top:2px solid #e0e0e0; text-align:center;'>
-        <button id="verify-btn-{widget_id}" 
-                style="padding:12px 28px; 
-                       background:#2e7d32; 
-                       color:white; 
-                       border:none; 
-                       border-radius:12px; 
-                       cursor:pointer; 
-                       font-weight:700; 
-                       font-size:1.05em;
-                       box-shadow:0 4px 10px rgba(46,125,50,0.3);
-                       transition:all 0.3s ease;">
-            📋 Copy AI Verification Prompt
-        </button>
-        <div id="verify-msg-{widget_id}" 
-             style="margin-top:12px; 
-                    font-weight:600; 
-                    color:#2e7d32; 
-                    min-height:24px;
-                    font-size:0.95em;">
+        <div style='margin-top:24px; padding-top:16px; border-top:2px solid #e0e0e0; text-align:center;'>
+            <button id="verify-btn-{widget_id}" 
+                    style="padding:12px 28px; 
+                        background:#2e7d32; 
+                        color:white; 
+                        border:none; 
+                        border-radius:12px; 
+                        cursor:pointer; 
+                        font-weight:700; 
+                        font-size:1.05em;
+                        box-shadow:0 4px 10px rgba(46,125,50,0.3);
+                        transition:all 0.3s ease;">
+                📋 Copy AI Verification Prompt
+            </button>
+            <div id="verify-msg-{widget_id}" 
+                style="margin-top:12px; 
+                        font-weight:600; 
+                        color:#2e7d32; 
+                        min-height:24px;
+                        font-size:0.95em;">
+            </div>
+            <!-- Hidden textarea with UNESCAPED prompt (uses raw {prompt} but safe because inside CDATA-like script setup) -->
+            <textarea id="fallback-textarea-{widget_id}" 
+                    style="position:absolute; left:-9999px; opacity:0; height:1px; width:1px;">
+    {prompt}
+            </textarea>
         </div>
-        <!-- Fallback textarea (hidden) for execCommand copy -->
-        <textarea id="fallback-textarea-{widget_id}" 
-                  style="position:absolute; left:-9999px; opacity:0; height:1px; width:1px;">{pyhtml.escape(prompt)}</textarea>
-    </div>
 
-    <script>
-    (function() {{
-        const text = {safe_text};
-        const btn = document.getElementById("verify-btn-{widget_id}");
-        const msg = document.getElementById("verify-msg-{widget_id}");
-        const fallbackTextarea = document.getElementById("fallback-textarea-{widget_id}");
-        if (!btn || !msg) return;
+        <script>
+        (function() {{
+            const text = {safe_text};
+            const btn = document.getElementById("verify-btn-{widget_id}");
+            const msg = document.getElementById("verify-msg-{widget_id}");
+            const fallbackTextarea = document.getElementById("fallback-textarea-{widget_id}");
+            if (!btn || !msg || !fallbackTextarea) return;
 
-        async function copyToClipboard() {{
-            // Try modern clipboard API first
-            if (navigator.clipboard && navigator.clipboard.writeText) {{
+            async function copyToClipboard() {{
+                // Try modern API first
+                if (navigator.clipboard && navigator.clipboard.writeText) {{
+                    try {{
+                        await navigator.clipboard.writeText(text);
+                        showSuccess();
+                        return;
+                    }} catch (err) {{
+                        console.log("Modern clipboard failed, falling back...");
+                    }}
+                }}
+
+                // Reliable fallback
                 try {{
-                    await navigator.clipboard.writeText(text);
+                    fallbackTextarea.select();
+                    fallbackTextarea.setSelectionRange(0, 99999); // Mobile support
+                    document.execCommand("copy");
                     showSuccess();
-                    return;
                 }} catch (err) {{
-                    console.log("Modern clipboard failed, falling back...");
+                    showFailure();
                 }}
             }}
 
-            // Fallback: select hidden textarea and use execCommand (works in Streamlit iframes)
-            try {{
-                fallbackTextarea.value = text;
-                fallbackTextarea.select();
-                fallbackTextarea.setSelectionRange(0, 99999); // For mobile
-                document.execCommand("copy");
-                showSuccess();
-            }} catch (err) {{
-                showFailure();
+            function showSuccess() {{
+                msg.innerHTML = "✅ Copied successfully! Paste into your AI tool to verify.";
+                btn.style.background = "#1b5e20";
+                btn.style.transform = "scale(0.98)";
+                setTimeout(() => {{
+                    msg.innerHTML = "";
+                    btn.style.background = "#2e7d32";
+                    btn.style.transform = "scale(1)";
+                }}, 4000);
             }}
-        }}
 
-        function showSuccess() {{
-            msg.innerHTML = "✅ Copied successfully! Paste into your AI tool to verify.";
-            btn.style.background = "#1b5e20";
-            btn.style.transform = "scale(0.98)";
-            setTimeout(() => {{
-                msg.innerHTML = "";
-                btn.style.background = "#2e7d32";
-                btn.style.transform = "scale(1)";
-            }}, 4000);
-        }}
+            function showFailure() {{
+                msg.innerHTML = "❌ Copy failed — please select &amp; copy the prompt manually.";
+                msg.style.color = "#c62828";
+                setTimeout(() => {{ msg.innerHTML = ""; msg.style.color = "#2e7d32"; }}, 6000);
+            }}
 
-        function showFailure() {{
-            msg.innerHTML = "❌ Copy failed — please select &amp; copy the prompt manually.";
-            msg.style.color = "#c62828";
-            setTimeout(() => {{ msg.innerHTML = ""; msg.style.color = "#2e7d32"; }}, 6000);
-        }}
-
-        btn.addEventListener("click", copyToClipboard);
-    }})();
-    </script>
-    """
+            btn.addEventListener("click", copyToClipboard);
+        }})();
+        </script>
+        """
     html_parts.append(verify_html)
 
     return f"""
