@@ -558,14 +558,15 @@ def render_stroke_view():
     char = state.get("stroke_view_char")
     if char:
         insights_result = render_learning_insights_html(char)
-        st.write(f"DEBUG: Type = {type(insights_result)}, Length = {len(insights_result) if isinstance(insights_result, tuple) else 'N/A'}")
-        if isinstance(insights_result, tuple) and len(insights_result) == 2:
-            insights_html, insights_height = insights_result
-            st.write(f"DEBUG: Height = {insights_height}, HTML length = {len(insights_html)}")
+        # Handle 3-value return (old version compatibility)
+        if isinstance(insights_result, tuple) and len(insights_result) == 3:
+            insights_html, insights_height, _ = insights_result
             if insights_html:
                 st_html(insights_html, height=insights_height)
-        else:
-            st.error(f"Function returned: {type(insights_result)}")
+        elif isinstance(insights_result, tuple) and len(insights_result) == 2:
+            insights_html, insights_height = insights_result
+            if insights_html:
+                st_html(insights_html, height=insights_height)
     # -----------------------
     
     if state.get_display_mode() != "Single Character":
