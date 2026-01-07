@@ -555,8 +555,13 @@ def render_stroke_view():
     st_html(main_html, height=450)
     
     # --- INSIGHTS PANEL ADDED HERE ---
-    st.markdown(render_learning_insights_html(state.get("stroke_view_char")), unsafe_allow_html=True)
+    insights_html, insights_height = render_learning_insights_html(state.get("stroke_view_char"))
+    if insights_html:
+        st_html(insights_html, height=insights_height)
     # ---------------------------------
+
+
+
     
     if state.get_display_mode() != "Single Character":
         if phrase_html := _render_phrase_html(state.get("stroke_view_char")):
