@@ -331,10 +331,11 @@ def render_learning_insights_html(char: str) -> str:
     )
 
     widget_id = f"verify-{uuid.uuid4().hex[:8]}"
+    safe_text = json.dumps(prompt, ensure_ascii=False)
 
     verify_html = f"""
     <div style='margin-top:24px; padding-top:16px; border-top:2px solid #e0e0e0; text-align:center;'>
-        <button id="show-btn-{widget_id}" 
+        <button id="copy-btn-{widget_id}" 
                 style="padding:12px 28px; 
                        background:#2e7d32; 
                        color:white; 
@@ -345,69 +346,67 @@ def render_learning_insights_html(char: str) -> str:
                        font-size:1.05em;
                        box-shadow:0 4px 10px rgba(46,125,50,0.3);
                        transition:all 0.3s ease;">
-            🔍 Show Verification Prompt
+            📋 Copy Verification Prompt
         </button>
-        <div id="prompt-container-{widget_id}" style="display:none; margin-top:20px; text-align:left;">
-            <div style="font-weight:600; color:#2e7d32; margin-bottom:10px;">
-                Prompt ready — click "Select All" then Ctrl+C (⌘+C) to copy
-            </div>
-            <pre id="prompt-text-{widget_id}" 
-                 style="background:#f8fff8; border:1px solid #a5d6a7; padding:16px; border-radius:8px; 
-                        white-space:pre-wrap; word-wrap:break-word; font-family:monospace; 
-                        max-height:400px; overflow-y:auto; font-size:0.95em;">
-{prompt.strip()}
-            </pre>
-            <div style="margin-top:12px; text-align:center;">
-                <button id="select-btn-{widget_id}" 
-                        style="padding:10px 20px; background:#4caf50; color:white; border:none; 
-                               border-radius:8px; cursor:pointer; font-weight:600;">
-                    Select All Text
-                </button>
-            </div>
-        </div>
         <div id="msg-{widget_id}" 
-             style="margin-top:12px; font-weight:600; color:#2e7d32; min-height:24px; font-size:0.95em;">
+             style="margin-top:12px; 
+                    font-weight:600; 
+                    color:#2e7d32; 
+                    min-height:24px;
+                    font-size:0.95em;">
         </div>
+        <!-- Hidden textarea - filled and used only by JS -->
+        <textarea id="hidden-text-{widget_id}" 
+                  style="position:absolute; left:-9999px; opacity:0;"></textarea>
     </div>
 
     <script>
     (function() {{
-        const showBtn = document.getElementById("show-btn-{widget_id}");
-        const container = document.getElementById("prompt-container-{widget_id}");
-        const selectBtn = document.getElementById("select-btn-{widget_id}");
-        const promptText = document.getElementById("prompt-text-{widget_id}");
+        const text = {safe_text};
+        const btn = document.getElementById("copy-btn-{widget_id}");
         const msg = document.getElementById("msg-{widget_id}");
+        const hiddenText = document.getElementById("hidden-text-{widget_id}");
+        if (!btn || !hiddenText) return;
 
-        if (!showBtn || !container) return;
+        function attemptCopy() {{
+            let success = false;
 
-        showBtn.addEventListener("click", function() {{
-            container.style.display = "block";
-            showBtn.style.display = "none";
-            msg.textContent = "Prompt displayed below — select and copy";
-            setTimeout(() => {{ msg.textContent = ""; }}, 4000);
-
-            // Auto-focus and select when shown
-            if (promptText) {{
-                const range = document.createRange();
-                range.selectNodeContents(promptText);
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
+            // Primary: execCommand fallback (works reliably in Streamlit/local HTTP)
+            try {{
+                hiddenText.value = text;
+                hiddenText.select();
+                hiddenText.setSelectionRange(0, 99999); // Mobile support
+                success = document.execCommand("copy");
+            }} catch (err) {{
+                console.log("execCommand failed:", err);
             }}
-        }});
 
-        if (selectBtn) {{
-            selectBtn.addEventListener("click", function() {{
-                const range = document.createRange();
-                range.selectNodeContents(promptText);
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-                msg.textContent = "Text selected — press Ctrl+C (⌘+C) to copy";
-                msg.style.color = "#2e7d32";
-                setTimeout(() => {{ msg.textContent = ""; }}, 4000);
-            }});
+            // Secondary: modern clipboard API (for HTTPS/deployed)
+            if (!success && navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText(text).then(() => {{
+                    success = true;
+                }}).catch((err) => {{
+                    console.log("Modern clipboard failed:", err);
+                }});
+            }}
+
+            if (success) {{
+                btn.textContent = "✅ Copied!";
+                btn.style.background = "#1b5e20";
+                msg.textContent = "Verification prompt copied to clipboard";
+                setTimeout(() => {{
+                    btn.textContent = "📋 Copy Verification Prompt";
+                    btn.style.background = "#2e7d32";
+                    msg.textContent = "";
+                }}, 3000);
+            }} else {{
+                msg.textContent = "Copy failed — try right-click → Copy on a selection";
+                msg.style.color = "#c62828";
+                setTimeout(() => {{ msg.textContent = ""; msg.style.color = "#2e7d32"; }}, 5000);
+            }}
         }}
+
+        btn.addEventListener("click", attemptCopy);
     }})();
     </script>
     """
