@@ -315,23 +315,50 @@ def render_learning_insights_html(char: str) -> tuple[str, int]:
     html_parts.append(f'<div id="vmsg{unique_id}" style="margin-top:10px; color:#2e7d32; font-weight:600; font-size:0.9em;"></div>')
     html_parts.append('</div>')
     
-    # JavaScript
+    # JavaScript - simpler version with better error handling
     script = f"""<script>
-(function() {{{{
-    var txt = {prompt_json};
-    var b = document.getElementById('vbtn{unique_id}');
-    var m = document.getElementById('vmsg{unique_id}');
-    if (b) {{{{
-        b.onclick = function() {{{{
-            navigator.clipboard.writeText(txt).then(function() {{{{
-                m.textContent = '✅ Copied! Paste into ChatGPT.';
-                setTimeout(function() {{{{ m.textContent = ''; }}}}, 3500);
-            }}}}).catch(function() {{{{
-                m.textContent = '❌ Copy failed.';
-                setTimeout(function() {{{{ m.textContent = ''; }}}}, 3500);
-            }}}});
-        }}}};
-    }}}}
+(function() {{
+    var promptText = {prompt_json};
+    var btnId = 'vbtn{unique_id}';
+    var msgId = 'vmsg{unique_id}';
+    
+    function setupButton() {{
+        var btn = document.getElementById(btnId);
+        var msg = document.getElementById(msgId);
+        
+        if (!btn || !msg) {{
+            setTimeout(setupButton, 100);
+            return;
+        }}
+        
+        btn.onclick = function() {{
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText(promptText)
+                    .then(function() {{
+                        msg.textContent = '✅ Copied! Paste into ChatGPT.';
+                        msg.style.display = 'block';
+                        setTimeout(function() {{
+                            msg.textContent = '';
+                            msg.style.display = 'none';
+                        }}, 3500);
+                    }})
+                    .catch(function(err) {{
+                        msg.textContent = '❌ Copy failed: ' + err.message;
+                        msg.style.display = 'block';
+                        console.error('Copy error:', err);
+                    }});
+            }} else {{
+                msg.textContent = '❌ Clipboard not supported';
+                msg.style.display = 'block';
+            }}
+        }};
+    }}
+    
+    if (document.readyState === 'loading') {{
+        document.addEventListener('DOMContentLoaded', setupButton);
+    }} else {{
+        setupButton();
+    }}
 }})();
 </script>"""
     html_parts.append(script)
