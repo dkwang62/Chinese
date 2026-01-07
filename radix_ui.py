@@ -202,57 +202,6 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
     
     return html_content, h
 
-
-# Hardcoded template mirroring Task 4 (directly in code, no dependency on JSON)
-VERIFY_PROMPT_TEMPLATE = """Task 4 — Logic & Pattern Tutor (From App Fields)
-
-You are a Chinese character structure tutor. Explain Radix’s “Character Logic & Patterns” panel clearly and conservatively.
-Do not invent etymology; if uncertain, say so. Do not assume any prior tasks have been run.
-
-INPUT (fields provided by the app):
-- char: {char}
-- def_en: {def_en}
-- decomposition: {decomposition}
-- semantic: {semantic}
-- phonetic: {phonetic}
-- phonetic_pinyin: {phonetic_pinyin}
-- is_sound_match: {is_sound_match}
-- pronunciation_family: {pronunciation_family}
-- semantic_family: {semantic_family}
-
-TASK:
-Explain (1) why semantic vs phonetic were assigned, and (2) what the two families mean,
-INCLUDING checking for false friends in pronunciation_family (e.g., visual matches caused by simplification).
-
-OUTPUT:
-
-1) Component Roles
-- If semantic exists: what meaning cue it suggests (1–2 lines).
-- If phonetic exists: what sound cue it suggests (1–2 lines).
-- Interpret is_sound_match:
-  - True: strong phonetic cue in modern Mandarin.
-  - False: candidate phonetic component but modern sound mismatch; give 1–2 plausible reasons only if confident.
-
-2) Pronunciation Family (share {phonetic})
-For each character in pronunciation_family, output ONE line:
-- Character: Classification (Likely true member / Visual only / Simplification artefact / Uncertain) — reason (<= 15 words).
-Then add ONE summary sentence: label as “Sound family” or safer “Component family.”
-
-3) Meaning Family (share {semantic})
-- 1–2 sentence theme of what {semantic} often signals in modern characters.
-- For each character in semantic_family: one short line on how the theme plausibly applies (no overclaiming).
-
-4) Learner Takeaway (max 2 bullets)
-- One rule-of-thumb about radicals (meaning cues).
-- One rule-of-thumb about phonetics (sound cues + why false friends occur).
-
-5) UI Tooltip Copy
-- Tooltip for “Meaning (Radical)” (<= 18 words)
-- Tooltip for “Sound Match / Sound Component” (<= 18 words)
-
-⸻
-"""
-
 def render_learning_insights_html(char: str) -> str:
     """Render the Logic/Analysis box for the character view."""
     if not char: return ""
@@ -295,149 +244,16 @@ def render_learning_insights_html(char: str) -> str:
             fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in s_fam])
             html_parts.append(f"<div><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {sem}):</div><div class='family-list'>{fam_str}</div></div>")
 
-    # NEW: Build the verification prompt using the hardcoded template
-    decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "None")
-    prompt = VERIFY_PROMPT_TEMPLATE.format(
-        char=char,
-        def_en=get_char_definition_en(char),
-        decomposition=decomposition,
-        semantic=sem or "None",
-        phonetic=pho or "None",
-        phonetic_pinyin=pho_pinyin or "None",
-        is_sound_match=str(is_match),
-        pronunciation_family=", ".join(p_fam) if p_fam else "None",
-        semantic_family=", ".join(s_fam) if s_fam else "None"
-    )
-
-    widget_id = str(uuid.uuid4())[:8]  # Unique ID for JS elements
-    safe_text = json.dumps(prompt, ensure_ascii=False)
-
-
-    # Build prompt (same as before)
-    decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "None")
-    p_fam = get_pronunciation_family(char)
-    s_fam = get_semantic_family(char)
-
-    prompt = VERIFY_PROMPT_TEMPLATE.format(
-        char=char,
-        def_en=get_char_definition_en(char),
-        decomposition=decomposition,
-        semantic=sem or "None",
-        phonetic=pho or "None",
-        phonetic_pinyin=pho_pinyin or "None",
-        is_sound_match=str(is_match),
-        pronunciation_family=", ".join(p_fam) if p_fam else "None",
-        semantic_family=", ".join(s_fam) if s_fam else "None"
-    ).strip()
-
-    widget_id = f"verify-{uuid.uuid4().hex[:8]}"
-    safe_text = json.dumps(prompt, ensure_ascii=False)
-
-    verify_html = f"""
-    <div style='margin-top:24px; padding-top:16px; border-top:2px solid #e0e0e0; text-align:center;'>
-        <button id="copy-btn-{widget_id}" 
-                style="padding:12px 28px; 
-                       background:#2e7d32; 
-                       color:white; 
-                       border:none; 
-                       border-radius:12px; 
-                       cursor:pointer; 
-                       font-weight:700; 
-                       font-size:1.05em;
-                       box-shadow:0 4px 10px rgba(46,125,50,0.3);
-                       transition:all 0.3s ease;">
-            📋 Copy Verification Prompt
-        </button>
-        <div id="msg-{widget_id}" 
-             style="margin-top:12px; 
-                    font-weight:600; 
-                    color:#2e7d32; 
-                    min-height:28px;
-                    font-size:0.95em;">
-        </div>
-
-        <!-- Hidden elements for copy fallback -->
-        <div id="prompt-box-{widget_id}" style="display:none;">
-            <pre id="prompt-text-{widget_id}" 
-                 style="white-space:pre-wrap; word-wrap:break-word; font-family:monospace; 
-                        font-size:0.95em; margin:0; padding:0;">
-{prompt}
-            </pre>
-        </div>
-        <textarea id="hidden-text-{widget_id}" 
-                  style="position:absolute; left:-9999px; opacity:0;"></textarea>
-    </div>
-
-    <script>
-    (function() {{
-        const btn = document.getElementById("copy-btn-{widget_id}");
-        const msg = document.getElementById("msg-{widget_id}");
-        const promptBox = document.getElementById("prompt-box-{widget_id}");
-        const promptText = document.getElementById("prompt-text-{widget_id}");
-        const hiddenText = document.getElementById("hidden-text-{widget_id}");
-        const text = {safe_text};
-
-        if (!btn) return;
-
-        btn.addEventListener("click", function() {{
-            let copied = false;
-
-            // Try execCommand first (most reliable in Streamlit/local)
-            try {{
-                hiddenText.value = text;
-                hiddenText.select();
-                hiddenText.setSelectionRange(0, 99999);
-                copied = document.execCommand("copy");
-            }} catch (e) {{}}
-
-            // Try modern clipboard API second
-            if (!copied && navigator.clipboard) {{
-                navigator.clipboard.writeText(text).then(() => {{
-                    copied = true;
-                }}).catch(() => {{}});
-            }}
-
-            // Final fallback: show + auto-select
-            if (!copied && promptText) {{
-                promptBox.style.display = "block";
-                const range = document.createRange();
-                range.selectNodeContents(promptText);
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-                msg.textContent = "Text selected — press Ctrl+C (⌘+C) to copy";
-                msg.style.color = "#2e7d32";
-                btn.textContent = "Selected — Ctrl+C to copy";
-                return;
-            }}
-
-            // Success path
-            if (copied) {{
-                btn.textContent = "✅ Copied!";
-                btn.style.background = "#1b5e20";
-                msg.textContent = "Verification prompt copied to clipboard";
-                setTimeout(() => {{
-                    btn.textContent = "📋 Copy Verification Prompt";
-                    btn.style.background = "#2e7d32";
-                    msg.textContent = "";
-                }}, 3000);
-            }} else {{
-                msg.textContent = "Copy failed — please refresh and try again";
-                msg.style.color = "#c62828";
-            }}
-        }});
-    }})();
-    </script>
-    """
-
-    html_parts.append(verify_html)
-
     return f"""
     <div class='insight-box'>
         <div class='insight-title'>🧠 Character Logic & Patterns</div>
         {''.join(html_parts)}
     </div>
     """
+
+
+
+
 
 
 # ==================== UI COMPONENTS ====================
