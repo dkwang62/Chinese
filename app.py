@@ -554,12 +554,11 @@ def render_stroke_view():
     main_html, _ = get_stroke_order_view_html(state.get("stroke_view_char"), state.get_display_mode())
     st_html(main_html, height=450)
     
-    # --- INSIGHTS PANEL ADDED HERE ---
+    # --- INSIGHTS PANEL ---
     insights_html, insights_height = render_learning_insights_html(state.get("stroke_view_char"))
     if insights_html:
         st_html(insights_html, height=insights_height)
-    # ---------------------------------
-
+    # -----------------------
 
 
     
