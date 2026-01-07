@@ -312,28 +312,80 @@ def render_learning_insights_html(char: str) -> str:
     widget_id = str(uuid.uuid4())[:8]  # Unique ID for JS elements
     safe_text = json.dumps(prompt, ensure_ascii=False)
 
-    # NEW: HTML + JS for the "Copy AI Verification Prompt" button
+
+# NEW: Improved verification prompt with clear copy feedback
+    decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "None")
+    p_fam = get_pronunciation_family(char)
+    s_fam = get_semantic_family(char)
+
+    prompt = VERIFY_PROMPT_TEMPLATE.format(
+        char=char,
+        def_en=get_char_definition_en(char),
+        decomposition=decomposition,
+        semantic=sem or "None",
+        phonetic=pho or "None",
+        phonetic_pinyin=pho_pinyin or "None",
+        is_sound_match=str(is_match),
+        pronunciation_family=", ".join(p_fam) if p_fam else "None",
+        semantic_family=", ".join(s_fam) if s_fam else "None"
+    )
+
+    widget_id = f"verify-{uuid.uuid4().hex[:8]}"  # Unique ID
+    safe_text = json.dumps(prompt, ensure_ascii=False)
+
     verify_html = f"""
-    <div style='margin-top:20px; border-top:1px solid #eee; padding-top:15px; text-align:center;'>
-        <button id="verify-btn-{widget_id}" style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Copy AI Verification Prompt</button>
+    <div style='margin-top:24px; padding-top:16px; border-top:2px solid #e0e0e0; text-align:center;'>
+        <button id="verify-btn-{widget_id}" 
+                style="padding:12px 28px; 
+                       background:#2e7d32; 
+                       color:white; 
+                       border:none; 
+                       border-radius:12px; 
+                       cursor:pointer; 
+                       font-weight:700; 
+                       font-size:1.05em;
+                       box-shadow:0 4px 10px rgba(46,125,50,0.3);
+                       transition:all 0.3s ease;">
+            📋 Copy AI Verification Prompt
+        </button>
+        <div id="verify-msg-{widget_id}" 
+             style="margin-top:12px; 
+                    font-weight:600; 
+                    color:#2e7d32; 
+                    min-height:24px;
+                    font-size:0.95em;">
+        </div>
     </div>
-    <div id="verify-msg-{widget_id}" style="text-align:center; margin-top:8px; color:#333; font-weight:500;"></div>
+
     <script>
     (function() {{
         const text = {safe_text};
         const btn = document.getElementById("verify-btn-{widget_id}");
         const msg = document.getElementById("verify-msg-{widget_id}");
-        if (!btn) return;
-        async function copy() {{
+        if (!btn || !msg) return;
+
+        async function copyToClipboard() {{
             try {{
                 await navigator.clipboard.writeText(text);
-                msg.textContent = "Copied! Paste into AI to verify families.";
-            }} catch (e) {{
-                msg.textContent = "Copy failed. Please try again.";
+                // Success feedback
+                msg.innerHTML = "✅ Copied successfully! Paste into ChatGPT or any AI to verify the families.";
+                btn.style.background = "#1b5e20";
+                btn.style.transform = "scale(0.98)";
+                
+                setTimeout(() => {{
+                    msg.innerHTML = "";
+                    btn.style.background = "#2e7d32";
+                    btn.style.transform = "scale(1)";
+                }}, 4000);
+            }} catch (err) {{
+                // Error feedback
+                msg.innerHTML = "❌ Copy failed — please select and copy the text manually.";
+                msg.style.color = "#c62828";
+                setTimeout(() => {{ msg.innerHTML = ""; msg.style.color = "#2e7d32"; }}, 5000);
             }}
-            setTimeout(() => {{msg.textContent = "";}}, 3000);
         }}
-        btn.addEventListener("click", copy);
+
+        btn.addEventListener("click", copyToClipboard);
     }})();
     </script>
     """
