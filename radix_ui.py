@@ -215,6 +215,28 @@ def render_learning_insights_html(char: str) -> str:
     if not sem and not pho:
         return ""
 
+    # Get additional data for the prompt
+    decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "None")
+    def_en = get_char_definition_en(char)
+    p_fam = get_pronunciation_family(char)
+    s_fam = get_semantic_family(char)
+    
+    # Build the prompt data object
+    prompt_data = {
+        "char": char,
+        "def_en": def_en or "None",
+        "decomposition": decomposition,
+        "semantic": sem or "None",
+        "phonetic": pho or "None",
+        "phonetic_pinyin": pho_pinyin or "None",
+        "is_sound_match": str(is_match),
+        "pronunciation_family": ", ".join(p_fam) if p_fam else "None",
+        "semantic_family": ", ".join(s_fam) if s_fam else "None"
+    }
+    
+    prompt_data_json = json.dumps(prompt_data, ensure_ascii=False)
+    unique_id = hashlib.md5(char.encode()).hexdigest()[:8]
+
     html_parts = []
     
     # 1. Component Roles
@@ -223,7 +245,7 @@ def render_learning_insights_html(char: str) -> str:
         roles_html.append(f"<div class='role-badge role-semantic'>💡 {sem} : Meaning (Radical)</div>")
     
     if pho:
-        match_icon = "🔊" if is_match else "🗣️"
+        match_icon = "📊" if is_match else "🗣️"
         match_text = "Sound Match" if is_match else "Sound Component"
         pinyin_display = f"({pho_pinyin})" if pho_pinyin else ""
         roles_html.append(f"<div class='role-badge role-phonetic'>{match_icon} {pho} {pinyin_display} : {match_text}</div>")
@@ -232,17 +254,91 @@ def render_learning_insights_html(char: str) -> str:
     
     # 2. Pronunciation Family
     if pho:
-        p_fam = get_pronunciation_family(char)
         if p_fam:
             fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in p_fam])
-            html_parts.append(f"<div style='margin-bottom:15px;'><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>🔊 SOUND FAMILY (share {pho}):</div><div class='family-list'>{fam_str}</div></div>")
+            html_parts.append(f"<div style='margin-bottom:15px;'><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>📊 SOUND FAMILY (share {pho}):</div><div class='family-list'>{fam_str}</div></div>")
 
     # 3. Semantic Family
     if sem:
-        s_fam = get_semantic_family(char)
         if s_fam:
             fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in s_fam])
             html_parts.append(f"<div><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {sem}):</div><div class='family-list'>{fam_str}</div></div>")
+
+    # 4. Verify with AI button
+    html_parts.append(f"""
+    <div style='margin-top:20px; text-align:center;'>
+        <button id='verify-btn-{unique_id}' style='padding:10px 20px; border-radius:10px; border:1px solid #ddd; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; cursor:pointer; font-weight:700; font-size:0.9em; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>
+            🤖 Verify with AI
+        </button>
+        <div id='verify-msg-{unique_id}' style='margin-top:10px; color:#2e7d32; font-weight:600; font-size:0.9em;'></div>
+    </div>
+    <script>
+    (function() {{
+        const data = {prompt_data_json};
+        const btn = document.getElementById('verify-btn-{unique_id}');
+        const msg = document.getElementById('verify-msg-{unique_id}');
+        
+        const promptTemplate = `Task 4 — Logic & Pattern Tutor (From App Fields)
+
+You are a Chinese character structure tutor. Explain Radix's "Character Logic & Patterns" panel clearly and conservatively.
+Do not invent etymology; if uncertain, say so. Do not assume any prior tasks have been run.
+
+INPUT (fields provided by the app):
+- char: ${{data.char}}
+- def_en: ${{data.def_en}}
+- decomposition: ${{data.decomposition}}
+- semantic: ${{data.semantic}}
+- phonetic: ${{data.phonetic}}
+- phonetic_pinyin: ${{data.phonetic_pinyin}}
+- is_sound_match: ${{data.is_sound_match}}
+- pronunciation_family: ${{data.pronunciation_family}}
+- semantic_family: ${{data.semantic_family}}
+
+TASK:
+Explain (1) why semantic vs phonetic were assigned, and (2) what the two families mean,
+INCLUDING checking for false friends in pronunciation_family (e.g., visual matches caused by simplification).
+
+OUTPUT:
+
+1) Component Roles
+- If semantic exists: what meaning cue it suggests (1–2 lines).
+- If phonetic exists: what sound cue it suggests (1–2 lines).
+- Interpret is_sound_match:
+  - True: strong phonetic cue in modern Mandarin.
+  - False: candidate phonetic component but modern sound mismatch; give 1–2 plausible reasons only if confident.
+
+2) Pronunciation Family (share ${{data.phonetic}})
+For each character in pronunciation_family, output ONE line:
+- Character: Classification (Likely true member / Visual only / Simplification artefact / Uncertain) — reason (<= 15 words).
+Then add ONE summary sentence: label as "Sound family" or safer "Component family."
+
+3) Meaning Family (share ${{data.semantic}})
+- 1–2 sentence theme of what ${{data.semantic}} often signals in modern characters.
+- For each character in semantic_family: one short line on how the theme plausibly applies (no overclaiming).
+
+4) Learner Takeaway (max 2 bullets)
+- One rule-of-thumb about radicals (meaning cues).
+- One rule-of-thumb about phonetics (sound cues + why false friends occur).
+
+5) UI Tooltip Copy
+- Tooltip for "Meaning (Radical)" (<= 18 words)
+- Tooltip for "Sound Match / Sound Component" (<= 18 words)
+
+⸻`;
+        
+        btn.addEventListener('click', async function() {{
+            try {{
+                await navigator.clipboard.writeText(promptTemplate);
+                msg.textContent = '✅ Copied to clipboard! Paste into ChatGPT to verify.';
+                setTimeout(() => {{ msg.textContent = ''; }}, 3500);
+            }} catch (e) {{
+                msg.textContent = '❌ Copy failed. Please try again.';
+                setTimeout(() => {{ msg.textContent = ''; }}, 3500);
+            }}
+        }});
+    }})();
+    </script>
+    """)
 
     return f"""
     <div class='insight-box'>
@@ -250,11 +346,6 @@ def render_learning_insights_html(char: str) -> str:
         {''.join(html_parts)}
     </div>
     """
-
-
-
-
-
 
 # ==================== UI COMPONENTS ====================
 
