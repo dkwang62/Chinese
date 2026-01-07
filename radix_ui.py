@@ -204,40 +204,95 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
 
 def render_learning_insights_html(char: str) -> str:
     """Render the Logic/Analysis box for the character view."""
-    if not char:
-        return ""
-
+    if not char: return ""
+    
     analysis = analyze_component_structure(char)
     sem = analysis.get("semantic")
     pho = analysis.get("phonetic")
     pho_pinyin = analysis.get("phonetic_pinyin", "")
     is_match = analysis.get("is_sound_match")
-
+    
     if not sem and not pho:
         return ""
 
-    # Get additional data
+    # Get additional data for the prompt
     decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "None")
     def_en = get_char_definition_en(char)
     p_fam = get_pronunciation_family(char)
     s_fam = get_semantic_family(char)
+    
+    # Build the prompt data object
+    prompt_data = {
+        "char": char,
+        "def_en": def_en or "None",
+        "decomposition": decomposition,
+        "semantic": sem or "None",
+        "phonetic": pho or "None",
+        "phonetic_pinyin": pho_pinyin or "None",
+        "is_sound_match": str(is_match),
+        "pronunciation_family": ", ".join(p_fam) if p_fam else "None",
+        "semantic_family": ", ".join(s_fam) if s_fam else "None"
+    }
+    
+    prompt_data_json = json.dumps(prompt_data, ensure_ascii=False)
+    unique_id = hashlib.md5(char.encode()).hexdigest()[:8]
 
-    # Hardcoded verification prompt template
-    VERIFY_PROMPT_TEMPLATE = """Task 4 — Logic & Pattern Tutor (From App Fields)
+    html_parts = []
+    
+    # 1. Component Roles
+    roles_html = []
+    if sem:
+        roles_html.append(f"<div class='role-badge role-semantic'>💡 {sem} : Meaning (Radical)</div>")
+    
+    if pho:
+        match_icon = "📊" if is_match else "🗣️"
+        match_text = "Sound Match" if is_match else "Sound Component"
+        pinyin_display = f"({pho_pinyin})" if pho_pinyin else ""
+        roles_html.append(f"<div class='role-badge role-phonetic'>{match_icon} {pho} {pinyin_display} : {match_text}</div>")
+        
+    html_parts.append(f"<div style='margin-bottom:20px;'>{''.join(roles_html)}</div>")
+    
+    # 2. Pronunciation Family
+    if pho:
+        if p_fam:
+            fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in p_fam])
+            html_parts.append(f"<div style='margin-bottom:15px;'><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>📊 SOUND FAMILY (share {pho}):</div><div class='family-list'>{fam_str}</div></div>")
 
-You are a Chinese character structure tutor. Explain Radix’s “Character Logic & Patterns” panel clearly and conservatively.
+    # 3. Semantic Family
+    if sem:
+        if s_fam:
+            fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in s_fam])
+            html_parts.append(f"<div><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {sem}):</div><div class='family-list'>{fam_str}</div></div>")
+
+    # 4. Verify with AI button
+    html_parts.append(f"""
+    <div style='margin-top:20px; text-align:center;'>
+        <button id='verify-btn-{unique_id}' style='padding:10px 20px; border-radius:10px; border:1px solid #ddd; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; cursor:pointer; font-weight:700; font-size:0.9em; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>
+            🤖 Verify with AI
+        </button>
+        <div id='verify-msg-{unique_id}' style='margin-top:10px; color:#2e7d32; font-weight:600; font-size:0.9em;'></div>
+    </div>
+    <script>
+    (function() {{
+        const data = {prompt_data_json};
+        const btn = document.getElementById('verify-btn-{unique_id}');
+        const msg = document.getElementById('verify-msg-{unique_id}');
+        
+        const promptTemplate = `Task 4 — Logic & Pattern Tutor (From App Fields)
+
+You are a Chinese character structure tutor. Explain Radix's "Character Logic & Patterns" panel clearly and conservatively.
 Do not invent etymology; if uncertain, say so. Do not assume any prior tasks have been run.
 
 INPUT (fields provided by the app):
-- char: {char}
-- def_en: {def_en}
-- decomposition: {decomposition}
-- semantic: {semantic}
-- phonetic: {phonetic}
-- phonetic_pinyin: {phonetic_pinyin}
-- is_sound_match: {is_sound_match}
-- pronunciation_family: {pronunciation_family}
-- semantic_family: {semantic_family}
+- char: ${{data.char}}
+- def_en: ${{data.def_en}}
+- decomposition: ${{data.decomposition}}
+- semantic: ${{data.semantic}}
+- phonetic: ${{data.phonetic}}
+- phonetic_pinyin: ${{data.phonetic_pinyin}}
+- is_sound_match: ${{data.is_sound_match}}
+- pronunciation_family: ${{data.pronunciation_family}}
+- semantic_family: ${{data.semantic_family}}
 
 TASK:
 Explain (1) why semantic vs phonetic were assigned, and (2) what the two families mean,
@@ -252,13 +307,13 @@ OUTPUT:
   - True: strong phonetic cue in modern Mandarin.
   - False: candidate phonetic component but modern sound mismatch; give 1–2 plausible reasons only if confident.
 
-2) Pronunciation Family (share {phonetic})
+2) Pronunciation Family (share ${{data.phonetic}})
 For each character in pronunciation_family, output ONE line:
 - Character: Classification (Likely true member / Visual only / Simplification artefact / Uncertain) — reason (<= 15 words).
-Then add ONE summary sentence: label as “Sound family” or safer “Component family.”
+Then add ONE summary sentence: label as "Sound family" or safer "Component family."
 
-3) Meaning Family (share {semantic})
-- 1–2 sentence theme of what {semantic} often signals in modern characters.
+3) Meaning Family (share ${{data.semantic}})
+- 1–2 sentence theme of what ${{data.semantic}} often signals in modern characters.
 - For each character in semantic_family: one short line on how the theme plausibly applies (no overclaiming).
 
 4) Learner Takeaway (max 2 bullets)
@@ -266,107 +321,19 @@ Then add ONE summary sentence: label as “Sound family” or safer “Component
 - One rule-of-thumb about phonetics (sound cues + why false friends occur).
 
 5) UI Tooltip Copy
-- Tooltip for “Meaning (Radical)” (<= 18 words)
-- Tooltip for “Sound Match / Sound Component” (<= 18 words)
+- Tooltip for "Meaning (Radical)" (<= 18 words)
+- Tooltip for "Sound Match / Sound Component" (<= 18 words)
 
-⸻"""
-
-    full_prompt = VERIFY_PROMPT_TEMPLATE.format(
-        char=char,
-        def_en=def_en or "None",
-        decomposition=decomposition,
-        semantic=sem or "None",
-        phonetic=pho or "None",
-        phonetic_pinyin=pho_pinyin or "None",
-        is_sound_match=str(is_match),
-        pronunciation_family=", ".join(p_fam) if p_fam else "None",
-        semantic_family=", ".join(s_fam) if s_fam else "None"
-    ).strip()
-
-    safe_prompt = json.dumps(full_prompt, ensure_ascii=False)
-
-    unique_id = hashlib.md5(char.encode()).hexdigest()[:8]
-
-    html_parts = []
-
-    # Component Roles
-    roles_html = []
-    if sem:
-        roles_html.append(f"<div class='role-badge role-semantic'>💡 {sem} : Meaning (Radical)</div>")
-    if pho:
-        match_icon = "🔊" if is_match else "🗣️"
-        match_text = "Sound Match" if is_match else "Sound Component"
-        pinyin_display = f"({pho_pinyin})" if pho_pinyin else ""
-        roles_html.append(f"<div class='role-badge role-phonetic'>{match_icon} {pho} {pinyin_display} : {match_text}</div>")
-    html_parts.append(f"<div style='margin-bottom:20px;'>{''.join(roles_html)}</div>")
-
-    # Pronunciation Family
-    if pho and p_fam:
-        fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in p_fam])
-        html_parts.append(f"<div style='margin-bottom:15px;'><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>🔊 SOUND FAMILY (share {pho}):</div><div class='family-list'>{fam_str}</div></div>")
-
-    # Semantic Family
-    if sem and s_fam:
-        fam_str = "".join([f"<span class='family-char'>{c}</span>" for c in s_fam])
-        html_parts.append(f"<div><div style='font-size:0.85em; font-weight:bold; color:#666; margin-bottom:5px;'>💡 MEANING FAMILY (share {sem}):</div><div class='family-list'>{fam_str}</div></div>")
-
-    # Verify button + JS (now guaranteed to run when rendered with st_html)
-    html_parts.append(f"""
-    <div style='margin-top:20px; text-align:center;'>
-        <button id='verify-btn-{unique_id}' 
-                style='padding:10px 20px; border-radius:10px; border:1px solid #ddd; 
-                       background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                       color:white; cursor:pointer; font-weight:700; font-size:0.9em; 
-                       box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>
-            🤖 Verify with AI
-        </button>
-        <div id='verify-msg-{unique_id}' 
-             style='margin-top:10px; color:#2e7d32; font-weight:600; font-size:0.9em; min-height:24px;'>
-        </div>
-        <textarea id='clipboard-target-{unique_id}' 
-                  style='position:absolute; left:-9999px; opacity:0;' readonly></textarea>
-    </div>
-
-    <script>
-    (function() {{
-        const text = {safe_prompt};
-        const btn = document.getElementById('verify-btn-{unique_id}');
-        const msg = document.getElementById('verify-msg-{unique_id}');
-        const ta = document.getElementById('clipboard-target-{unique_id}');
-
-        if (!btn || !msg || !ta) return;
-
-        // Temporary test: prove JS is running
-        msg.textContent = "JS active – click button to copy";
-
-        btn.addEventListener('click', async () => {{
-            let copied = false;
-
-            // Modern clipboard API (HTTPS/deployed)
-            if (navigator.clipboard && navigator.clipboard.writeText) {{
-                try {{
-                    await navigator.clipboard.writeText(text);
-                    copied = true;
-                }} catch (e) {{}}
-            }}
-
-            // execCommand fallback (local HTTP)
-            if (!copied) {{
-                try {{
-                    ta.value = text;
-                    ta.select();
-                    ta.setSelectionRange(0, text.length);
-                    copied = document.execCommand('copy');
-                }} catch (e) {{}}
-            }}
-
-            if (copied) {{
-                msg.textContent = '✅ Copied! Paste into ChatGPT to verify.';
-                setTimeout(() => {{ msg.textContent = 'JS active – click button to copy'; }}, 4000);
-            }} else {{
-                msg.textContent = 'Copy failed – try in deployed app';
-                msg.style.color = '#c62828';
-                setTimeout(() => {{ msg.textContent = 'JS active – click button to copy'; msg.style.color = '#2e7d32'; }}, 5000);
+⸻`;
+        
+        btn.addEventListener('click', async function() {{
+            try {{
+                await navigator.clipboard.writeText(promptTemplate);
+                msg.textContent = '✅ Copied to clipboard! Paste into ChatGPT to verify.';
+                setTimeout(() => {{ msg.textContent = ''; }}, 3500);
+            }} catch (e) {{
+                msg.textContent = '❌ Copy failed. Please try again.';
+                setTimeout(() => {{ msg.textContent = ''; }}, 3500);
             }}
         }});
     }})();
