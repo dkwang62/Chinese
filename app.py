@@ -558,15 +558,23 @@ def render_stroke_view():
     char = state.get("stroke_view_char")
     if char:
         insights_result = render_learning_insights_html(char)
-        # Handle 3-value return (old version compatibility)
-        if isinstance(insights_result, tuple) and len(insights_result) == 3:
-            insights_html, insights_height, _ = insights_result
+        # Handle both 2-value and 3-value returns
+        if isinstance(insights_result, tuple):
+            if len(insights_result) == 3:
+                insights_html, insights_height, prompt_text = insights_result
+            elif len(insights_result) == 2:
+                insights_html, insights_height = insights_result
+                prompt_text = None
+            else:
+                insights_html, insights_height, prompt_text = None, 0, None
+                
             if insights_html:
                 st_html(insights_html, height=insights_height)
-        elif isinstance(insights_result, tuple) and len(insights_result) == 2:
-            insights_html, insights_height = insights_result
-            if insights_html:
-                st_html(insights_html, height=insights_height)
+                
+            # Add copy button using Streamlit's working method
+            if prompt_text:
+                st.markdown("---")
+                render_copy_to_clipboard(prompt_text, f"verify_{char}")
     # -----------------------
     
     if state.get_display_mode() != "Single Character":
