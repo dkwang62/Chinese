@@ -202,10 +202,10 @@ def get_stroke_order_sidebar_html(char: str, size: int = 140) -> tuple[str, int]
     
     return html_content, h
 
-def render_learning_insights_html(char: str) -> tuple[str, int]:
-    """Render the Logic/Analysis box for the character view. Returns (html, height)."""
+def render_learning_insights_html(char: str) -> tuple[str, int, str]:
+    """Render the Logic/Analysis box for the character view. Returns (html, height, prompt_text)."""
     if not char: 
-        return "", 0
+        return "", 0, ""
     
     analysis = analyze_component_structure(char)
     sem = analysis.get("semantic")
@@ -214,7 +214,7 @@ def render_learning_insights_html(char: str) -> tuple[str, int]:
     is_match = analysis.get("is_sound_match")
     
     if not sem and not pho:
-        return "", 0
+        return "", 0, ""
 
     # Get data for prompt
     decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "None")
@@ -308,13 +308,6 @@ def render_learning_insights_html(char: str) -> tuple[str, int]:
     ]
     prompt_full = "\n".join(lines)
 
-    # 4. Button section - use details/summary for expandable prompt
-    html_parts.append('<details style="margin-top:20px; border:1px solid #ddd; border-radius:8px; padding:10px; background:#f8f9fa;">')
-    html_parts.append('<summary style="cursor:pointer; font-weight:700; color:#667eea; padding:5px;">🤖 AI Verification Prompt (Click to expand & copy)</summary>')
-    html_parts.append(f'<textarea readonly style="width:100%; height:400px; margin-top:10px; padding:10px; font-family:monospace; font-size:0.85em; border:1px solid #ddd; border-radius:4px;">{pyhtml.escape(prompt_full)}</textarea>')
-    html_parts.append('<div style="margin-top:8px; font-size:0.85em; color:#666;">Click inside the text area, press Ctrl+A (or Cmd+A on Mac) to select all, then Ctrl+C (Cmd+C) to copy.</div>')
-    html_parts.append('</details>')
-
     # Assemble final HTML
     content = ''.join(html_parts)
     
@@ -326,21 +319,17 @@ def render_learning_insights_html(char: str) -> tuple[str, int]:
 .role-phonetic {{background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb;}}
 .family-list {{display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px;}}
 .family-char {{font-size: 1.4em; color: #333; padding: 2px 8px; background: #f5f5f5; border-radius: 6px; border: 1px solid #eee;}}
-details {{margin-top:20px; border:1px solid #ddd; border-radius:8px; padding:10px; background:#f8f9fa;}}
-summary {{cursor:pointer; font-weight:700; color:#667eea; padding:5px;}}
-details[open] summary {{margin-bottom:10px; border-bottom:1px solid #ddd; padding-bottom:10px;}}
-textarea {{width:100%; height:400px; margin-top:10px; padding:10px; font-family:monospace; font-size:0.85em; border:1px solid #ddd; border-radius:4px; resize:vertical;}}
 </style>
 <div class="insight-box">
 <div class="insight-title">🧠 Character Logic & Patterns</div>
 {content}
 </div>"""
     
-    base_height = 280
+    base_height = 200
     if p_fam: base_height += 80
     if s_fam: base_height += 80
     
-    return full_html, base_height
+    return full_html, base_height, prompt_full
 
 # ==================== UI COMPONENTS ====================
 
