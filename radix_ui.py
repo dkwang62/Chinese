@@ -331,11 +331,10 @@ def render_learning_insights_html(char: str) -> str:
     )
 
     widget_id = f"verify-{uuid.uuid4().hex[:8]}"
-    safe_text = json.dumps(prompt, ensure_ascii=False)
 
     verify_html = f"""
     <div style='margin-top:24px; padding-top:16px; border-top:2px solid #e0e0e0; text-align:center;'>
-        <button id="verify-btn-{widget_id}" 
+        <button id="show-btn-{widget_id}" 
                 style="padding:12px 28px; 
                        background:#2e7d32; 
                        color:white; 
@@ -346,73 +345,69 @@ def render_learning_insights_html(char: str) -> str:
                        font-size:1.05em;
                        box-shadow:0 4px 10px rgba(46,125,50,0.3);
                        transition:all 0.3s ease;">
-            📋 Copy Verification Prompt
+            🔍 Show Verification Prompt
         </button>
-        <div id="verify-msg-{widget_id}" 
-             style="margin-top:12px; 
-                    font-weight:600; 
-                    color:#2e7d32; 
-                    min-height:24px;
-                    font-size:0.95em;">
+        <div id="prompt-container-{widget_id}" style="display:none; margin-top:20px; text-align:left;">
+            <div style="font-weight:600; color:#2e7d32; margin-bottom:10px;">
+                Prompt ready — click "Select All" then Ctrl+C (⌘+C) to copy
+            </div>
+            <pre id="prompt-text-{widget_id}" 
+                 style="background:#f8fff8; border:1px solid #a5d6a7; padding:16px; border-radius:8px; 
+                        white-space:pre-wrap; word-wrap:break-word; font-family:monospace; 
+                        max-height:400px; overflow-y:auto; font-size:0.95em;">
+{prompt.strip()}
+            </pre>
+            <div style="margin-top:12px; text-align:center;">
+                <button id="select-btn-{widget_id}" 
+                        style="padding:10px 20px; background:#4caf50; color:white; border:none; 
+                               border-radius:8px; cursor:pointer; font-weight:600;">
+                    Select All Text
+                </button>
+            </div>
         </div>
-        <!-- Hidden empty textarea - will be filled by JS -->
-        <textarea id="fallback-textarea-{widget_id}" 
-                  style="position:absolute; left:-9999px; opacity:0; height:1px; width:1px;"></textarea>
+        <div id="msg-{widget_id}" 
+             style="margin-top:12px; font-weight:600; color:#2e7d32; min-height:24px; font-size:0.95em;">
+        </div>
     </div>
 
     <script>
     (function() {{
-        const text = {safe_text};
-        const btn = document.getElementById("verify-btn-{widget_id}");
-        const msg = document.getElementById("verify-msg-{widget_id}");
-        const fallbackTextarea = document.getElementById("fallback-textarea-{widget_id}");
-        if (!btn || !msg || !fallbackTextarea) return;
+        const showBtn = document.getElementById("show-btn-{widget_id}");
+        const container = document.getElementById("prompt-container-{widget_id}");
+        const selectBtn = document.getElementById("select-btn-{widget_id}");
+        const promptText = document.getElementById("prompt-text-{widget_id}");
+        const msg = document.getElementById("msg-{widget_id}");
 
-        async function copyToClipboard() {{
-            let copied = false;
+        if (!showBtn || !container) return;
 
-            // Try modern clipboard API
-            if (navigator.clipboard && navigator.clipboard.writeText) {{
-                try {{
-                    await navigator.clipboard.writeText(text);
-                    copied = true;
-                }} catch (err) {{
-                    console.log("Modern clipboard failed");
-                }}
+        showBtn.addEventListener("click", function() {{
+            container.style.display = "block";
+            showBtn.style.display = "none";
+            msg.textContent = "Prompt displayed below — select and copy";
+            setTimeout(() => {{ msg.textContent = ""; }}, 4000);
+
+            // Auto-focus and select when shown
+            if (promptText) {{
+                const range = document.createRange();
+                range.selectNodeContents(promptText);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
             }}
+        }});
 
-            // Fallback if modern failed
-            if (!copied) {{
-                try {{
-                    fallbackTextarea.value = text;
-                    fallbackTextarea.select();
-                    fallbackTextarea.setSelectionRange(0, 99999);
-                    document.execCommand("copy");
-                    copied = true;
-                }} catch (err) {{
-                    console.log("Fallback failed");
-                }}
-            }}
-
-            if (copied) {{
-                // Success feedback
-                btn.textContent = "✅ Copied!";
-                btn.style.background = "#1b5e20";
-                msg.textContent = "Prompt copied to clipboard";
-                setTimeout(() => {{
-                    btn.textContent = "📋 Copy Verification Prompt";
-                    btn.style.background = "#2e7d32";
-                    msg.textContent = "";
-                }}, 3000);
-            }} else {{
-                // Rare failure
-                msg.textContent = "Copy failed — try manually selecting text";
-                msg.style.color = "#c62828";
-                setTimeout(() => {{ msg.textContent = ""; msg.style.color = "#2e7d32"; }}, 5000);
-            }}
+        if (selectBtn) {{
+            selectBtn.addEventListener("click", function() {{
+                const range = document.createRange();
+                range.selectNodeContents(promptText);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+                msg.textContent = "Text selected — press Ctrl+C (⌘+C) to copy";
+                msg.style.color = "#2e7d32";
+                setTimeout(() => {{ msg.textContent = ""; }}, 4000);
+            }});
         }}
-
-        btn.addEventListener("click", copyToClipboard);
     }})();
     </script>
     """
