@@ -306,127 +306,37 @@ def render_learning_insights_html(char: str) -> tuple[str, int]:
         "- Tooltip for \"Meaning (Radical)\" (<= 18 words)",
         "- Tooltip for \"Sound Match / Sound Component\" (<= 18 words)"
     ]
-    prompt_full = "\\n".join(lines)
-    prompt_json = json.dumps(prompt_full, ensure_ascii=False)
+    prompt_full = "\n".join(lines)
 
-    # 4. Button section
-    html_parts.append('<div style="margin-top:20px; text-align:center;">')
-    html_parts.append(f'<button id="vbtn{unique_id}" style="padding:10px 20px; border-radius:10px; border:1px solid #ddd; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; cursor:pointer; font-weight:700; font-size:0.9em; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);">🤖 Verify with AI</button>')
-    html_parts.append(f'<div id="vmsg{unique_id}" style="margin-top:10px; color:#2e7d32; font-weight:600; font-size:0.9em;"></div>')
-    html_parts.append('</div>')
-    
-    # JavaScript - with fallback method
-    script = f"""<script>
-(function() {{
-    var promptText = {prompt_json};
-    var btnId = 'vbtn{unique_id}';
-    var msgId = 'vmsg{unique_id}';
-    
-    function copyToClipboardFallback(text) {{
-        var textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        
-        try {{
-            var successful = document.execCommand('copy');
-            document.body.removeChild(textArea);
-            return successful;
-        }} catch (err) {{
-            document.body.removeChild(textArea);
-            return false;
-        }}
-    }}
-    
-    function setupButton() {{
-        var btn = document.getElementById(btnId);
-        var msg = document.getElementById(msgId);
-        
-        if (!btn || !msg) {{
-            console.log('Button or message element not found, retrying...');
-            setTimeout(setupButton, 100);
-            return;
-        }}
-        
-        console.log('Button setup complete for {unique_id}');
-        
-        btn.onclick = function() {{
-            console.log('Button clicked, attempting copy...');
-            msg.style.display = 'block';
-            
-            // Try modern clipboard API first
-            if (navigator.clipboard && navigator.clipboard.writeText) {{
-                console.log('Using clipboard API');
-                navigator.clipboard.writeText(promptText)
-                    .then(function() {{
-                        console.log('Copy successful via clipboard API');
-                        msg.textContent = '✅ Copied! Paste into ChatGPT.';
-                        setTimeout(function() {{
-                            msg.textContent = '';
-                            msg.style.display = 'none';
-                        }}, 3500);
-                    }})
-                    .catch(function(err) {{
-                        console.log('Clipboard API failed, trying fallback:', err);
-                        // Try fallback
-                        if (copyToClipboardFallback(promptText)) {{
-                            msg.textContent = '✅ Copied! Paste into ChatGPT.';
-                            setTimeout(function() {{
-                                msg.textContent = '';
-                                msg.style.display = 'none';
-                            }}, 3500);
-                        }} else {{
-                            msg.textContent = '❌ Copy failed. Please check console.';
-                            console.error('Both methods failed:', err);
-                        }}
-                    }});
-            }} else {{
-                console.log('Clipboard API not available, using fallback');
-                // Use fallback directly
-                if (copyToClipboardFallback(promptText)) {{
-                    msg.textContent = '✅ Copied! Paste into ChatGPT.';
-                    setTimeout(function() {{
-                        msg.textContent = '';
-                        msg.style.display = 'none';
-                    }}, 3500);
-                }} else {{
-                    msg.textContent = '❌ Copy failed. Try manually.';
-                }}
-            }}
-        }};
-    }}
-    
-    if (document.readyState === 'loading') {{
-        document.addEventListener('DOMContentLoaded', setupButton);
-    }} else {{
-        setupButton();
-    }}
-}})();
-</script>"""
-    html_parts.append(script)
+    # 4. Button section - use details/summary for expandable prompt
+    html_parts.append('<details style="margin-top:20px; border:1px solid #ddd; border-radius:8px; padding:10px; background:#f8f9fa;">')
+    html_parts.append('<summary style="cursor:pointer; font-weight:700; color:#667eea; padding:5px;">🤖 AI Verification Prompt (Click to expand & copy)</summary>')
+    html_parts.append(f'<textarea readonly style="width:100%; height:400px; margin-top:10px; padding:10px; font-family:monospace; font-size:0.85em; border:1px solid #ddd; border-radius:4px;">{pyhtml.escape(prompt_full)}</textarea>')
+    html_parts.append('<div style="margin-top:8px; font-size:0.85em; color:#666;">Click inside the text area, press Ctrl+A (or Cmd+A on Mac) to select all, then Ctrl+C (Cmd+C) to copy.</div>')
+    html_parts.append('</details>')
 
     # Assemble final HTML
     content = ''.join(html_parts)
     
     full_html = f"""<style>
-.insight-box {{{{background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);}}}}
-.insight-title {{{{font-weight: 800; color: #37474f; font-size: 1.1em; margin-bottom: 15px;}}}}
-.role-badge {{{{display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; font-size: 0.9em; font-weight: 600; margin-right: 10px; margin-bottom: 8px;}}}}
-.role-semantic {{{{background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9;}}}}
-.role-phonetic {{{{background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb;}}}}
-.family-list {{{{display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px;}}}}
-.family-char {{{{font-size: 1.4em; color: #333; padding: 2px 8px; background: #f5f5f5; border-radius: 6px; border: 1px solid #eee;}}}}
+.insight-box {{background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);}}
+.insight-title {{font-weight: 800; color: #37474f; font-size: 1.1em; margin-bottom: 15px;}}
+.role-badge {{display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; font-size: 0.9em; font-weight: 600; margin-right: 10px; margin-bottom: 8px;}}
+.role-semantic {{background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9;}}
+.role-phonetic {{background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb;}}
+.family-list {{display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px;}}
+.family-char {{font-size: 1.4em; color: #333; padding: 2px 8px; background: #f5f5f5; border-radius: 6px; border: 1px solid #eee;}}
+details {{margin-top:20px; border:1px solid #ddd; border-radius:8px; padding:10px; background:#f8f9fa;}}
+summary {{cursor:pointer; font-weight:700; color:#667eea; padding:5px;}}
+details[open] summary {{margin-bottom:10px; border-bottom:1px solid #ddd; padding-bottom:10px;}}
+textarea {{width:100%; height:400px; margin-top:10px; padding:10px; font-family:monospace; font-size:0.85em; border:1px solid #ddd; border-radius:4px; resize:vertical;}}
 </style>
 <div class="insight-box">
 <div class="insight-title">🧠 Character Logic & Patterns</div>
 {content}
 </div>"""
     
-    base_height = 200
+    base_height = 280
     if p_fam: base_height += 80
     if s_fam: base_height += 80
     
