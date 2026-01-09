@@ -39,25 +39,6 @@ config.initialize_prompt_config()
 
 # ==================== CALLBACKS ====================
 
-def _validate_and_search(raw: str, error_callback=None):
-    """Shared search validation logic."""
-    validated = InputValidator.validate_character_input(raw, error_callback)
-    if validated:
-        state.enter_character_view(validated)
-
-def sync_text():
-    _validate_and_search(state.get("w_text", ""), lambda msg: state.set("text_input_warning", msg))
-
-def sync_sidebar_text():
-    _validate_and_search(state.get("sb_search", ""), st.toast)
-
-def sync_splash_text():
-    raw = state.get("splash_search", "")
-    if InputValidator.validate_character_input(raw):
-        state.complete_onboarding()
-    state.set("sb_search", raw)
-    sync_sidebar_text()
-
 def sync_stroke_range():
     state.set("stroke_range", state.get("w_stroke_range"))
     state.set("page", 1)
@@ -249,17 +230,36 @@ def render_splash():
     
     with col_search:
         with st.expander("🔍 Search", expanded=False):
+            # --- CHARACTER SEARCH ---
             st.markdown("**Character Search**")
-            st.text_input("Paste or type a character to explore", key="splash_search", on_change=sync_splash_text, placeholder="e.g., 水", label_visibility="collapsed")
-            st.caption("Enter one Chinese character to jump directly to its details")
-            st.markdown("---")
+            col_sp_in, col_sp_btn = st.columns([4, 1])
+            with col_sp_in:
+                st.text_input(
+                    "Paste or type a character", 
+                    key="splash_search", 
+                    placeholder="e.g., 水", 
+                    label_visibility="collapsed",
+                    on_change=lambda: state.process_search_and_clear(
+                        st.session_state.splash_search, "splash_search", st.toast
+                    )
+                )
+            with col_sp_btn:
+                if st.button("🔍", key="splash_search_btn", use_container_width=True):
+                    if state.process_search_and_clear(st.session_state.splash_search, "splash_search", st.toast):
+                        st.rerun()
+
+            st.caption("Enter one Hanzi to jump to its details")
+            st.markdown("<div style='margin: 15px 0; border-top: 1px dashed #ddd;'></div>", unsafe_allow_html=True)
+            
+            # --- DEFINITION SEARCH ---
+            # st.markdown("**English Definition Search**")
             search_key = render_definition_search_ui("splash")
             if st.button("Search Definitions", use_container_width=True, type="primary", key="splash_def_btn"):
                 state.set("w_def_search", state.get(search_key, ""))
                 search_by_definition()
-                state.complete_onboarding()
+                state.complete_onboarding() 
                 st.rerun()
-            st.caption("Search across character definitions and phrase meanings")
+            st.caption("Search across meanings (e.g., 'fire', 'mountain')")
     
     with col_data:
         with st.expander("📂 User Data (Save/Load/Review & Edit)", expanded=False):
@@ -478,9 +478,6 @@ def render_sidebar():
                     <div style='font-size: 0.85em; color: #31333F; line-height: 1.4;'>{p_txt}</div>
                 </div>
                 """, unsafe_allow_html=True)
-
-
-
             
             st.markdown("---")
             st.checkbox("Show in Favourites", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
@@ -489,24 +486,34 @@ def render_sidebar():
                 state.set("onboarding_done", False)
                 st.rerun()
 
-        if not state.is_showing_inputs():
-            with st.expander("Display Phrases", expanded=False):
-                modes = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
-                idx = modes.index(state.get_display_mode()) if state.get_display_mode() in modes else 1
-                if (nm := st.radio("Select mode", options=modes, index=idx, key="sidebar_display_mode", label_visibility="collapsed")) != state.get_display_mode():
-                    state.set("display_mode", nm)
-                    st.rerun()
-
+        # Sidebar Search with combined layout
         with st.expander("🔍 Search", expanded=False):
             st.markdown("**Character Search**")
-            st.text_input("Paste or type a character", key="sb_search", on_change=sync_sidebar_text, placeholder="e.g., 水", label_visibility="collapsed")
-            st.markdown("---")
+            col_sb_in, col_sb_btn = st.columns([3, 1])
+            with col_sb_in:
+                st.text_input(
+                    "Paste or type a character", 
+                    key="sb_search", 
+                    placeholder="e.g., 水", 
+                    label_visibility="collapsed",
+                    on_change=lambda: state.process_search_and_clear(
+                        st.session_state.sb_search, "sb_search", st.toast
+                    )
+                )
+            with col_sb_btn:
+                if st.button("🔍", key="sb_search_btn", use_container_width=True):
+                    if state.process_search_and_clear(st.session_state.sb_search, "sb_search", st.toast):
+                        st.rerun()
+
+            st.markdown("<div style='margin: 15px 0; border-top: 1px dashed #ddd;'></div>", unsafe_allow_html=True)
+            
+            # st.markdown("**English Definition Search**")
             search_key = render_definition_search_ui("sb")
             if st.button("Search Definitions", use_container_width=True, type="primary", key="sb_def_btn"):
                 state.set("w_def_search", state.get(search_key, ""))
                 search_by_definition()
                 st.rerun()
-            st.caption("Search across character definitions and phrase meanings")
+            st.caption("Search across meanings (e.g., 'fire')")
 
         if not state.is_stroke_view_active():
             with st.expander("📎 Filters", expanded=False):
@@ -554,11 +561,9 @@ def render_stroke_view():
     main_html, _ = get_stroke_order_view_html(state.get("stroke_view_char"), state.get_display_mode())
     st_html(main_html, height=450)
     
-    # --- INSIGHTS PANEL ---
     char = state.get("stroke_view_char")
     if char:
         insights_result = render_learning_insights_html(char)
-        # Handle both 2-value and 3-value returns
         if isinstance(insights_result, tuple):
             if len(insights_result) == 3:
                 insights_html, insights_height, prompt_text = insights_result
@@ -570,22 +575,14 @@ def render_stroke_view():
                 
             if insights_html:
                 st_html(insights_html, height=insights_height)
-                
-            # Add copy button using Streamlit's working method
             if prompt_text:
                 st.markdown("---")
                 st.markdown("**🤖 Verify Logic & Patterns Analysis with AI**")
-                st.caption("Copy this prompt to ChatGPT to verify the semantic/phonetic analysis shown above")
                 render_copy_to_clipboard(prompt_text, f"verify_{char}")
     
     if state.get_display_mode() != "Single Character":
         if phrase_html := _render_phrase_html(state.get("stroke_view_char")):
             st.markdown(phrase_html, unsafe_allow_html=True)
-
-    char = state.get("stroke_view_char", "").strip()
-    if not char:
-        st.info("Select a character to generate the ChatGPT prompt.")
-        st.stop()
 
     st.markdown("### ChatGPT Prompt")
     config.normalize_prompt_state()
@@ -611,10 +608,10 @@ def render_stroke_view():
         state.set("prompt_selected_task_ids", sel)
 
     prompt_text = render_combined_prompt(
-        char=char,
+        char=state.get("stroke_view_char"),
         prompt_config=state.get("prompt_config"),
         selected_task_ids=state.get("prompt_selected_task_ids"),
-        definition_en=get_char_definition_en(char)
+        definition_en=get_char_definition_en(state.get("stroke_view_char"))
     )
     st.text_area("Copy this prompt into ChatGPT", value=prompt_text, height=320)
     render_copy_to_clipboard(prompt_text, str(hash(state.get("stroke_view_char"))))
@@ -653,14 +650,14 @@ def render_grid_view():
     if state.get_grid_sort_mode() == "usage": filter_parts.append("<span class='status-tag'>View: Components only</span>")
     if state.get_grid_sort_mode() == "frequency": filter_parts.append(f"<span class='status-tag'>Script: {state.get('grid_script_filter')}</span>")
     
-    st.markdown(f"<div class='status-line' style='display: flex; flex-direction: column; gap: 8px;'><div style='display: flex; justify-content: space-between; align-items: center;'><div style='display: flex; flex-wrap: wrap; gap: 8px;'><span style='font-weight: 800; margin-right: 5px;'>📎 Filters:</span> {''.join(filter_parts)}</div><div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>Click once to preview in the sidebar; click the same button again to drill down.</div></div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='status-line' style='display: flex; flex-direction: column; gap: 8px;'><div style='display: flex; justify-content: space-between; align-items: center;'><div style='display: flex; flex-wrap: wrap; gap: 8px;'><span style='font-weight: 800; margin-right: 5px;'>📎 Filters:</span> {''.join(filter_parts)}</div><div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>Click once to preview; click again to drill down.</div></div></div>", unsafe_allow_html=True)
 
     filtered = [c for c in component_map if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max and (state.get("radical") == "none" or component_map[c]["meta"].get("radical") == state.get("radical")) and (state.get("component_idc") == "none" or component_map[c]["meta"].get("decomposition", "").startswith(state.get("component_idc"))) and (state.get_grid_sort_mode() != "usage" or c in stats_cache["used_components"])]
     if state.get_grid_sort_mode() == "frequency": filtered = apply_script_filter(filtered, state.get("grid_script_filter"))
     sorted_comps = sorted(filtered, key=sort_key_frequency_primary if state.get_grid_sort_mode() == "frequency" else sort_key_usage_primary)
 
     if not sorted_comps:
-        st.info("No components match current filters.")
+        st.info("No components match filters.")
     else:
         total = len(sorted_comps)
         max_page = max(1, math.ceil(total / PAGE_SIZE))
@@ -688,23 +685,31 @@ def render_grid_view():
 
         with st.expander("🔍 Search", expanded=False):
             st.markdown("**Character Search**")
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                if state.get("text_input_warning"): st.warning(state.get("text_input_warning"))
-                st.text_input("Go to component/character", value=state.get("text_input_comp"), key="w_text", on_change=sync_text, placeholder="Type one Hanzi, e.g. 水", label_visibility="collapsed")
-                st.caption("Enter one Chinese character to jump directly to its details")
-            st.markdown("---")
-            col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
-            with col_s2:
-                search_key = render_definition_search_ui("w")
-                if st.button("Search Definitions", use_container_width=True, type="primary", key="w_def_btn"):
-                    state.set("w_def_search", state.get(search_key, ""))
-                    search_by_definition()
-                    st.rerun()
-                st.caption("Search across character definitions and phrase meanings")
+            col_input, col_btn = st.columns([4, 1])
+            with col_input:
+                st.text_input(
+                    "Go to component", 
+                    key="w_text", 
+                    placeholder="Paste or type Hanzi...", 
+                    label_visibility="collapsed",
+                    on_change=lambda: state.process_search_and_clear(
+                        st.session_state.w_text, "w_text", st.toast
+                    )
+                )
+            with col_btn:
+                if st.button("🔍 Search", key="w_text_btn", use_container_width=True):
+                    if state.process_search_and_clear(st.session_state.w_text, "w_text", st.toast):
+                        st.rerun()
+            
+            st.markdown("<div style='margin: 15px 0; border-top: 1px dashed #ddd;'></div>", unsafe_allow_html=True)
+            # st.markdown("**English Definition Search**")
+            search_key = render_definition_search_ui("w")
+            if st.button("Search Definitions", use_container_width=True, type="primary", key="w_def_btn_grid"):
+                state.set("w_def_search", state.get(search_key, ""))
+                search_by_definition()
+                st.rerun()
 
 def render_character_lineage_view():
-    from radix_core import IDC_CHARS
     sel = state.get_selected_component()
     info = component_map.get(sel, {})
     decomp = info.get("meta", {}).get("decomposition", "")
@@ -719,12 +724,10 @@ def render_character_lineage_view():
     st.markdown("<div class='lineage-header'>🎯 Current Selection</div>", unsafe_allow_html=True)
     focus_group = [sel]
     if cc_t2s and cc_s2t:
-        s_cand = cc_t2s.convert(sel)
-        t_cand = cc_s2t.convert(sel)
+        s_cand, t_cand = cc_t2s.convert(sel), cc_s2t.convert(sel)
         variant = s_cand if s_cand != sel else t_cand
         if variant != sel and variant in component_map:
             focus_group.append(variant)
-    
     for f in apply_script_filter(focus_group, state.get_script_filter()):
         render_radix_row(f)
 
@@ -732,41 +735,29 @@ def render_character_lineage_view():
     children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
 
     if children:
-        children_sorted = sorted(children, key=sort_key_usage_primary)
-        visible_children = apply_script_filter(children_sorted, state.get_script_filter())
+        visible_children = apply_script_filter(sorted(children, key=sort_key_usage_primary), state.get_script_filter())
         unique_visible = list(dict.fromkeys(visible_children))
-        
-        BATCH_SIZE = 25
-        total_derivs = len(unique_visible)
-        current_page = state.get("derivative_page", 0)
-        
-        max_page = max(0, math.ceil(total_derivs / BATCH_SIZE) - 1)
-        if current_page > max_page:
-            current_page = max_page
-            state.set("derivative_page", current_page)
-        
+        BATCH_SIZE, total_derivs = 25, len(unique_visible)
+        current_page = min(state.get("derivative_page", 0), max(0, math.ceil(total_derivs / BATCH_SIZE) - 1))
         start_idx = current_page * BATCH_SIZE
         end_idx = min(start_idx + BATCH_SIZE, total_derivs)
         current_batch = unique_visible[start_idx:end_idx]
 
         st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {total_derivs} characters)</div>", unsafe_allow_html=True)
-
         nav_c1, nav_c2, nav_c3 = st.columns([1, 2, 1])
         with nav_c1:
             if current_page > 0:
-                if st.button("⬅️ Previous 25", key="deriv_prev_top", use_container_width=True):
+                if st.button("⬅️ Previous 25", key="deriv_prev", use_container_width=True):
                     state.set("derivative_page", current_page - 1)
                     st.rerun()
         with nav_c3:
             if end_idx < total_derivs:
-                remaining = total_derivs - end_idx
-                if st.button(f"Next 25 ➡️", key="deriv_next_top", use_container_width=True, help=f"{remaining} more"):
+                if st.button(f"Next 25 ➡️", key="deriv_next", use_container_width=True):
                     state.set("derivative_page", current_page + 1)
                     st.rerun()
         
         chars_html = "".join([f"<span style='display:inline-block; margin: 2px 6px; font-size: 1.4em; font-weight: bold; color: #444;'>{c}</span>" for c in current_batch])
-        st.markdown(f"""<div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: center;"><div style="font-size: 0.85em; color: #888; margin-bottom: 8px; text-transform: uppercase; font-weight: 700;">Batch {current_page + 1} of {max_page + 1} &middot; Showing {start_idx + 1}–{end_idx}</div><div style="line-height: 1.6;">{chars_html}</div></div>""", unsafe_allow_html=True)
-        
+        st.markdown(f"""<div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: center;"><div style="font-size: 0.85em; color: #888; margin-bottom: 8px; text-transform: uppercase; font-weight: 700;">Batch {current_page + 1} &middot; Showing {start_idx + 1}–{end_idx}</div><div style="line-height: 1.6;">{chars_html}</div></div>""", unsafe_allow_html=True)
         for child in current_batch:
             render_radix_row(child, minimal=True)
 
@@ -774,27 +765,19 @@ def render_character_lineage_view():
 
 def main():
     if not component_map:
-        st.error("Component dataset not loaded.")
+        st.error("Dataset not loaded.")
         st.stop()
-    
     if not state.is_startup_complete():
         render_startup_file_choice()
         st.stop()
-    
     if not state.is_onboarding_complete():
         render_splash()
         st.stop()
-    
     render_sidebar()
-    
-    if state.is_stroke_view_active():
-        render_stroke_view()
-    elif state.is_definition_search_active():
-        render_definition_search_results()
-    elif state.is_showing_inputs():
-        render_grid_view()
-    else:
-        render_character_lineage_view()
+    if state.is_stroke_view_active(): render_stroke_view()
+    elif state.is_definition_search_active(): render_definition_search_results()
+    elif state.is_showing_inputs(): render_grid_view()
+    else: render_character_lineage_view()
 
 if __name__ == "__main__":
     main()
