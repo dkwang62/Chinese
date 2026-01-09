@@ -266,6 +266,18 @@ class StateManager:
         for k in keys_to_clear:
             self.state.pop(k, None)
 
+    # Inside radix_state.py -> StateManager class
+    def process_search_and_clear(self, raw_input: str, widget_key: str, error_callback=None):
+        """Processes search, clears widget, and handles onboarding completion."""
+        from radix_state import InputValidator
+        validated = InputValidator.validate_character_input(raw_input, error_callback)
+        if validated:
+            self.state[widget_key] = "" # Clear the sticky widget
+            self.set("onboarding_done", True) # Ensure we move past splash
+            self.enter_character_view(validated)
+            return True
+        return False
+
 # ==================== CONFIG MANAGER ====================
 
 class ConfigManager:
