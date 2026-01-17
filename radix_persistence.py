@@ -37,20 +37,31 @@ class SessionPersistence:
         state_hash = hashlib.md5(json.dumps(snapshot, sort_keys=True).encode()).hexdigest()[:8]
         current_char = snapshot.get('selected_comp', 'none')
         
+        # Debug: log what we're actually saving
+        show_inputs = snapshot.get('show_inputs', True)
+        
         return f"""
         <script>
             (function() {{
                 const stateData = {json.dumps(state_json)};
                 const stateHash = "{state_hash}";
                 const currentChar = "{current_char}";
+                const showInputs = {str(show_inputs).lower()};
                 const timestamp = new Date().toLocaleTimeString();
+                
+                // Parse and log the actual state being saved
+                const parsedState = JSON.parse(stateData);
+                console.log('[Radix] 💾 Saving state:');
+                console.log('  - Character:', currentChar);
+                console.log('  - Show inputs:', showInputs);
+                console.log('  - Full state:', parsedState);
                 
                 localStorage.setItem('{SessionPersistence.STORAGE_KEY}', stateData);
                 localStorage.setItem('{SessionPersistence.STORAGE_KEY}_hash', stateHash);
                 localStorage.setItem('{SessionPersistence.STORAGE_KEY}_char', currentChar);
                 localStorage.setItem('{SessionPersistence.STORAGE_KEY}_time', timestamp);
                 
-                console.log('✅ [Radix] Saved at ' + timestamp + ' | Char: ' + currentChar);
+                console.log('✅ [Radix] Saved at ' + timestamp);
             }})();
         </script>
         """
@@ -246,18 +257,36 @@ class PersistenceManager:
                     test_html = f"""
                     <script>
                         const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
+                        console.log('[Radix] Test Restore clicked');
+                        console.log('[Radix] Raw savedState:', savedState);
+                        
                         if (savedState) {{
-                            const stateObj = JSON.parse(savedState);
-                            const char = stateObj.selected_comp || '';
-                            if (char && char !== 'none') {{
-                                const params = new URLSearchParams(window.location.search);
-                                params.set('_restore_to', char);
-                                window.location.href = window.location.pathname + '?' + params.toString();
-                            }} else {{
-                                alert('No character saved to restore');
+                            try {{
+                                const stateObj = JSON.parse(savedState);
+                                console.log('[Radix] Parsed state:', stateObj);
+                                
+                                const char = stateObj.selected_comp || '';
+                                const showInputs = stateObj.show_inputs;
+                                
+                                console.log('[Radix] Character from state:', char);
+                                console.log('[Radix] Show inputs:', showInputs);
+                                
+                                if (char && char !== 'none' && char !== '') {{
+                                    console.log('[Radix] ✅ Valid character found, navigating to:', char);
+                                    const params = new URLSearchParams(window.location.search);
+                                    params.set('_restore_to', char);
+                                    window.location.href = window.location.pathname + '?' + params.toString();
+                                }} else {{
+                                    console.log('[Radix] ❌ No valid character to restore');
+                                    alert('No character saved to restore (found: "' + char + '")');
+                                }}
+                            }} catch (e) {{
+                                console.error('[Radix] Failed to parse state:', e);
+                                alert('Failed to parse saved state: ' + e.message);
                             }}
                         }} else {{
-                            alert('No saved state found');
+                            console.log('[Radix] ❌ No saved state in localStorage');
+                            alert('No saved state found in browser storage');
                         }}
                     </script>
                     """
