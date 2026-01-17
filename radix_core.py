@@ -260,299 +260,101 @@ def get_char_definition_en(char: str) -> str:
 
 # --- PHONETIC & SEMANTIC ANALYSIS ---
 
-def _idc_arity(ch: str) -> int:
-    """
-    Return the number of components for an Ideographic Description Character (IDC).
-    Most IDCs are binary; ⿲ and ⿳ are ternary.
-    """
-    return 3 if ch in {"⿲", "⿳"} else 2
-
-
-def _read_idc_component(expr: str, i: int) -> tuple[str, int]:
-    """
-    Read a single component starting at position i within an IDC expression.
-
-    A component can be:
-      - a single Han character (or component glyph), or
-      - a nested IDC expression beginning with an IDC character.
-
-    Returns (component_string, next_index).
-    """
-    if not expr or i >= len(expr):
-        return "", i
-
-    ch = expr[i]
-
-    # Nested IDC expression
-    if ch in IDC_CHARS:
-        arity = _idc_arity(ch)
-        j = i + 1
-        parts = []
-        for _ in range(arity):
-            part, j = _read_idc_component(expr, j)
-            if not part:
-                break
-            parts.append(part)
-        return expr[i:j], j
-
-    # Single-character component
-    return ch, i + 1
-
-
-def _get_immediate_children(decomp_str: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
-    """
-    For clear binary compounds only:
-      - ⿰ (Left-Right)
-      - ⿱ (Top-Bottom)
-
-    Returns (idc, child1, child2), where each child may be a single glyph or a nested expression string.
-    """
-    if not decomp_str:
-        return None, None, None
-
-    idc = decomp_str[0]
-    if idc not in {"⿰", "⿱"}:
-        return None, None, None
-
-    i = 1
-    c1, i = _read_idc_component(decomp_str, i)
-    c2, i = _read_idc_component(decomp_str, i)
-
-    if not c1 or not c2:
-        return idc, None, None
-
-    return idc, c1, c2
-
-
-def _head_glyph(component: str) -> Optional[str]:
-    """
-    If component is a nested IDC expression, return its first non-IDC glyph (heuristic).
-    If it's a single glyph, return it.
-    """
-    if not component:
-        return None
-    for ch in component:
-        if ch not in IDC_CHARS:
-            return ch
-    return None
-
-
-# Common high-impact radical/component variants (extend as your dataset reveals more misses)
-_RADICAL_VARIANTS = {
-    "水": "氵",
-    "手": "扌",
-    "心": "忄",
-    "火": "灬",
-    "犬": "犭",
-    "衣": "衤",
-    "示": "礻",
-    "言": "讠",   # simplified form
-    "金": "钅",
-    "食": "饣",
-    "糸": "纟",
-}
-
-
-def _normalize_radical(r: Optional[str]) -> Optional[str]:
-    if not r:
-        return None
-    r = clean_field(r)
-    if not r or r == "—":
-        return None
-    return _RADICAL_VARIANTS.get(r, r)
-
-
-def _split_pinyin_readings(p: Optional[str]) -> List[str]:
-    """
-    Split a pinyin field into readings.
-
-    Supports common separators: spaces, commas, semicolons, slashes.
-    Returns tone-preserving tokens (e.g., 'qing1').
-    """
-    if not p:
-        return []
-    p = clean_field(p)
-    if not p or p == "—":
-        return []
-    tokens = re.split(r"[\s,;/]+", p.strip())
-    return [t for t in tokens if t]
-
-
-def _pinyin_plain(p: str) -> str:
-    """Lowercase pinyin with tone numbers removed."""
-    return re.sub(r"[0-9]", "", p).lower()
-
-
-def _phonetic_similarity(a: str, b: str) -> float:
-    """
-    Heuristic similarity between pinyin syllables (tones ignored).
-      1.0: exact match (after tone removal)
-      0.7: same final (rough rime match)
-      0.4: same initial
-      0.0: otherwise
-    """
-    a = _pinyin_plain(a)
-    b = _pinyin_plain(b)
-    if not a or not b:
-        return 0.0
-    if a == b:
-        return 1.0
-
-    initials = [
-        "zh", "ch", "sh",
-        "b", "p", "m", "f", "d", "t", "n", "l",
-        "g", "k", "h", "j", "q", "x",
-        "r", "z", "c", "s", "y", "w",
-    ]
-
-    def split_if(syl: str) -> tuple[str, str]:
-        for ini in initials:
-            if syl.startswith(ini):
-                return ini, syl[len(ini):]
-        return "", syl
-
-    ai, af = split_if(a)
-    bi, bf = split_if(b)
-
-    if af and bf and af == bf:
-        return 0.7
-    if ai and bi and ai == bi:
-        return 0.4
-    return 0.0
-
-
 def analyze_component_structure(char: str) -> dict:
     """
-    Identify likely Semantic (radical) and Phonetic components using:
-      - strict gating to binary IDC compounds (⿰ / ⿱),
-      - immediate-child parsing (avoids nested "leaf spillover"),
-      - radical normalization for common variant forms,
-      - graded pinyin similarity scoring across multiple readings.
-
-    Returns:
-      {
-        "char": ...,
-        "structure": "⿰" | "⿱" | None,
-        "semantic": <glyph> | None,
-        "phonetic": <glyph> | None,
-        "phonetic_pinyin": <str> | None,
-        "sound_score": <float>,
-        "is_sound_match": <bool>
-      }
+    Analyze character to identify Semantic (Radical) and Phonetic components.
+    RESTRICTION: Only analyzes Left-Right (⿰) or Top-Bottom (⿱) structures 
+    to avoid false positives in complex or single-body characters.
     """
     info = component_map.get(char, {})
     meta = info.get("meta", {})
-
-    decomp_str = meta.get("decomposition", "") or ""
-    idc, c1, c2 = _get_immediate_children(decomp_str)
-    if not idc or not c1 or not c2:
+    
+    # 1. VALIDATE STRUCTURE FIRST
+    # We only want to guess logic for clear binary compounds.
+    # ⿰ = Left-Right, ⿱ = Top-Bottom
+    ALLOWED_IDCS = {'⿰', '⿱'}
+    decomp_str = meta.get("decomposition", "")
+    
+    # If decomposition is missing or doesn't start with allowed IDC, skip analysis.
+    if not decomp_str or decomp_str[0] not in ALLOWED_IDCS:
         return {
             "char": char,
-            "structure": None,
             "semantic": None,
             "phonetic": None,
             "phonetic_pinyin": None,
-            "sound_score": 0.0,
-            "is_sound_match": False,
+            "is_sound_match": False
         }
-
-    radical = _normalize_radical(meta.get("radical"))
-    char_pinyins = _split_pinyin_readings(meta.get("pinyin"))
-
-    # Use head glyphs if children are nested IDC expressions
-    h1 = _head_glyph(c1)
-    h2 = _head_glyph(c2)
-
-    # Positional prior:
-    #   ⿰: left semantic, right phonetic
-    #   ⿱: top semantic, bottom phonetic
-    semantic = None
+    
+    # 2. Identify Semantic (Radical)
+    radical = clean_field(meta.get("radical", ""))
+    if radical == "—": radical = None
+    
+    # 3. Identify Phonetic Candidate
+    parts = [c for c in decomp_str if c not in IDC_CHARS and c != char]
+    
     phonetic = None
-
-    if radical and h1 == radical:
-        semantic, phonetic = h1, h2
-    elif radical and h2 == radical:
-        semantic, phonetic = h2, h1
-    else:
-        # fallback to positional prior
-        semantic, phonetic = h1, h2
-
-    phonetic_pinyins: List[str] = []
-    sound_score = 0.0
-
-    if phonetic:
-        phon_meta = component_map.get(phonetic, {}).get("meta", {})
-        phonetic_pinyins = _split_pinyin_readings(phon_meta.get("pinyin"))
-
-        # Best similarity score across readings
-        best = 0.0
-        for cp in char_pinyins:
-            for pp in phonetic_pinyins:
-                best = max(best, _phonetic_similarity(cp, pp))
-        sound_score = best
-
+    phonetic_pinyin = ""
+    is_match = False
+    
+    if radical and parts:
+        # Try to find the part that ISN'T the radical
+        potential_phonetics = [p for p in parts if p != radical]
+        
+        # Heuristic: If multiple parts remain, take the one with highest stroke count or first one
+        if potential_phonetics:
+            phonetic = potential_phonetics[0] 
+            
+            # Check for sound similarity
+            char_pinyin = clean_field(meta.get("pinyin", ""))
+            phonetic_data = component_map.get(phonetic, {})
+            phonetic_pinyin = clean_field(phonetic_data.get("meta", {}).get("pinyin", ""))
+            
+            if char_pinyin and phonetic_pinyin and char_pinyin != "—" and phonetic_pinyin != "—":
+                # Clean tones for comparison
+                import re
+                cp_plain = re.sub(r'[0-9]', '', char_pinyin).lower()
+                pp_plain = re.sub(r'[0-9]', '', phonetic_pinyin).lower()
+                if cp_plain == pp_plain:
+                    is_match = True
+    
     return {
         "char": char,
-        "structure": idc,
-        "semantic": semantic,
+        "semantic": radical,
         "phonetic": phonetic,
-        "phonetic_pinyin": " ".join(phonetic_pinyins) if phonetic_pinyins else None,
-        "sound_score": sound_score,
-        "is_sound_match": sound_score >= 0.7,  # tune threshold if needed
+        "phonetic_pinyin": phonetic_pinyin,
+        "is_sound_match": is_match
     }
 
-
-# --- Indexes for fast family lookup (built lazily) ---
-_PHONETIC_INDEX: Optional[Dict[str, List[str]]] = None
-_RADICAL_INDEX: Optional[Dict[str, List[str]]] = None
-
-
-def _ensure_family_indexes() -> None:
-    global _PHONETIC_INDEX, _RADICAL_INDEX
-    if _PHONETIC_INDEX is not None and _RADICAL_INDEX is not None:
-        return
-
-    phonetic_index: Dict[str, List[str]] = {}
-    radical_index: Dict[str, List[str]] = {}
-
-    # Build radical index first (cheap)
-    for c, info in component_map.items():
-        r = _normalize_radical(info.get("meta", {}).get("radical"))
-        if r:
-            radical_index.setdefault(r, []).append(c)
-
-    # Build phonetic index using the analyzer (heavier but still manageable once)
-    for c in component_map.keys():
-        a = analyze_component_structure(c)
-        ph = a.get("phonetic")
-        if ph:
-            phonetic_index.setdefault(ph, []).append(c)
-
-    _PHONETIC_INDEX = phonetic_index
-    _RADICAL_INDEX = radical_index
-
-
 def get_pronunciation_family(char: str, limit: int = 8) -> list:
-    """Find other characters that share the same phonetic component (as inferred by analyze_component_structure)."""
-    _ensure_family_indexes()
+    """Find other characters that share the same phonetic component."""
     analysis = analyze_component_structure(char)
     phonetic = analysis.get("phonetic")
-    if not phonetic or not _PHONETIC_INDEX:
+    
+    if not phonetic:
         return []
-
-    family = [c for c in _PHONETIC_INDEX.get(phonetic, []) if c != char]
+        
+    family = []
+    for c, info in component_map.items():
+        if c == char: continue
+        d = info.get("meta", {}).get("decomposition", "")
+        if phonetic in d:
+            family.append(c)
+            
     family.sort(key=lambda x: component_map.get(x, {}).get("freq_per_million", 0), reverse=True)
     return family[:limit]
 
-
 def get_semantic_family(char: str, limit: int = 8) -> list:
-    """Find other characters with the same (normalized) radical."""
-    _ensure_family_indexes()
-    radical = _normalize_radical(component_map.get(char, {}).get("meta", {}).get("radical"))
-    if not radical or not _RADICAL_INDEX:
+    """Find other characters with the same radical."""
+    radical = component_map.get(char, {}).get("meta", {}).get("radical")
+    if not radical or radical == "—":
         return []
-
-    family = [c for c in _RADICAL_INDEX.get(radical, []) if c != char]
+        
+    family = []
+    for c, info in component_map.items():
+        if c == char: continue
+        if info.get("meta", {}).get("radical") == radical:
+            family.append(c)
+            
     family.sort(key=lambda x: component_map.get(x, {}).get("freq_per_million", 0), reverse=True)
     return family[:limit]
 
