@@ -233,7 +233,7 @@ class PersistenceManager:
             
             st.markdown("---")
             
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             with col1:
                 if st.button("💾 Save Now", use_container_width=True):
                     st_html(SessionPersistence.save_to_browser(self.state.state), height=0)
@@ -241,16 +241,37 @@ class PersistenceManager:
                     st.rerun()
             
             with col2:
+                if st.button("🔄 Test Restore", use_container_width=True):
+                    # Read from localStorage and navigate
+                    test_html = f"""
+                    <script>
+                        const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
+                        if (savedState) {{
+                            const stateObj = JSON.parse(savedState);
+                            const char = stateObj.selected_comp || '';
+                            if (char && char !== 'none') {{
+                                const params = new URLSearchParams(window.location.search);
+                                params.set('_restore_to', char);
+                                window.location.href = window.location.pathname + '?' + params.toString();
+                            }} else {{
+                                alert('No character saved to restore');
+                            }}
+                        }} else {{
+                            alert('No saved state found');
+                        }}
+                    </script>
+                    """
+                    st_html(test_html, height=0)
+            
+            with col3:
                 if st.button("🗑️ Clear", use_container_width=True):
                     st_html(SessionPersistence.clear_browser_storage(), height=0)
                     st.success("Cleared!")
             
             st.markdown("---")
-            st.caption("**How to test:**")
-            st.caption("1. Navigate to a character")
-            st.caption("2. Close this browser tab")
-            st.caption("3. Reopen app URL")
-            st.caption("4. Check console (F12) for restore messages")
+            st.caption("**Quick test:** Click '🔄 Test Restore' to manually trigger restoration")
+            st.caption("**Full test:** Close tab → Reopen app URL")
+            st.caption("**Debug:** Open console (F12) for restore messages")
             
             with st.expander("🔍 Current State"):
                 st.json({
