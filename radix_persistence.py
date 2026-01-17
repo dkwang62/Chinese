@@ -154,8 +154,9 @@ class PersistenceManager:
             st_html(html_content, height=0)
     
     def try_restore(self):
-        """Restore state from localStorage - DIRECT APPLICATION"""
-        # Check if we have a restore target in query params FIRST
+        """Restore state from localStorage - AFTER onboarding is fully complete"""
+        
+        # First, check if we have a restore target in query params
         if '_restore_to' in st.query_params:
             char_to_restore = st.query_params['_restore_to']
             
@@ -182,18 +183,19 @@ class PersistenceManager:
         if self.state.state.get("_restore_attempted"):
             return
         
+        # Mark that we've attempted (so we don't loop)
         self.state.state["_restore_attempted"] = True
         
-        # Check if we're starting fresh (no character selected, onboarding done)
+        # Check current state - we need to be fully past onboarding
         current_selected = self.state.state.get("selected_comp", "")
         onboarding_done = self.state.state.get("onboarding_done", False)
-        show_inputs = self.state.state.get("show_inputs", True)
+        startup_done = self.state.state.get("startup_file_choice_made", False)
         
-        # Only restore if we're at the default start state
-        if current_selected or not onboarding_done or not show_inputs:
-            # Already navigated somewhere, don't restore
+        # If user already selected something, or not fully done with startup, skip
+        if current_selected or not onboarding_done or not startup_done:
             return
         
+        # We're at the grid/favorites screen - NOW we can restore
         # Inject a component that reads localStorage and redirects
         trigger_restore = f"""
         <script>
@@ -207,8 +209,14 @@ class PersistenceManager:
                     
                     const stateObj = JSON.parse(savedState);
                     const savedChar = stateObj.selected_comp || '';
+                    const wasViewingChar = stateObj.show_inputs === false;
                     
-                    if (savedChar && savedChar !== 'none' && savedChar !== '') {{
+                    console.log('[Radix] Found saved state:');
+                    console.log('  - Character:', savedChar);
+                    console.log('  - Was viewing char:', wasViewingChar);
+                    
+                    // Only restore if they were actually viewing a character
+                    if (savedChar && savedChar !== 'none' && savedChar !== '' && wasViewingChar) {{
                         console.log('[Radix] 🎯 Triggering restore to:', savedChar);
                         
                         // Redirect with query param
@@ -219,7 +227,7 @@ class PersistenceManager:
                         console.log('[Radix] Redirecting to:', newUrl);
                         window.location.href = newUrl;
                     }} else {{
-                        console.log('[Radix] No character to restore');
+                        console.log('[Radix] Not a valid restoration state (char=' + savedChar + ', viewing=' + wasViewingChar + ')');
                     }}
                     
                 }} catch (e) {{
