@@ -24,6 +24,8 @@ from radix_ui import (
     render_copy_to_clipboard, get_stroke_order_sidebar_html,
     render_definition_search_ui, render_learning_insights_html
 )
+from radix_persistence import PersistenceManager  # ✅ ADD THIS LINE
+
 
 # Configure Streamlit
 st.set_page_config(**PAGE_CONFIG)
@@ -764,20 +766,51 @@ def render_character_lineage_view():
 # ==================== MAIN ====================
 
 def main():
+    """Main application entry point with routing and persistence."""
     if not component_map:
-        st.error("Dataset not loaded.")
+        st.error("Component dataset not loaded.")
         st.stop()
+    
+    # Initialize managers
+    state = StateManager()
+    config = ConfigManager(state)
+    persistence = PersistenceManager(state)  # ✅ NEW
+    
+    state.initialize()
+    
+    # Try to restore session from browser (only on first load)
+    persistence.try_restore()  # ✅ NEW
+    
+    config.load_server_data()
+    config.initialize_prompt_config()
+    
+    # Route to appropriate page
     if not state.is_startup_complete():
         render_startup_file_choice()
         st.stop()
+    
     if not state.is_onboarding_complete():
         render_splash()
         st.stop()
+    
+    # Render sidebar (always present after onboarding)
     render_sidebar()
-    if state.is_stroke_view_active(): render_stroke_view()
-    elif state.is_definition_search_active(): render_definition_search_results()
-    elif state.is_showing_inputs(): render_grid_view()
-    else: render_character_lineage_view()
+    
+    # Add heartbeat to keep session alive
+    persistence.add_heartbeat()  # ✅ NEW
+    
+    # Route main content
+    if state.is_stroke_view_active():
+        render_stroke_view()
+    elif state.is_definition_search_active():
+        render_definition_search_results()
+    elif state.is_showing_inputs():
+        render_grid_view()
+    else:
+        render_character_lineage_view()
+    
+    # Auto-save state to browser at end of every render
+    persistence.auto_save()  # ✅ NEW
 
 if __name__ == "__main__":
     main()
