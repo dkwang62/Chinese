@@ -144,7 +144,30 @@ class PersistenceManager:
     
     def try_restore(self):
         """Restore state from localStorage - DIRECT APPLICATION"""
-        # Only try once per session
+        # Check if we have a restore target in query params FIRST
+        if '_restore_to' in st.query_params:
+            char_to_restore = st.query_params['_restore_to']
+            
+            # Clear the param immediately
+            st.query_params.clear()
+            
+            # Apply the restoration - use the proper navigation method
+            if char_to_restore and char_to_restore != 'none':
+                # Use the state manager's enter_character_view method
+                self.state.enter_character_view(char_to_restore)
+                
+                st.toast(f"🔄 Restored session: {char_to_restore}", icon="✅")
+                
+                # Mark that we've restored
+                self.state.state["_restore_attempted"] = True
+                
+                # Force a rerun to show the character view
+                st.rerun()
+            
+            # If we get here, restoration is done
+            return
+        
+        # Only try to trigger restore once per session
         if self.state.state.get("_restore_attempted"):
             return
         
@@ -160,107 +183,41 @@ class PersistenceManager:
             # Already navigated somewhere, don't restore
             return
         
-        # Inject a component that reads localStorage and stores in sessionStorage
-        read_component = f"""
+        # Inject a component that reads localStorage and redirects
+        trigger_restore = f"""
         <script>
             (function() {{
                 try {{
                     const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
                     if (!savedState) {{
-                        console.log('[Radix] No saved state found');
+                        console.log('[Radix] No saved state to restore');
                         return;
                     }}
                     
                     const stateObj = JSON.parse(savedState);
-                    console.log('[Radix] 📦 Loaded state:', stateObj);
+                    const savedChar = stateObj.selected_comp || '';
                     
-                    // Store each key in sessionStorage so Python can read it
-                    for (const [key, value] of Object.entries(stateObj)) {{
-                        sessionStorage.setItem('_radix_restore_' + key, JSON.stringify(value));
+                    if (savedChar && savedChar !== 'none' && savedChar !== '') {{
+                        console.log('[Radix] 🎯 Triggering restore to:', savedChar);
+                        
+                        // Redirect with query param
+                        const params = new URLSearchParams(window.location.search);
+                        params.set('_restore_to', savedChar);
+                        const newUrl = window.location.pathname + '?' + params.toString();
+                        
+                        console.log('[Radix] Redirecting to:', newUrl);
+                        window.location.href = newUrl;
+                    }} else {{
+                        console.log('[Radix] No character to restore');
                     }}
                     
-                    sessionStorage.setItem('_radix_restore_ready', 'true');
-                    console.log('[Radix] ✅ State ready for restoration');
-                    
                 }} catch (e) {{
-                    console.error('[Radix] Failed to load state:', e);
+                    console.error('[Radix] Restore trigger failed:', e);
                 }}
             }})();
         </script>
         """
-        st_html(read_component, height=0)
-        
-        # Now check if restore is ready and apply it
-        check_component = f"""
-        <div id="restore-status" style="display:none;"></div>
-        <script>
-            const ready = sessionStorage.getItem('_radix_restore_ready');
-            if (ready === 'true') {{
-                document.getElementById('restore-status').setAttribute('data-ready', 'true');
-                const char = JSON.parse(sessionStorage.getItem('_radix_restore_selected_comp') || '""');
-                if (char) {{
-                    document.getElementById('restore-status').setAttribute('data-char', char);
-                }}
-            }}
-        </script>
-        """
-        st_html(check_component, height=0)
-        
-        # Since we can't read DOM attributes, we'll use a different approach:
-        # Just apply the restoration directly if it's the first load
-        
-        # Check if this looks like a fresh page load (not a rerun)
-        if '_radix_first_load' not in self.state.state:
-            self.state.state['_radix_first_load'] = False
-            
-            # This IS the first load - try to restore
-            # We'll trigger a rerun with query params
-            trigger_restore = f"""
-            <script>
-                (function() {{
-                    const ready = sessionStorage.getItem('_radix_restore_ready');
-                    if (ready === 'true') {{
-                        const char = JSON.parse(sessionStorage.getItem('_radix_restore_selected_comp') || '""');
-                        
-                        if (char && char !== 'none' && char !== '') {{
-                            console.log('[Radix] 🎯 Triggering restore to:', char);
-                            
-                            // Add to URL to trigger navigation
-                            const params = new URLSearchParams(window.location.search);
-                            params.set('_restore_to', char);
-                            const newUrl = window.location.pathname + '?' + params.toString();
-                            
-                            // Navigate to new URL (this will reload Streamlit)
-                            window.location.href = newUrl;
-                        }}
-                        
-                        // Clear the flag so we don't loop
-                        sessionStorage.removeItem('_radix_restore_ready');
-                    }}
-                }})();
-            </script>
-            """
-            st_html(trigger_restore, height=0)
-        
-        # Check if we have a restore target in query params
-        if '_restore_to' in st.query_params:
-            char_to_restore = st.query_params['_restore_to']
-            
-            # Clear the param immediately
-            new_params = {k: v for k, v in st.query_params.items() if k != '_restore_to'}
-            st.query_params.clear()
-            for k, v in new_params.items():
-                st.query_params[k] = v
-            
-            # Apply the restoration - use the proper navigation method
-            if char_to_restore and char_to_restore != 'none':
-                # Use the state manager's enter_character_view method
-                self.state.enter_character_view(char_to_restore)
-                
-                st.toast(f"🔄 Restored session: {char_to_restore}", icon="✅")
-                
-                # Force a rerun to show the character view
-                st.rerun()
+        st_html(trigger_restore, height=0)
     
     def add_heartbeat(self):
         """Add heartbeat"""
