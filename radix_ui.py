@@ -331,6 +331,24 @@ def render_learning_insights_html(char: str) -> tuple[str, int, str]:
     
     return full_html, base_height, prompt_full
 
+# Add to radix_ui.py
+def render_session_heartbeat():
+    """Invisible component that keeps session alive"""
+    st_html("""
+    <script>
+        // Ping the server every 60 seconds
+        setInterval(() => {
+            fetch(window.location.href, {
+                method: 'GET',
+                headers: {'Cache-Control': 'no-cache'}
+            }).catch(e => console.log('Heartbeat failed:', e));
+        }, 60000); // Every 60 seconds
+    </script>
+    """, height=0)
+
+# Call this in render_sidebar() or main()
+
+
 # ==================== UI COMPONENTS ====================
 
 def render_definition_search_ui(key_prefix: str):
