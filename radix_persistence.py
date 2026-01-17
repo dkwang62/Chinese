@@ -246,83 +246,21 @@ class PersistenceManager:
         if '_restore_to' in st.query_params:
             char_to_restore = st.query_params['_restore_to']
             
-            # Clear the param
-            del st.query_params['_restore_to']
+            # Clear the param immediately
+            new_params = {k: v for k, v in st.query_params.items() if k != '_restore_to'}
+            st.query_params.clear()
+            for k, v in new_params.items():
+                st.query_params[k] = v
             
-            # Apply the restoration
-            if char_to_restore:
-                console.log(f"[Radix] Applying restoration to: {char_to_restore}")
-                
-                # Apply all the stored state
-                for key in SessionPersistence.PERSISTENT_KEYS:
-                    session_key = f'_radix_restore_{key}'
-                    # We can't read from sessionStorage here, so just apply the character
-                
-                # At minimum, navigate to the character
-                self.state.state['selected_comp'] = char_to_restore
-                self.state.state['last_valid_selected_comp'] = char_to_restore
-                self.state.state['show_inputs'] = False
-                self.state.state['history'] = []
+            # Apply the restoration - use the proper navigation method
+            if char_to_restore and char_to_restore != 'none':
+                # Use the state manager's enter_character_view method
+                self.state.enter_character_view(char_to_restore)
                 
                 st.toast(f"🔄 Restored session: {char_to_restore}", icon="✅")
-                st.rerun()
-    
-    def check_pending_navigation(self):
-        """Check if we need to navigate to a restored character"""
-        # This is called AFTER initial state setup
-        if not self.state.state.get("_nav_check_done"):
-            self.state.state["_nav_check_done"] = True
-            
-            # Read the pending nav via a detection component
-            detect_html = f"""
-            <div id="nav-detector" data-pending="false"></div>
-            <script>
-                const pending = sessionStorage.getItem('_radix_restore_pending');
-                const navChar = sessionStorage.getItem('_radix_nav_to_char');
-                if (pending === 'true' && navChar) {{
-                    document.getElementById('nav-detector').setAttribute('data-pending', navChar);
-                    
-                    // Clear flags
-                    sessionStorage.removeItem('_radix_restore_pending');
-                    console.log('[Radix] ✅ Restoration complete for:', navChar);
-                }}
-            </script>
-            """
-            st_html(detect_html, height=0)
-            
-            # Now manually apply navigation if needed
-            # This is a workaround - we'll just show a message
-            nav_html = f"""
-            <script>
-                const navChar = sessionStorage.getItem('_radix_nav_to_char');
-                const navHistory = sessionStorage.getItem('_radix_nav_to_history');
-                const navMode = sessionStorage.getItem('_radix_nav_to_mode');
                 
-                if (navChar) {{
-                    console.log('[Radix] 🎯 AUTO-NAVIGATING to:', navChar);
-                    
-                    // Show a toast-like message
-                    const toast = document.createElement('div');
-                    toast.style.cssText = `
-                        position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-                        background: #4caf50; color: white; padding: 16px 32px;
-                        border-radius: 12px; font-weight: 700; font-size: 16px;
-                        z-index: 10000; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                        animation: slideDown 0.3s ease;
-                    `;
-                    toast.textContent = `🔄 Restoring session: ${{navChar}}`;
-                    document.body.appendChild(toast);
-                    
-                    setTimeout(() => toast.remove(), 3000);
-                    
-                    // Clear the storage
-                    sessionStorage.removeItem('_radix_nav_to_char');
-                    sessionStorage.removeItem('_radix_nav_to_history');
-                    sessionStorage.removeItem('_radix_nav_to_mode');
-                }}
-            </script>
-            """
-            st_html(nav_html, height=0)
+                # Force a rerun to show the character view
+                st.rerun()
     
     def add_heartbeat(self):
         """Add heartbeat"""
