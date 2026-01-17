@@ -457,6 +457,14 @@ def render_sidebar():
                 st.button("🏠 Root", on_click=state.go_to_root, use_container_width=True)
             st.markdown("---")
 
+        # Create persistence manager instance
+        from radix_persistence import PersistenceManager
+        persistence = PersistenceManager(state)
+        
+        # Always show persistence controls
+        persistence.render_controls()
+        
+
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
         if current_char_for_sidebar:
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
