@@ -786,9 +786,6 @@ def main():
     
     state.initialize()
     
-    # Try to restore session from browser
-    persistence.try_restore()
-    
     config.load_server_data()
     config.initialize_prompt_config()
     
@@ -800,6 +797,9 @@ def main():
     if not state.is_onboarding_complete():
         render_splash()
         st.stop()
+
+    # Try to restore session from browser
+    persistence.try_restore()
     
     # Render sidebar
     render_sidebar()
