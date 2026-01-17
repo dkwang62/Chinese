@@ -6,6 +6,8 @@ import json
 import uuid
 from typing import Any, Dict, List, Optional, Callable
 from radix_core import normalize_single_hanzi, resolve_to_known_variant
+import streamlit.components.v1 as components
+
 
 # ==================== CONSTANTS ====================
 
@@ -153,6 +155,23 @@ class StateManager:
     
     def is_definition_search_active(self) -> bool:
         return self.state.get("definition_search_mode", False)
+
+
+
+# Add these methods to StateManager
+    def save_navigation_state(self):
+        """Save navigation state to browser"""
+        state = {
+            "selected_comp": self.get_selected_component(),
+            "history": self.get_history(),
+            "show_inputs": self.is_showing_inputs(),
+            "display_mode": self.get_display_mode()
+        }
+        components.html(f"""
+        <script>
+            localStorage.setItem('radix_nav', {json.dumps(json.dumps(state))});
+        </script>
+        """, height=0)
     
     # --- Navigation Actions ---
     def enter_character_view(self, char: str):
