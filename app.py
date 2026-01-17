@@ -792,9 +792,6 @@ def main():
     config.load_server_data()
     config.initialize_prompt_config()
     
-    # Check if we need to navigate to a restored character
-    persistence.check_pending_navigation()  # ← ADD THIS LINE
-    
     # Route to appropriate page
     if not state.is_startup_complete():
         render_startup_file_choice()
