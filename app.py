@@ -782,15 +782,18 @@ def main():
     # Initialize managers
     state = StateManager()
     config = ConfigManager(state)
-    persistence = PersistenceManager(state)  # ✅ NEW
+    persistence = PersistenceManager(state)
     
     state.initialize()
     
-    # Try to restore session from browser (only on first load)
-    persistence.try_restore()  # ✅ NEW
+    # Try to restore session from browser
+    persistence.try_restore()
     
     config.load_server_data()
     config.initialize_prompt_config()
+    
+    # Check if we need to navigate to a restored character
+    persistence.check_pending_navigation()  # ← ADD THIS LINE
     
     # Route to appropriate page
     if not state.is_startup_complete():
@@ -801,11 +804,11 @@ def main():
         render_splash()
         st.stop()
     
-    # Render sidebar (always present after onboarding)
+    # Render sidebar
     render_sidebar()
     
-    # Add heartbeat to keep session alive
-    persistence.add_heartbeat()  # ✅ NEW
+    # Add heartbeat
+    persistence.add_heartbeat()
     
     # Route main content
     if state.is_stroke_view_active():
@@ -817,8 +820,8 @@ def main():
     else:
         render_character_lineage_view()
     
-    # Auto-save state to browser at end of every render
-    persistence.auto_save()  # ✅ NEW
+    # Auto-save
+    persistence.auto_save()
 
 if __name__ == "__main__":
     main()
