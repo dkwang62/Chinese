@@ -133,7 +133,6 @@ class StateManager:
     def set(self, key: str, value: Any):
         self.state[key] = value
     
-    # FIX: Allow both positional dicts AND kwargs to support all update styles
     def update(self, *args, **kwargs):
         self.state.update(*args, **kwargs)
     
@@ -156,26 +155,13 @@ class StateManager:
     def is_definition_search_active(self) -> bool:
         return self.state.get("definition_search_mode", False)
 
-
-
-# Add these methods to StateManager
-    def save_navigation_state(self):
-        """Save navigation state to browser"""
-        state = {
-            "selected_comp": self.get_selected_component(),
-            "history": self.get_history(),
-            "show_inputs": self.is_showing_inputs(),
-            "display_mode": self.get_display_mode()
-        }
-        components.html(f"""
-        <script>
-            localStorage.setItem('radix_nav', {json.dumps(json.dumps(state))});
-        </script>
-        """, height=0)
-    
     # --- Navigation Actions ---
     def enter_character_view(self, char: str):
         """Enter character view with given character."""
+        # Update URL for persistence
+        if char:
+            st.query_params["c"] = char
+
         self.update(
             script_filter="Any",
             history=[],
@@ -207,6 +193,9 @@ class StateManager:
         history = self.get_history()
         if history:
             prev = history.pop()
+            # Update URL to previous character
+            st.query_params["c"] = prev
+            
             self.update(
                 history=history,
                 selected_comp=prev,
@@ -217,9 +206,16 @@ class StateManager:
             )
         else:
             self.set("show_inputs", True)
+            # Clear URL when going back to input list
+            if "c" in st.query_params:
+                del st.query_params["c"]
     
     def go_to_root(self):
         """Navigate to root/grid view."""
+        # Clear URL for persistence
+        if "c" in st.query_params:
+            del st.query_params["c"]
+
         self.update(
             history=[],
             preview_comp=None,
@@ -245,6 +241,8 @@ class StateManager:
         if not self.get_selected_component():
             self.state["selected_comp"] = char
             self.state["last_valid_selected_comp"] = char
+            # Ensure URL is set if we entered stroke view directly
+            st.query_params["c"] = char
     
     def exit_stroke_view(self):
         """Exit stroke view."""
@@ -285,10 +283,10 @@ class StateManager:
         for k in keys_to_clear:
             self.state.pop(k, None)
 
-    # Inside radix_state.py -> StateManager class
     def process_search_and_clear(self, raw_input: str, widget_key: str, error_callback=None):
         """Processes search, clears widget, and handles onboarding completion."""
-        from radix_state import InputValidator
+        # Use local import to avoid circular dependency at module level
+        from radix_state import InputValidator 
         validated = InputValidator.validate_character_input(raw_input, error_callback)
         if validated:
             self.state[widget_key] = "" # Clear the sticky widget
@@ -339,7 +337,6 @@ class ConfigManager:
             self.state.clear_derived_widget_state()
             self.import_profile_dict(obj)
             
-            # This call caused the error previously; now fixed by StateManager.update(*args)
             self.state.update({
                 "_upload_applied": True,
                 "_manual_config_active": True,
