@@ -69,12 +69,17 @@ def list_tile_click(c):
             history = state.get_history()
             history.append(state.get_selected_component())
             state.set("history", history)
+        
+        # Note: Persistence is handled inside state.enter_character_view now
         state.update(
             selected_comp=c,
             show_inputs=False,
             preview_comp=None,
             derivative_page=0
         )
+        # Manually trigger URL update if using raw update instead of enter_character_view
+        if c: st.query_params["c"] = c
+
     else:
         state.set("preview_comp", c)
 
@@ -778,9 +783,13 @@ def main():
     config.load_server_data()
     config.initialize_prompt_config()
 
+    # --- RESTORE CHECK ---
+    # Attempt to restore from URL (e.g. ?c=水) before any splash screens
+    persistence.try_restore()
+
     # Try to restore session from browser as early as possible.
     # This allows a saved character to bypass startup/onboarding screens.
-    persistence.try_restore()
+    # persistence.try_restore()
 
     # Route to appropriate page
     if not state.is_startup_complete():
