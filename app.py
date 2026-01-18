@@ -171,6 +171,28 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
 # ==================== PAGE RENDERERS ====================
 
 def render_startup_file_choice():
+    """Render startup file choice screen."""
+    
+    # ADD THIS: Show Quick Resume button if saved session exists
+    from radix_persistence import PersistenceManager
+    persistence = PersistenceManager(state)
+    persistence.render_quick_resume_button()
+    # END NEW CODE
+    
+    st.markdown("""
+    <div class="splash-wrap">
+        <div class="splash-card">
+            <div class="splash-title">Radix 🈯 - Data Setup</div>
+            <div class="splash-sub" style="margin-top: 20px;">
+                Do you have a local Radix user data file you'd like to use?
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+
+    
     st.markdown("""
     <div class="splash-wrap">
         <div class="splash-card">
