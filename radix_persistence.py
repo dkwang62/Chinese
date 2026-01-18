@@ -154,18 +154,24 @@ class PersistenceManager:
             st_html(html_content, height=0)
     
     def try_restore(self):
-        """Restore state from localStorage - AFTER onboarding is fully complete"""
+        """Restore state from localStorage - EARLY, before startup/onboarding gates"""
         
-        # First, check if we have a restore target in query params
+        # STEP 1: Check if we're coming back from a redirect with restore params
         if '_restore_to' in st.query_params:
-            char_to_restore = st.query_params['_restore_to']
+            char_to_restore = st.query_params.get('_restore_to', '')
+            resume_mode = st.query_params.get('_resume', '') == '1'
             
-            # Clear the param immediately
+            # Clear the params immediately
             st.query_params.clear()
             
-            # Apply the restoration - use the proper navigation method
+            if resume_mode:
+                # Deep resume: skip startup and onboarding
+                self.state.state["startup_file_choice_made"] = True
+                self.state.state["onboarding_done"] = True
+            
+            # Apply the restoration
             if char_to_restore and char_to_restore != 'none':
-                # Use the state manager's enter_character_view method
+                # Navigate to the character
                 self.state.enter_character_view(char_to_restore)
                 
                 st.toast(f"🔄 Restored session: {char_to_restore}", icon="✅")
@@ -176,27 +182,23 @@ class PersistenceManager:
                 # Force a rerun to show the character view
                 st.rerun()
             
-            # If we get here, restoration is done
             return
         
-        # Only try to trigger restore once per session
+        # STEP 2: Only try to trigger restore once per session
         if self.state.state.get("_restore_attempted"):
             return
         
-        # Mark that we've attempted (so we don't loop)
         self.state.state["_restore_attempted"] = True
         
-        # Check current state - we need to be fully past onboarding
+        # STEP 3: Check if we should trigger a restore
+        # We can be at ANY point in the app - startup, onboarding, or grid
         current_selected = self.state.state.get("selected_comp", "")
-        onboarding_done = self.state.state.get("onboarding_done", False)
-        startup_done = self.state.state.get("startup_file_choice_made", False)
         
-        # If user already selected something, or not fully done with startup, skip
-        if current_selected or not onboarding_done or not startup_done:
+        # Don't restore if user already selected something
+        if current_selected:
             return
         
-        # We're at the grid/favorites screen - NOW we can restore
-        # Inject a component that reads localStorage and redirects
+        # Inject JavaScript that reads localStorage and redirects if valid session found
         trigger_restore = f"""
         <script>
             (function() {{
@@ -210,28 +212,39 @@ class PersistenceManager:
                     const stateObj = JSON.parse(savedState);
                     const savedChar = stateObj.selected_comp || '';
                     const wasViewingChar = stateObj.show_inputs === false;
+                    const hadCompletedOnboarding = stateObj.onboarding_done === true;
+                    const hadCompletedStartup = stateObj.startup_file_choice_made === true;
                     
-                    console.log('[Radix] Found saved state:');
+                    console.log('[Radix] 📦 Found saved session:');
                     console.log('  - Character:', savedChar);
-                    console.log('  - Was viewing char:', wasViewingChar);
+                    console.log('  - Was viewing character:', wasViewingChar);
+                    console.log('  - Had completed startup:', hadCompletedStartup);
+                    console.log('  - Had completed onboarding:', hadCompletedOnboarding);
                     
-                    // Only restore if they were actually viewing a character
-                    if (savedChar && savedChar !== 'none' && savedChar !== '' && wasViewingChar) {{
-                        console.log('[Radix] 🎯 Triggering restore to:', savedChar);
+                    // Only restore if they had a complete session with a character selected
+                    if (savedChar && savedChar !== 'none' && savedChar !== '' && 
+                        wasViewingChar && hadCompletedOnboarding && hadCompletedStartup) {{
                         
-                        // Redirect with query param
+                        console.log('[Radix] ✅ Valid restore state detected');
+                        console.log('[Radix] 🎯 Triggering DEEP RESUME to:', savedChar);
+                        
+                        // Build redirect URL with resume flag
                         const params = new URLSearchParams(window.location.search);
+                        params.set('_resume', '1');  // Skip startup + onboarding
                         params.set('_restore_to', savedChar);
-                        const newUrl = window.location.pathname + '?' + params.toString();
                         
-                        console.log('[Radix] Redirecting to:', newUrl);
+                        const newUrl = window.location.pathname + '?' + params.toString();
+                        console.log('[Radix] 🚀 Redirecting to:', newUrl);
+                        
+                        // Redirect
                         window.location.href = newUrl;
                     }} else {{
-                        console.log('[Radix] Not a valid restoration state (char=' + savedChar + ', viewing=' + wasViewingChar + ')');
+                        console.log('[Radix] ❌ Cannot restore - incomplete session state');
+                        console.log('  (Need: char selected + viewing char + completed startup/onboarding)');
                     }}
                     
                 }} catch (e) {{
-                    console.error('[Radix] Restore trigger failed:', e);
+                    console.error('[Radix] ❌ Restore trigger failed:', e);
                 }}
             }})();
         </script>
@@ -261,11 +274,11 @@ class PersistenceManager:
             
             with col2:
                 if st.button("🔄 Test Restore", use_container_width=True):
-                    # Read from localStorage and navigate
+                    # Read from localStorage and navigate with DEEP RESUME
                     test_html = f"""
                     <script>
                         const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
-                        console.log('[Radix] Test Restore clicked');
+                        console.log('[Radix] 🧪 Test Restore clicked');
                         console.log('[Radix] Raw savedState:', savedState);
                         
                         if (savedState) {{
@@ -276,25 +289,31 @@ class PersistenceManager:
                                 const char = stateObj.selected_comp || '';
                                 const showInputs = stateObj.show_inputs;
                                 
-                                console.log('[Radix] Character from state:', char);
+                                console.log('[Radix] Character:', char);
                                 console.log('[Radix] Show inputs:', showInputs);
                                 
                                 if (char && char !== 'none' && char !== '') {{
-                                    console.log('[Radix] ✅ Valid character found, navigating to:', char);
+                                    console.log('[Radix] ✅ Triggering deep resume to:', char);
+                                    
                                     const params = new URLSearchParams(window.location.search);
+                                    params.set('_resume', '1');  // Deep resume flag
                                     params.set('_restore_to', char);
-                                    window.location.href = window.location.pathname + '?' + params.toString();
+                                    
+                                    const newUrl = window.location.pathname + '?' + params.toString();
+                                    console.log('[Radix] Redirecting to:', newUrl);
+                                    
+                                    window.location.href = newUrl;
                                 }} else {{
-                                    console.log('[Radix] ❌ No valid character to restore');
+                                    console.log('[Radix] ❌ No valid character');
                                     alert('No character saved to restore (found: "' + char + '")');
                                 }}
                             }} catch (e) {{
-                                console.error('[Radix] Failed to parse state:', e);
+                                console.error('[Radix] Failed to parse:', e);
                                 alert('Failed to parse saved state: ' + e.message);
                             }}
                         }} else {{
-                            console.log('[Radix] ❌ No saved state in localStorage');
-                            alert('No saved state found in browser storage');
+                            console.log('[Radix] ❌ No saved state');
+                            alert('No saved state found');
                         }}
                     </script>
                     """
