@@ -173,11 +173,22 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
 def render_startup_file_choice():
     """Render startup file choice screen."""
     
-    # ADD THIS: Show Quick Resume button if saved session exists
-    from radix_persistence import PersistenceManager
-    persistence = PersistenceManager(state)
+    # ADD QUICK RESUME BUTTON AT THE TOP
+    # Need to import and use the state from the calling context
+    # This is a bit tricky since state isn't passed as parameter
+    # Let's add it via session_state directly
+    from radix_persistence import PersistenceManager, SessionPersistence
+    
+    # Create a temporary state manager wrapper
+    class TempStateWrapper:
+        def __init__(self):
+            self.state = st.session_state
+    
+    temp_state = TempStateWrapper()
+    persistence = PersistenceManager(temp_state)
+    
+    # Show Quick Resume button if available
     persistence.render_quick_resume_button()
-    # END NEW CODE
     
     st.markdown("""
     <div class="splash-wrap">
@@ -189,37 +200,23 @@ def render_startup_file_choice():
         </div>
     </div>
     """, unsafe_allow_html=True)
-
-
-
-    
-    st.markdown("""
-    <div class="splash-wrap">
-        <div class="splash-card">
-            <div class="splash-title">Radix 🈑 - Data Setup</div>
-            <div class="splash-sub" style="margin-top: 20px;">
-                Do you have a local Radix user data file you'd like to use?
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
     
     st.markdown("<div style='max-width: 600px; margin: 40px auto;'>", unsafe_allow_html=True)
     
     c1, c2 = st.columns(2)
     if c1.button("📱 Yes, upload my local file", use_container_width=True, type="primary"):
-        state.set("startup_choice", "upload")
+        st.session_state["startup_choice"] = "upload"
         st.rerun()
     if c2.button("☁️ No, use server defaults", use_container_width=True):
-        state.set("startup_choice", "server")
-        if state.get("server_data_available"):
-            obj = state.get("server_data")
-            state.update(
-                favourites_list=obj["favourites_list"],
-                prompt_config=obj["prompt_config"],
-                prompt_ui=obj["prompt_ui"]
-            )
-        state.complete_startup()
+        st.session_state["startup_choice"] = "server"
+        if st.session_state.get("server_data_available"):
+            obj = st.session_state.get("server_data")
+            st.session_state.update({
+                "favourites_list": obj["favourites_list"],
+                "prompt_config": obj["prompt_config"],
+                "prompt_ui": obj["prompt_ui"]
+            })
+        st.session_state["startup_file_choice_made"] = True
         st.rerun()
     
     st.markdown("</div>", unsafe_allow_html=True)
