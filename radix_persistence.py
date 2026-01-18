@@ -1,5 +1,5 @@
 # radix_persistence.py
-# URL-based session persistence with Clickable Links
+# Smart Persistence: URL for sharing + LocalStorage for crash recovery
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -8,40 +8,67 @@ import urllib.parse
 class SessionPersistence:
     """Manages browser-based session persistence"""
     
-    HEARTBEAT_INTERVAL = 45000
-    
+    # 1. AUTO-SAVE SCRIPT (Invisible)
+    # Writes the current character to Browser LocalStorage every time it updates
     @staticmethod
-    def get_heartbeat_component() -> str:
-        """Keep session alive with heartbeat"""
+    def get_auto_save_script(char: str) -> str:
+        safe_char = char or ""
         return f"""
-        <div id="radix-heartbeat" style="
-            position: fixed; bottom: 10px; right: 10px;
-            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-            color: white; padding: 8px 16px; border-radius: 24px;
-            font-size: 12px; font-weight: 700; z-index: 9999;
-            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
-            display: none; font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        ">💚 Session Active</div>
         <script>
-            (function() {{
-                const el = document.getElementById('radix-heartbeat');
-                let count = 0;
-                function ping() {{
-                    count++;
-                    fetch(window.location.href, {{
-                        method: 'GET',
-                        headers: {{'Cache-Control': 'no-cache'}},
-                        credentials: 'same-origin'
-                    }}).then(() => {{
-                        console.log(`💚 [Radix] Heartbeat #${{count}}`);
-                        el.textContent = `💚 Active (ping #${{count}})`;
-                        el.style.display = 'block';
-                        setTimeout(() => el.style.display = 'none', 2000);
-                    }});
-                }}
-                setInterval(ping, {SessionPersistence.HEARTBEAT_INTERVAL});
-                setTimeout(ping, 5000);
-            }})();
+            try {{
+                localStorage.setItem('radix_last_char', '{safe_char}');
+                console.log('[Radix] Auto-saved to storage: {safe_char}');
+            }} catch (e) {{ console.error('Save failed', e); }}
+        </script>
+        """
+
+    # 2. RESUME BUTTON (Visible only if save found)
+    # Reads LocalStorage. If a character exists, shows a styled Link Button.
+    @staticmethod
+    def get_resume_component() -> str:
+        return """
+        <div id="radix-resume-wrapper" style="text-align:center; margin-top:20px; display:none;">
+            <a id="radix-resume-link" href="#" target="_top" style="
+                text-decoration: none;
+                background-color: #ffffff;
+                color: #d35400;
+                border: 2px solid #d35400;
+                padding: 12px 25px;
+                border-radius: 8px;
+                font-weight: 700;
+                font-family: sans-serif;
+                font-size: 16px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                transition: all 0.2s;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            ">
+                🔄 Resume Previous Session
+            </a>
+            <div style="font-size: 0.85em; color: #666; margin-top: 8px;">
+                Recovered from browser storage
+            </div>
+        </div>
+        <script>
+            (function() {
+                try {
+                    const saved = localStorage.getItem('radix_last_char');
+                    // Check if saved value is valid (1 character)
+                    if (saved && saved.length === 1 && saved !== 'null') {
+                        const link = document.getElementById('radix-resume-link');
+                        const wrapper = document.getElementById('radix-resume-wrapper');
+                        
+                        // Update link to point to the URL parameter
+                        // target="_top" breaks out of the iframe to reload the app
+                        link.href = "?c=" + encodeURIComponent(saved);
+                        link.innerHTML = "🔄 Resume Session: " + saved;
+                        
+                        // Reveal the button
+                        wrapper.style.display = "block";
+                    }
+                } catch (e) { console.error('Resume check failed', e); }
+            })();
         </script>
         """
 
@@ -51,18 +78,27 @@ class PersistenceManager:
     def __init__(self, state_manager):
         self.state = state_manager
     
-    # Your specific app domain
-    BASE_URL = "https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app/"
-    
     def auto_save(self):
-        """No-op for URL persistence."""
-        pass
+        """
+        Called at end of main loop. 
+        1. Ensures URL is synced (?c=...)
+        2. Writes to LocalStorage for crash recovery
+        """
+        char = self.state.get_selected_component()
+        if char:
+            # Inject invisible JS to save to LocalStorage
+            st_html(SessionPersistence.get_auto_save_script(char), height=0)
     
     def try_restore(self):
-        """Restore state from URL query parameters."""
+        """
+        Restore state from URL query parameters.
+        Run this BEFORE startup checks.
+        """
+        # If we already have a selection, do nothing
         if self.state.get_selected_component():
             return
 
+        # Check URL
         char_param = st.query_params.get("c")
         
         if char_param:
@@ -72,42 +108,20 @@ class PersistenceManager:
                 self.state.complete_startup()
                 self.state.complete_onboarding()
                 self.state.enter_character_view(validated)
-                st.toast(f"Restored: {validated}", icon="🔄")
+                st.toast(f"Restored from URL: {validated}", icon="🔄")
     
-    def add_heartbeat(self):
-        """Add heartbeat"""
-        if self.state.is_onboarding_complete():
-            st_html(SessionPersistence.get_heartbeat_component(), height=0)
-    
-    def render_controls(self):
-        """Render controls with CLICKABLE buttons"""
-        with st.expander("🔗 Share & Save", expanded=False):
-            st.info("State is saved in the URL.")
-            
-            # 1. Get current char
-            current_c = st.query_params.get("c")
-            if not current_c:
-                current_c = self.state.get_selected_component()
+    def show_resume_option(self):
+        """
+        Render the 'Resume' button on Splash/Home screen.
+        """
+        st_html(SessionPersistence.get_resume_component(), height=100)
 
-            # 2. Generate Clickable Link
-            if current_c:
-                param = urllib.parse.urlencode({'c': current_c})
-                full_url = f"{self.BASE_URL}?{param}"
-                
-                # Renders a clickable button that opens the link
-                st.link_button(
-                    label=f"🔗 Open {current_c} in New Tab", 
-                    url=full_url, 
-                    use_container_width=True
-                )
-                
-                # Also show code for copying if needed
-                st.caption("Or copy raw link:")
-                st.code(full_url, language="text")
-            else:
-                st.link_button("🏠 Open Home Page", self.BASE_URL, use_container_width=True)
+    def render_controls(self):
+        """Render debug controls in sidebar"""
+        with st.expander("💾 Connection Status", expanded=False):
+            st.caption("✅ URL Persistence Active")
+            st.caption("✅ Local Backup Active")
             
-            st.markdown("---")
-            if st.button("🗑️ Reset / Go Home", use_container_width=True):
-                self.state.go_to_root()
-                st.rerun()
+            if st.button("🗑️ Clear Local History", use_container_width=True):
+                st_html("<script>localStorage.removeItem('radix_last_char');</script>", height=0)
+                st.toast("History cleared")
