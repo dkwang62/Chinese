@@ -785,9 +785,11 @@ def main():
     persistence = PersistenceManager(state)
     
     state.initialize()
-    
     config.load_server_data()
     config.initialize_prompt_config()
+    
+    # ✅ TRY RESTORE EARLY - before startup/onboarding gates
+    persistence.try_restore()
     
     # Route to appropriate page
     if not state.is_startup_complete():
@@ -797,9 +799,6 @@ def main():
     if not state.is_onboarding_complete():
         render_splash()
         st.stop()
-
-    # Try to restore session from browser
-    persistence.try_restore()
     
     # Render sidebar
     render_sidebar()
