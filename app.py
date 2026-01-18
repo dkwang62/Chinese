@@ -171,25 +171,118 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
 # ==================== PAGE RENDERERS ====================
 
 def render_startup_file_choice():
-    """Render startup file choice screen."""
+    """Render startup file choice screen with Quick Resume."""
     
-    # ADD QUICK RESUME BUTTON AT THE TOP
-    # Need to import and use the state from the calling context
-    # This is a bit tricky since state isn't passed as parameter
-    # Let's add it via session_state directly
-    from radix_persistence import PersistenceManager, SessionPersistence
+    # Check if we have a resume request in query params
+    if '_resume' in st.query_params and '_restore_to' in st.query_params:
+        char = st.query_params.get('_restore_to', '')
+        
+        # Clear params
+        st.query_params.clear()
+        
+        # Set the flags to bypass startup and onboarding
+        st.session_state["startup_file_choice_made"] = True
+        st.session_state["onboarding_done"] = True
+        
+        # Navigate to character
+        st.session_state.update({
+            'selected_comp': char,
+            'last_valid_selected_comp': char,
+            'show_inputs': False,
+            'history': [],
+            'text_input_comp': char,
+            'text_input_warning': None,
+            'preview_comp': None,
+            'stroke_view_active': False,
+            'stroke_view_char': '',
+            'display_mode': "2-Characters",
+            'definition_search_mode': False,
+            'definition_search_results': None,
+            'derivative_page': 0,
+            'script_filter': "Any"
+        })
+        
+        st.toast(f"🔄 Restored session: {char}", icon="✅")
+        st.rerun()
+        return
     
-    # Create a temporary state manager wrapper
-    class TempStateWrapper:
-        def __init__(self):
-            self.state = st.session_state
+    # Show Quick Resume button using inline JavaScript that redirects
+    quick_resume_html = """
+    <div id="quick-resume-holder" style="margin: 30px auto; text-align: center;"></div>
+    <script>
+        (function() {
+            const savedState = localStorage.getItem('radix_session_v1');
+            if (!savedState) return;
+            
+            try {
+                const state = JSON.parse(savedState);
+                const char = state.selected_comp || '';
+                const isValid = char && char !== 'none' && 
+                               state.show_inputs === false && 
+                               state.onboarding_done === true && 
+                               state.startup_file_choice_made === true;
+                
+                if (isValid) {
+                    const holder = document.getElementById('quick-resume-holder');
+                    holder.innerHTML = `
+                        <div style="
+                            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+                            border: 3px solid #2e7d32;
+                            border-radius: 20px;
+                            padding: 24px 40px;
+                            max-width: 550px;
+                            margin: 0 auto 30px auto;
+                            box-shadow: 0 8px 24px rgba(76, 175, 80, 0.4);
+                            animation: slideIn 0.5s ease;
+                        ">
+                            <div style="color: white; font-size: 20px; font-weight: 700; margin-bottom: 10px;">
+                                🔄 Welcome Back!
+                            </div>
+                            <div style="color: #e8f5e9; font-size: 15px; margin-bottom: 18px;">
+                                Previous session: <span style="font-size: 28px; font-weight: 700;">${char}</span>
+                            </div>
+                            <button onclick="resumeSession('${char}')" style="
+                                background: white;
+                                color: #2e7d32;
+                                border: none;
+                                border-radius: 14px;
+                                padding: 16px 40px;
+                                font-size: 17px;
+                                font-weight: 700;
+                                cursor: pointer;
+                                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                                transition: all 0.2s ease;
+                            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.3)';"
+                               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)';">
+                                ⚡ Quick Resume to ${char}
+                            </button>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error('Quick Resume error:', e);
+            }
+        })();
+        
+        function resumeSession(char) {
+            console.log('[Radix] Quick Resume clicked for:', char);
+            const params = new URLSearchParams(window.location.search);
+            params.set('_resume', '1');
+            params.set('_restore_to', char);
+            window.location.href = window.location.pathname + '?' + params.toString();
+        }
+    </script>
+    <style>
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    """
     
-    temp_state = TempStateWrapper()
-    persistence = PersistenceManager(temp_state)
+    st.markdown(quick_resume_html, unsafe_allow_html=True)
     
-    # Show Quick Resume button if available
-    persistence.render_quick_resume_button()
-    
+    # Rest of your existing startup screen
     st.markdown("""
     <div class="splash-wrap">
         <div class="splash-card">
@@ -220,6 +313,7 @@ def render_startup_file_choice():
         st.rerun()
     
     st.markdown("</div>", unsafe_allow_html=True)
+
     
     if state.get("startup_choice") == "upload":
         st.markdown("<div style='max-width: 600px; margin: 40px auto;'><h3>📤 Upload Your Local File</h3>", unsafe_allow_html=True)
