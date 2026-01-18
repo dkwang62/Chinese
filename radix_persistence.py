@@ -1,14 +1,13 @@
 # radix_persistence.py
-# URL-based session persistence with Shareable Links
+# URL-based session persistence with Clickable Links
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
-import urllib.parse  # Added for URL encoding
+import urllib.parse
 
 class SessionPersistence:
     """Manages browser-based session persistence"""
     
-    # Keeping the heartbeat to ensure session doesn't expire too quickly
     HEARTBEAT_INTERVAL = 45000
     
     @staticmethod
@@ -56,17 +55,11 @@ class PersistenceManager:
     BASE_URL = "https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app/"
     
     def auto_save(self):
-        """
-        No-op for URL persistence.
-        State is saved implicitly when enter_character_view updates the URL.
-        """
+        """No-op for URL persistence."""
         pass
     
     def try_restore(self):
-        """
-        Restore state from URL query parameters.
-        This runs server-side before the UI renders.
-        """
+        """Restore state from URL query parameters."""
         if self.state.get_selected_component():
             return
 
@@ -87,27 +80,32 @@ class PersistenceManager:
             st_html(SessionPersistence.get_heartbeat_component(), height=0)
     
     def render_controls(self):
-        """Render controls with full shareable link generation"""
+        """Render controls with CLICKABLE buttons"""
         with st.expander("🔗 Share & Save", expanded=False):
-            st.info("Your state is saved in the URL automatically.")
+            st.info("State is saved in the URL.")
             
-            # 1. Get current char from URL or State
+            # 1. Get current char
             current_c = st.query_params.get("c")
             if not current_c:
                 current_c = self.state.get_selected_component()
 
-            # 2. Generate the full Link
+            # 2. Generate Clickable Link
             if current_c:
-                # URL encode the character (e.g. 日 becomes %E6%97%A5)
                 param = urllib.parse.urlencode({'c': current_c})
                 full_url = f"{self.BASE_URL}?{param}"
                 
-                st.markdown("**Current Character Link**")
+                # Renders a clickable button that opens the link
+                st.link_button(
+                    label=f"🔗 Open {current_c} in New Tab", 
+                    url=full_url, 
+                    use_container_width=True
+                )
+                
+                # Also show code for copying if needed
+                st.caption("Or copy raw link:")
                 st.code(full_url, language="text")
-                st.caption("Copy this to share exactly this character.")
             else:
-                st.markdown("**Home Link**")
-                st.code(self.BASE_URL, language="text")
+                st.link_button("🏠 Open Home Page", self.BASE_URL, use_container_width=True)
             
             st.markdown("---")
             if st.button("🗑️ Reset / Go Home", use_container_width=True):
