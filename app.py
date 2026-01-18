@@ -31,7 +31,7 @@ from radix_persistence import PersistenceManager
 st.set_page_config(**PAGE_CONFIG)
 apply_styles()
 
-# Initialize managers (do not run initialization until main())
+# Initialize managers
 state = StateManager()
 config = ConfigManager(state)
 persistence = PersistenceManager(state)
@@ -69,17 +69,7 @@ def list_tile_click(c):
             history = state.get_history()
             history.append(state.get_selected_component())
             state.set("history", history)
-        
-        # Note: Persistence is handled inside state.enter_character_view now
-        state.update(
-            selected_comp=c,
-            show_inputs=False,
-            preview_comp=None,
-            derivative_page=0
-        )
-        # Manually trigger URL update if using raw update instead of enter_character_view
-        if c: st.query_params["c"] = c
-
+        state.enter_character_view(c)
     else:
         state.set("preview_comp", c)
 
@@ -224,6 +214,10 @@ def render_startup_file_choice():
 def render_splash():
     st.markdown("""<div class="palace-entrance-container"><div class="grand-torii">⛩️</div><div class="entrance-text">Grand Hall of Radix 🈑 Components</div></div>""", unsafe_allow_html=True)
     
+    # === HERE IS THE NEW RESUME BUTTON ===
+    persistence.show_resume_option()
+    # =====================================
+
     _, c, _ = st.columns([1, 1, 1])
     if c.button("🚪 Enter", key="entrance_btn", use_container_width=True, type="primary"):
         state.complete_onboarding()
@@ -257,7 +251,6 @@ def render_splash():
             st.markdown("<div style='margin: 15px 0; border-top: 1px dashed #ddd;'></div>", unsafe_allow_html=True)
             
             # --- DEFINITION SEARCH ---
-            # st.markdown("**English Definition Search**")
             search_key = render_definition_search_ui("splash")
             if st.button("Search Definitions", use_container_width=True, type="primary", key="splash_def_btn"):
                 state.set("w_def_search", state.get(search_key, ""))
@@ -787,10 +780,6 @@ def main():
     # Attempt to restore from URL (e.g. ?c=水) before any splash screens
     persistence.try_restore()
 
-    # Try to restore session from browser as early as possible.
-    # This allows a saved character to bypass startup/onboarding screens.
-    # persistence.try_restore()
-
     # Route to appropriate page
     if not state.is_startup_complete():
         render_startup_file_choice()
@@ -816,7 +805,7 @@ def main():
     else:
         render_character_lineage_view()
     
-    # Auto-save
+    # Auto-save (writes to LocalStorage for crash recovery)
     persistence.auto_save()
 
 if __name__ == "__main__":
