@@ -119,8 +119,8 @@ class PersistenceManager:
         self.state = state_manager
     
     # HARDCODED APP URL
-    BASE_URL = "https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app"
-    
+    # BASE_URL = "https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app"
+    BASE_URL = st.secrets.get("app", {}).get("base_url", "https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app")
     def auto_save(self):
         char = self.state.get_selected_component()
         if char:
