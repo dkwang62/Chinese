@@ -1,5 +1,5 @@
 # radix_persistence.py
-# Smart Persistence: Absolute URL links to escape iframe sandboxes
+# Smart Persistence: Robust Sandbox Escape
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -20,30 +20,23 @@ class SessionPersistence:
         </script>
         """
 
-    # 2. RESUME BUTTON (Now uses explicit BASE_URL)
+    # 2. RESUME BUTTON (Robust Navigation)
     @staticmethod
     def get_resume_component(base_url: str) -> str:
-        # Check for heartbeat loop script to keep session alive
+        # Heartbeat script
         heartbeat_script = f"""
         <script>
             (function() {{
-                const interval = 45000;
-                function ping() {{
-                    fetch(window.location.href, {{
-                        method: 'GET',
-                        headers: {{'Cache-Control': 'no-cache'}},
-                        credentials: 'same-origin'
-                    }}).catch(e => {{}});
-                }}
-                setInterval(ping, interval);
+                setInterval(() => {{
+                    fetch(window.location.href, {{method: 'GET'}}).catch(e => {{}});
+                }}, 45000);
             }})();
         </script>
         """
         
-        # We pass base_url into JS so the link is absolute (e.g. https://app...?c=X)
         return f"""
         <div id="radix-resume-wrapper" style="text-align:center; margin-top:20px; display:none;">
-            <a id="radix-resume-link" href="#" target="_top" style="
+            <a id="radix-resume-link" href="#" style="
                 text-decoration: none;
                 background-color: #ffffff;
                 color: #d35400;
@@ -58,6 +51,7 @@ class SessionPersistence:
                 display: inline-flex;
                 align-items: center;
                 gap: 8px;
+                cursor: pointer;
             ">
                 🔄 Resume Previous Session
             </a>
@@ -69,23 +63,40 @@ class SessionPersistence:
             (function() {{
                 try {{
                     const saved = localStorage.getItem('radix_last_char');
-                    // Check if saved value is valid (1 character)
                     if (saved && saved.length === 1 && saved !== 'null') {{
                         const link = document.getElementById('radix-resume-link');
                         const wrapper = document.getElementById('radix-resume-wrapper');
                         
-                        // Construct ABSOLUTE URL to escape the iframe
-                        // We remove any trailing slash from base and adding query
+                        // Construct URL
                         const baseUrl = "{base_url}".replace(/\\/$/, "");
                         const fullUrl = baseUrl + "/?c=" + encodeURIComponent(saved);
                         
                         link.href = fullUrl;
                         link.innerHTML = "🔄 Resume Session: " + saved;
-                        
-                        // Reveal the button
                         wrapper.style.display = "block";
+                        
+                        // CLICK HANDLER: Try Top Nav -> Fallback to New Tab
+                        link.onclick = function(e) {{
+                            e.preventDefault();
+                            link.innerHTML = "⌛ Loading...";
+                            link.style.opacity = "0.7";
+                            
+                            try {{
+                                // Attempt 1: Navigate current tab
+                                window.top.location.href = fullUrl;
+                            }} catch (err) {{
+                                console.log("Top nav blocked, opening new tab");
+                                // Attempt 2: Open new tab (sandbox usually allows this)
+                                window.open(fullUrl, '_blank');
+                                // Reset button text
+                                setTimeout(() => {{
+                                    link.innerHTML = "🔄 Resume Session: " + saved;
+                                    link.style.opacity = "1";
+                                }}, 1000);
+                            }}
+                        }};
                     }}
-                }} catch (e) {{ console.error('Resume check failed', e); }}
+                }} catch (e) {{ console.error('Resume error', e); }}
             }})();
         </script>
         {heartbeat_script}
@@ -93,7 +104,6 @@ class SessionPersistence:
 
     @staticmethod
     def get_heartbeat_component() -> str:
-        """Simple keep-alive heartbeat for the main app view"""
         return """
         <script>
             setInterval(() => {
@@ -108,22 +118,19 @@ class PersistenceManager:
     def __init__(self, state_manager):
         self.state = state_manager
     
-    # HARDCODED APP URL - Ensures links always go to the right place
+    # HARDCODED APP URL
     BASE_URL = "https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app"
     
     def auto_save(self):
-        """Called at end of main loop."""
         char = self.state.get_selected_component()
         if char:
             st_html(SessionPersistence.get_auto_save_script(char), height=0)
     
     def try_restore(self):
-        """Restore state from URL query parameters."""
         if self.state.get_selected_component():
             return
 
         char_param = st.query_params.get("c")
-        
         if char_param:
             from radix_state import InputValidator
             validated = InputValidator.validate_character_input(char_param)
@@ -134,20 +141,14 @@ class PersistenceManager:
                 st.toast(f"Restored from URL: {validated}", icon="🔄")
     
     def show_resume_option(self):
-        """Render the 'Resume' button on Splash/Home screen."""
-        # Pass the BASE_URL to the static method
         st_html(SessionPersistence.get_resume_component(self.BASE_URL), height=100)
         
     def add_heartbeat(self):
-        """Add heartbeat to keep the session alive."""
         st_html(SessionPersistence.get_heartbeat_component(), height=0)
 
     def render_controls(self):
-        """Render debug controls in sidebar"""
         with st.expander("💾 Connection Status", expanded=False):
             st.caption("✅ URL Persistence Active")
-            st.caption("✅ Local Backup Active")
-            
             if st.button("🗑️ Clear Local History", use_container_width=True):
                 st_html("<script>localStorage.removeItem('radix_last_char');</script>", height=0)
                 st.toast("History cleared")
