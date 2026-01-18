@@ -147,6 +147,113 @@ class PersistenceManager:
     def __init__(self, state_manager):
         self.state = state_manager
     
+    def get_saved_character_info(self) -> str:
+        """Get HTML component that reads saved character from localStorage"""
+        return f"""
+        <div id="saved-char-info" style="display:none;" data-char="" data-valid="false"></div>
+        <script>
+            (function() {{
+                try {{
+                    const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
+                    if (savedState) {{
+                        const stateObj = JSON.parse(savedState);
+                        const char = stateObj.selected_comp || '';
+                        const wasViewingChar = stateObj.show_inputs === false;
+                        const hadOnboarding = stateObj.onboarding_done === true;
+                        const hadStartup = stateObj.startup_file_choice_made === true;
+                        
+                        const isValid = char && char !== 'none' && wasViewingChar && hadOnboarding && hadStartup;
+                        
+                        const el = document.getElementById('saved-char-info');
+                        el.setAttribute('data-char', char);
+                        el.setAttribute('data-valid', isValid ? 'true' : 'false');
+                        
+                        console.log('[Radix] Saved session check:', {{char, isValid}});
+                    }}
+                }} catch (e) {{
+                    console.error('[Radix] Failed to check saved session:', e);
+                }}
+            }})();
+        </script>
+        """
+    
+    def render_quick_resume_button(self):
+        """Render a 'Quick Resume' button on startup screen if saved session exists"""
+        # Inject component to check for saved session
+        info_html = self.get_saved_character_info()
+        st_html(info_html, height=0)
+        
+        # Now show a button that triggers resume
+        resume_html = f"""
+        <div id="quick-resume-container" style="margin: 20px auto; text-align: center;"></div>
+        <script>
+            (function() {{
+                setTimeout(() => {{
+                    const el = document.getElementById('saved-char-info');
+                    const char = el ? el.getAttribute('data-char') : '';
+                    const isValid = el ? el.getAttribute('data-valid') === 'true' : false;
+                    
+                    if (isValid && char) {{
+                        const container = document.getElementById('quick-resume-container');
+                        container.innerHTML = `
+                            <div style="
+                                background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+                                border: 3px solid #2e7d32;
+                                border-radius: 16px;
+                                padding: 20px 30px;
+                                max-width: 500px;
+                                margin: 0 auto;
+                                box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+                            ">
+                                <div style="color: white; font-size: 18px; font-weight: 700; margin-bottom: 12px;">
+                                    🔄 Previous Session Found
+                                </div>
+                                <div style="color: #e8f5e9; font-size: 14px; margin-bottom: 16px;">
+                                    You were viewing: <strong style="font-size: 24px;">${{char}}</strong>
+                                </div>
+                                <button id="quick-resume-btn" style="
+                                    background: white;
+                                    color: #2e7d32;
+                                    border: none;
+                                    border-radius: 12px;
+                                    padding: 14px 32px;
+                                    font-size: 16px;
+                                    font-weight: 700;
+                                    cursor: pointer;
+                                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                                    transition: all 0.2s ease;
+                                ">
+                                    ⚡ Quick Resume to ${{char}}
+                                </button>
+                            </div>
+                        `;
+                        
+                        // Add click handler
+                        document.getElementById('quick-resume-btn').addEventListener('click', () => {{
+                            console.log('[Radix] Quick Resume clicked for:', char);
+                            const params = new URLSearchParams(window.location.search);
+                            params.set('_resume', '1');
+                            params.set('_restore_to', char);
+                            window.location.href = window.location.pathname + '?' + params.toString();
+                        }});
+                        
+                        // Add hover effect
+                        const btn = document.getElementById('quick-resume-btn');
+                        btn.addEventListener('mouseenter', () => {{
+                            btn.style.transform = 'scale(1.05)';
+                            btn.style.boxShadow = '0 6px 16px rgba(0,0,0,0.3)';
+                        }});
+                        btn.addEventListener('mouseleave', () => {{
+                            btn.style.transform = 'scale(1)';
+                            btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                        }});
+                    }}
+                }}, 100);  // Small delay to ensure DOM is ready
+            }})();
+        </script>
+        """
+        st_html(resume_html, height=180)
+    
     def auto_save(self):
         """Auto-save on every render"""
         if self.state.is_onboarding_complete():
