@@ -261,102 +261,68 @@ class PersistenceManager:
             st_html(html_content, height=0)
     
     def try_restore(self):
-        """Restore state from localStorage - EARLY, before startup/onboarding gates"""
-        
-        # STEP 1: Check if we're coming back from a redirect with restore params
-        if '_restore_to' in st.query_params:
-            char_to_restore = st.query_params.get('_restore_to', '')
-            resume_mode = st.query_params.get('_resume', '') == '1'
-            
-            # Clear the params immediately
-            st.query_params.clear()
-            
-            if resume_mode:
-                # Deep resume: skip startup and onboarding
-                self.state.state["startup_file_choice_made"] = True
-                self.state.state["onboarding_done"] = True
-            
-            # Apply the restoration
-            if char_to_restore and char_to_restore != 'none':
-                # Navigate to the character
-                self.state.enter_character_view(char_to_restore)
-                
-                st.toast(f"🔄 Restored session: {char_to_restore}", icon="✅")
-                
-                # Mark that we've restored
-                self.state.state["_restore_attempted"] = True
-                
-                # Force a rerun to show the character view
-                st.rerun()
-            
-            return
-        
-        # STEP 2: Only try to trigger restore once per session
-        if self.state.state.get("_restore_attempted"):
-            return
-        
-        self.state.state["_restore_attempted"] = True
-        
-        # STEP 3: Check if we should trigger a restore
-        # We can be at ANY point in the app - startup, onboarding, or grid
-        current_selected = self.state.state.get("selected_comp", "")
-        
-        # Don't restore if user already selected something
-        if current_selected:
-            return
-        
-        # Inject JavaScript that reads localStorage and redirects if valid session found
-        trigger_restore = f"""
-        <script>
-            (function() {{
-                try {{
-                    const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
-                    if (!savedState) {{
-                        console.log('[Radix] No saved state to restore');
-                        return;
-                    }}
-                    
-                    const stateObj = JSON.parse(savedState);
-                    const savedChar = stateObj.selected_comp || '';
-                    const wasViewingChar = stateObj.show_inputs === false;
-                    const hadCompletedOnboarding = stateObj.onboarding_done === true;
-                    const hadCompletedStartup = stateObj.startup_file_choice_made === true;
-                    
-                    console.log('[Radix] 📦 Found saved session:');
-                    console.log('  - Character:', savedChar);
-                    console.log('  - Was viewing character:', wasViewingChar);
-                    console.log('  - Had completed startup:', hadCompletedStartup);
-                    console.log('  - Had completed onboarding:', hadCompletedOnboarding);
-                    
-                    // Only restore if they had a complete session with a character selected
-                    if (savedChar && savedChar !== 'none' && savedChar !== '' && 
-                        wasViewingChar && hadCompletedOnboarding && hadCompletedStartup) {{
-                        
-                        console.log('[Radix] ✅ Valid restore state detected');
-                        console.log('[Radix] 🎯 Triggering DEEP RESUME to:', savedChar);
-                        
-                        // Build redirect URL with resume flag
-                        const params = new URLSearchParams(window.location.search);
-                        params.set('_resume', '1');  // Skip startup + onboarding
-                        params.set('_restore_to', savedChar);
-                        
-                        const newUrl = window.location.pathname + '?' + params.toString();
-                        console.log('[Radix] 🚀 Redirecting to:', newUrl);
-                        
-                        // Redirect
-                        window.location.href = newUrl;
-                    }} else {{
-                        console.log('[Radix] ❌ Cannot restore - incomplete session state');
-                        console.log('  (Need: char selected + viewing char + completed startup/onboarding)');
-                    }}
-                    
-                }} catch (e) {{
-                    console.error('[Radix] ❌ Restore trigger failed:', e);
-                }}
-            }})();
-        </script>
-        """
-        st_html(trigger_restore, height=0)
+    """
+    Restore using the same validation path as Search:
+    localStorage -> query param -> validate -> enter_character_view.
+    Works even on startup/onboarding screens.
+    """
+
+    # 1) Apply restore if a query param exists
+    restore_char = None
+    if "_restore_search" in st.query_params:
+        restore_char = st.query_params.get("_restore_search", "")
+    elif "_restore_to" in st.query_params:
+        restore_char = st.query_params.get("_restore_to", "")  # backward compat
+
+    if restore_char:
+        st.query_params.clear()
+
+        from radix_state import InputValidator
+        validated = InputValidator.validate_character_input(restore_char)
+
+        if validated:
+            self.state.complete_startup()
+            self.state.complete_onboarding()
+            self.state.enter_character_view(validated)
+            self.state.state["_restore_attempted"] = True
+            st.rerun()
+        else:
+            self.state.state["_restore_attempted"] = True
+        return
+
+    # 2) One-time JS trigger: read localStorage and redirect with _restore_search
+    if self.state.state.get("_restore_attempted"):
+        return
+    self.state.state["_restore_attempted"] = True
+
+    # Don't override an existing selection
+    if self.state.state.get("selected_comp", ""):
+        return
+
+    trigger_restore = f"""
+    <script>
+      (function() {{
+        try {{
+          const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
+          if (!savedState) return;
+
+          const stateObj = JSON.parse(savedState);
+
+          // Prefer selected_comp, fallback to last_valid_selected_comp
+          const savedChar = (stateObj.selected_comp || stateObj.last_valid_selected_comp || '').trim();
+
+          if (savedChar && savedChar !== 'none' && savedChar.length === 1) {{
+            const params = new URLSearchParams(window.location.search);
+            params.set('_restore_search', savedChar);
+            window.location.href = window.location.pathname + '?' + params.toString();
+          }}
+        }} catch (e) {{
+          console.error('[Radix] Restore trigger failed:', e);
+        }}
+      }})();
+    </script>
+    """
+    st_html(trigger_restore, height=0)
     
     def add_heartbeat(self):
         """Add heartbeat"""
