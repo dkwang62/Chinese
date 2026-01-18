@@ -24,20 +24,18 @@ from radix_ui import (
     render_copy_to_clipboard, get_stroke_order_sidebar_html,
     render_definition_search_ui, render_learning_insights_html
 )
-from radix_persistence import PersistenceManager  # ✅ ADD THIS LINE
+from radix_persistence import PersistenceManager
 
 
 # Configure Streamlit
 st.set_page_config(**PAGE_CONFIG)
 apply_styles()
 
-# Initialize managers
+# Initialize managers (do not run initialization until main())
 state = StateManager()
 config = ConfigManager(state)
+persistence = PersistenceManager(state)
 
-state.initialize()
-config.load_server_data()
-config.initialize_prompt_config()
 
 # ==================== CALLBACKS ====================
 
@@ -171,122 +169,10 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
 # ==================== PAGE RENDERERS ====================
 
 def render_startup_file_choice():
-    """Render startup file choice screen with Quick Resume."""
-    
-    # Check if we have a resume request in query params
-    if '_resume' in st.query_params and '_restore_to' in st.query_params:
-        char = st.query_params.get('_restore_to', '')
-        
-        # Clear params
-        st.query_params.clear()
-        
-        # Set the flags to bypass startup and onboarding
-        st.session_state["startup_file_choice_made"] = True
-        st.session_state["onboarding_done"] = True
-        
-        # Navigate to character
-        st.session_state.update({
-            'selected_comp': char,
-            'last_valid_selected_comp': char,
-            'show_inputs': False,
-            'history': [],
-            'text_input_comp': char,
-            'text_input_warning': None,
-            'preview_comp': None,
-            'stroke_view_active': False,
-            'stroke_view_char': '',
-            'display_mode': "2-Characters",
-            'definition_search_mode': False,
-            'definition_search_results': None,
-            'derivative_page': 0,
-            'script_filter': "Any"
-        })
-        
-        st.toast(f"🔄 Restored session: {char}", icon="✅")
-        st.rerun()
-        return
-    
-    # Show Quick Resume button using inline JavaScript that redirects
-    quick_resume_html = """
-    <div id="quick-resume-holder" style="margin: 30px auto; text-align: center;"></div>
-    <script>
-        (function() {
-            const savedState = localStorage.getItem('radix_session_v1');
-            if (!savedState) return;
-            
-            try {
-                const state = JSON.parse(savedState);
-                const char = state.selected_comp || '';
-                const isValid = char && char !== 'none' && 
-                               state.show_inputs === false && 
-                               state.onboarding_done === true && 
-                               state.startup_file_choice_made === true;
-                
-                if (isValid) {
-                    const holder = document.getElementById('quick-resume-holder');
-                    holder.innerHTML = `
-                        <div style="
-                            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-                            border: 3px solid #2e7d32;
-                            border-radius: 20px;
-                            padding: 24px 40px;
-                            max-width: 550px;
-                            margin: 0 auto 30px auto;
-                            box-shadow: 0 8px 24px rgba(76, 175, 80, 0.4);
-                            animation: slideIn 0.5s ease;
-                        ">
-                            <div style="color: white; font-size: 20px; font-weight: 700; margin-bottom: 10px;">
-                                🔄 Welcome Back!
-                            </div>
-                            <div style="color: #e8f5e9; font-size: 15px; margin-bottom: 18px;">
-                                Previous session: <span style="font-size: 28px; font-weight: 700;">${char}</span>
-                            </div>
-                            <button onclick="resumeSession('${char}')" style="
-                                background: white;
-                                color: #2e7d32;
-                                border: none;
-                                border-radius: 14px;
-                                padding: 16px 40px;
-                                font-size: 17px;
-                                font-weight: 700;
-                                cursor: pointer;
-                                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-                                transition: all 0.2s ease;
-                            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.3)';"
-                               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)';">
-                                ⚡ Quick Resume to ${char}
-                            </button>
-                        </div>
-                    `;
-                }
-            } catch (e) {
-                console.error('Quick Resume error:', e);
-            }
-        })();
-        
-        function resumeSession(char) {
-            console.log('[Radix] Quick Resume clicked for:', char);
-            const params = new URLSearchParams(window.location.search);
-            params.set('_resume', '1');
-            params.set('_restore_to', char);
-            window.location.href = window.location.pathname + '?' + params.toString();
-        }
-    </script>
-    <style>
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
-    """
-    
-    st.markdown(quick_resume_html, unsafe_allow_html=True)
-    
-    # Rest of your existing startup screen
     st.markdown("""
     <div class="splash-wrap">
         <div class="splash-card">
-            <div class="splash-title">Radix 🈯 - Data Setup</div>
+            <div class="splash-title">Radix 🈑 - Data Setup</div>
             <div class="splash-sub" style="margin-top: 20px;">
                 Do you have a local Radix user data file you'd like to use?
             </div>
@@ -298,22 +184,21 @@ def render_startup_file_choice():
     
     c1, c2 = st.columns(2)
     if c1.button("📱 Yes, upload my local file", use_container_width=True, type="primary"):
-        st.session_state["startup_choice"] = "upload"
+        state.set("startup_choice", "upload")
         st.rerun()
     if c2.button("☁️ No, use server defaults", use_container_width=True):
-        st.session_state["startup_choice"] = "server"
-        if st.session_state.get("server_data_available"):
-            obj = st.session_state.get("server_data")
-            st.session_state.update({
-                "favourites_list": obj["favourites_list"],
-                "prompt_config": obj["prompt_config"],
-                "prompt_ui": obj["prompt_ui"]
-            })
-        st.session_state["startup_file_choice_made"] = True
+        state.set("startup_choice", "server")
+        if state.get("server_data_available"):
+            obj = state.get("server_data")
+            state.update(
+                favourites_list=obj["favourites_list"],
+                prompt_config=obj["prompt_config"],
+                prompt_ui=obj["prompt_ui"]
+            )
+        state.complete_startup()
         st.rerun()
     
     st.markdown("</div>", unsafe_allow_html=True)
-
     
     if state.get("startup_choice") == "upload":
         st.markdown("<div style='max-width: 600px; margin: 40px auto;'><h3>📤 Upload Your Local File</h3>", unsafe_allow_html=True)
@@ -570,13 +455,9 @@ def render_sidebar():
                 st.button("🏠 Root", on_click=state.go_to_root, use_container_width=True)
             st.markdown("---")
 
-        # Create persistence manager instance
-        from radix_persistence import PersistenceManager
-        persistence = PersistenceManager(state)
-        
-        # Always show persistence controls
+        # Persistence controls
         persistence.render_controls()
-        
+
 
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
         if current_char_for_sidebar:
@@ -891,19 +772,16 @@ def main():
     if not component_map:
         st.error("Component dataset not loaded.")
         st.stop()
-    
-    # Initialize managers
-    state = StateManager()
-    config = ConfigManager(state)
-    persistence = PersistenceManager(state)
-    
+
+    # Initialize (globals)
     state.initialize()
     config.load_server_data()
     config.initialize_prompt_config()
-    
-    # ✅ TRY RESTORE EARLY - before startup/onboarding gates
+
+    # Try to restore session from browser as early as possible.
+    # This allows a saved character to bypass startup/onboarding screens.
     persistence.try_restore()
-    
+
     # Route to appropriate page
     if not state.is_startup_complete():
         render_startup_file_choice()
