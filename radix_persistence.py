@@ -147,113 +147,6 @@ class PersistenceManager:
     def __init__(self, state_manager):
         self.state = state_manager
     
-    def get_saved_character_info(self) -> str:
-        """Get HTML component that reads saved character from localStorage"""
-        return f"""
-        <div id="saved-char-info" style="display:none;" data-char="" data-valid="false"></div>
-        <script>
-            (function() {{
-                try {{
-                    const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
-                    if (savedState) {{
-                        const stateObj = JSON.parse(savedState);
-                        const char = stateObj.selected_comp || '';
-                        const wasViewingChar = stateObj.show_inputs === false;
-                        const hadOnboarding = stateObj.onboarding_done === true;
-                        const hadStartup = stateObj.startup_file_choice_made === true;
-                        
-                        const isValid = char && char !== 'none' && wasViewingChar && hadOnboarding && hadStartup;
-                        
-                        const el = document.getElementById('saved-char-info');
-                        el.setAttribute('data-char', char);
-                        el.setAttribute('data-valid', isValid ? 'true' : 'false');
-                        
-                        console.log('[Radix] Saved session check:', {{char, isValid}});
-                    }}
-                }} catch (e) {{
-                    console.error('[Radix] Failed to check saved session:', e);
-                }}
-            }})();
-        </script>
-        """
-    
-    def render_quick_resume_button(self):
-        """Render a 'Quick Resume' button on startup screen if saved session exists"""
-        # Inject component to check for saved session
-        info_html = self.get_saved_character_info()
-        st_html(info_html, height=0)
-        
-        # Now show a button that triggers resume
-        resume_html = f"""
-        <div id="quick-resume-container" style="margin: 20px auto; text-align: center;"></div>
-        <script>
-            (function() {{
-                setTimeout(() => {{
-                    const el = document.getElementById('saved-char-info');
-                    const char = el ? el.getAttribute('data-char') : '';
-                    const isValid = el ? el.getAttribute('data-valid') === 'true' : false;
-                    
-                    if (isValid && char) {{
-                        const container = document.getElementById('quick-resume-container');
-                        container.innerHTML = `
-                            <div style="
-                                background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-                                border: 3px solid #2e7d32;
-                                border-radius: 16px;
-                                padding: 20px 30px;
-                                max-width: 500px;
-                                margin: 0 auto;
-                                box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
-                            ">
-                                <div style="color: white; font-size: 18px; font-weight: 700; margin-bottom: 12px;">
-                                    🔄 Previous Session Found
-                                </div>
-                                <div style="color: #e8f5e9; font-size: 14px; margin-bottom: 16px;">
-                                    You were viewing: <strong style="font-size: 24px;">${{char}}</strong>
-                                </div>
-                                <button id="quick-resume-btn" style="
-                                    background: white;
-                                    color: #2e7d32;
-                                    border: none;
-                                    border-radius: 12px;
-                                    padding: 14px 32px;
-                                    font-size: 16px;
-                                    font-weight: 700;
-                                    cursor: pointer;
-                                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-                                    transition: all 0.2s ease;
-                                ">
-                                    ⚡ Quick Resume to ${{char}}
-                                </button>
-                            </div>
-                        `;
-                        
-                        // Add click handler
-                        document.getElementById('quick-resume-btn').addEventListener('click', () => {{
-                            console.log('[Radix] Quick Resume clicked for:', char);
-                            const params = new URLSearchParams(window.location.search);
-                            params.set('_resume', '1');
-                            params.set('_restore_to', char);
-                            window.location.href = window.location.pathname + '?' + params.toString();
-                        }});
-                        
-                        // Add hover effect
-                        const btn = document.getElementById('quick-resume-btn');
-                        btn.addEventListener('mouseenter', () => {{
-                            btn.style.transform = 'scale(1.05)';
-                            btn.style.boxShadow = '0 6px 16px rgba(0,0,0,0.3)';
-                        }});
-                        btn.addEventListener('mouseleave', () => {{
-                            btn.style.transform = 'scale(1)';
-                            btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-                        }});
-                    }}
-                }}, 100);  // Small delay to ensure DOM is ready
-            }})();
-        </script>
-        """
-        st_html(resume_html, height=180)
-    
     def auto_save(self):
         """Auto-save on every render"""
         if self.state.is_onboarding_complete():
@@ -261,68 +154,91 @@ class PersistenceManager:
             st_html(html_content, height=0)
     
     def try_restore(self):
-    """
-    Restore using the same validation path as Search:
-    localStorage -> query param -> validate -> enter_character_view.
-    Works even on startup/onboarding screens.
-    """
+        """Restore state from localStorage.
 
-    # 1) Apply restore if a query param exists
-    restore_char = None
-    if "_restore_search" in st.query_params:
-        restore_char = st.query_params.get("_restore_search", "")
-    elif "_restore_to" in st.query_params:
-        restore_char = st.query_params.get("_restore_to", "")  # backward compat
+        Strategy:
+        - JS reads localStorage and redirects with a query param.
+        - Python validates via the same single-character validation used by Search,
+          then navigates via enter_character_view.
 
-    if restore_char:
-        st.query_params.clear()
+        This works even when the user is still on the startup/onboarding screens.
+        """
 
-        from radix_state import InputValidator
-        validated = InputValidator.validate_character_input(restore_char)
+        # --- 1) If a restore request came in via query params, apply it immediately ---
+        restore_char = None
+        if '_restore_search' in st.query_params:
+            restore_char = st.query_params.get('_restore_search', '')
+        elif '_restore_to' in st.query_params:
+            # Back-compat: older param name
+            restore_char = st.query_params.get('_restore_to', '')
 
-        if validated:
-            self.state.complete_startup()
-            self.state.complete_onboarding()
-            self.state.enter_character_view(validated)
-            self.state.state["_restore_attempted"] = True
-            st.rerun()
-        else:
-            self.state.state["_restore_attempted"] = True
-        return
+        if restore_char:
+            # Clear params immediately to avoid rerun loops
+            st.query_params.clear()
 
-    # 2) One-time JS trigger: read localStorage and redirect with _restore_search
-    if self.state.state.get("_restore_attempted"):
-        return
-    self.state.state["_restore_attempted"] = True
+            from radix_state import InputValidator
+            validated = InputValidator.validate_character_input(restore_char)
 
-    # Don't override an existing selection
-    if self.state.state.get("selected_comp", ""):
-        return
+            if validated:
+                # Bypass startup + onboarding layers
+                self.state.complete_startup()
+                self.state.complete_onboarding()
 
-    trigger_restore = f"""
-    <script>
-      (function() {{
-        try {{
-          const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
-          if (!savedState) return;
+                # Navigate using the same logic as Search
+                self.state.enter_character_view(validated)
+                st.toast(f"🔄 Restored session: {validated}", icon="✅")
+                self.state.state["_restore_attempted"] = True
+                st.rerun()
+            else:
+                # Mark attempted so we don't keep trying a bad value
+                self.state.state["_restore_attempted"] = True
+            return
 
-          const stateObj = JSON.parse(savedState);
+        # --- 2) Otherwise, inject a one-time JS trigger to pull localStorage and redirect ---
+        if self.state.state.get("_restore_attempted"):
+            return
+        self.state.state["_restore_attempted"] = True
 
-          // Prefer selected_comp, fallback to last_valid_selected_comp
-          const savedChar = (stateObj.selected_comp || stateObj.last_valid_selected_comp || '').trim();
+        # If the app already has a selected component, don't override it
+        if self.state.state.get("selected_comp", ""):
+            return
 
-          if (savedChar && savedChar !== 'none' && savedChar.length === 1) {{
-            const params = new URLSearchParams(window.location.search);
-            params.set('_restore_search', savedChar);
-            window.location.href = window.location.pathname + '?' + params.toString();
-          }}
-        }} catch (e) {{
-          console.error('[Radix] Restore trigger failed:', e);
-        }}
-      }})();
-    </script>
-    """
-    st_html(trigger_restore, height=0)
+        trigger_restore = f"""
+        <script>
+            (function() {{
+                try {{
+                    const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
+                    if (!savedState) {{
+                        console.log('[Radix] No saved state to restore');
+                        return;
+                    }}
+
+                    const stateObj = JSON.parse(savedState);
+                    // Prefer selected_comp, then last_valid_selected_comp
+                    const savedChar = (stateObj.selected_comp || stateObj.last_valid_selected_comp || '').trim();
+
+                    console.log('[Radix] Found saved state:', stateObj);
+                    console.log('[Radix] Candidate restore char:', savedChar);
+
+                    // Only attempt redirect if we have a plausible single character
+                    if (savedChar && savedChar !== 'none' && savedChar.length === 1) {{
+                        const params = new URLSearchParams(window.location.search);
+                        params.set('_restore_search', savedChar);
+
+                        const newUrl = window.location.pathname + '?' + params.toString();
+                        console.log('[Radix] Redirecting to:', newUrl);
+                        window.location.href = newUrl;
+                    }} else {{
+                        console.log('[Radix] No valid single-character restore target');
+                    }}
+                }} catch (e) {{
+                    console.error('[Radix] Restore trigger failed:', e);
+                }}
+            }})();
+        </script>
+        """
+
+        st_html(trigger_restore, height=0)
     
     def add_heartbeat(self):
         """Add heartbeat"""
@@ -347,11 +263,11 @@ class PersistenceManager:
             
             with col2:
                 if st.button("🔄 Test Restore", use_container_width=True):
-                    # Read from localStorage and navigate with DEEP RESUME
+                    # Read from localStorage and navigate
                     test_html = f"""
                     <script>
                         const savedState = localStorage.getItem('{SessionPersistence.STORAGE_KEY}');
-                        console.log('[Radix] 🧪 Test Restore clicked');
+                        console.log('[Radix] Test Restore clicked');
                         console.log('[Radix] Raw savedState:', savedState);
                         
                         if (savedState) {{
@@ -362,31 +278,25 @@ class PersistenceManager:
                                 const char = stateObj.selected_comp || '';
                                 const showInputs = stateObj.show_inputs;
                                 
-                                console.log('[Radix] Character:', char);
+                                console.log('[Radix] Character from state:', char);
                                 console.log('[Radix] Show inputs:', showInputs);
                                 
                                 if (char && char !== 'none' && char !== '') {{
-                                    console.log('[Radix] ✅ Triggering deep resume to:', char);
-                                    
+                                    console.log('[Radix] ✅ Valid character found, navigating to:', char);
                                     const params = new URLSearchParams(window.location.search);
-                                    params.set('_resume', '1');  // Deep resume flag
                                     params.set('_restore_to', char);
-                                    
-                                    const newUrl = window.location.pathname + '?' + params.toString();
-                                    console.log('[Radix] Redirecting to:', newUrl);
-                                    
-                                    window.location.href = newUrl;
+                                    window.location.href = window.location.pathname + '?' + params.toString();
                                 }} else {{
-                                    console.log('[Radix] ❌ No valid character');
+                                    console.log('[Radix] ❌ No valid character to restore');
                                     alert('No character saved to restore (found: "' + char + '")');
                                 }}
                             }} catch (e) {{
-                                console.error('[Radix] Failed to parse:', e);
+                                console.error('[Radix] Failed to parse state:', e);
                                 alert('Failed to parse saved state: ' + e.message);
                             }}
                         }} else {{
-                            console.log('[Radix] ❌ No saved state');
-                            alert('No saved state found');
+                            console.log('[Radix] ❌ No saved state in localStorage');
+                            alert('No saved state found in browser storage');
                         }}
                     </script>
                     """
