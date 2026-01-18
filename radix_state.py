@@ -162,9 +162,9 @@ class StateManager:
         if char:
             st.query_params["c"] = char
 
+        # FIXED: Removed 'history=[]' so the breadcrumb trail is preserved!
         self.update(
             script_filter="Any",
-            history=[],
             selected_comp=char,
             last_valid_selected_comp=char,
             text_input_comp=char,
