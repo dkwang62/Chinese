@@ -1,5 +1,5 @@
 # radix_persistence.py
-# Smart Persistence: URL for sharing + LocalStorage for crash recovery
+# Smart Persistence: Absolute URL links to escape iframe sandboxes
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -9,7 +9,6 @@ class SessionPersistence:
     """Manages browser-based session persistence"""
     
     # 1. AUTO-SAVE SCRIPT (Invisible)
-    # Writes the current character to Browser LocalStorage every time it updates
     @staticmethod
     def get_auto_save_script(char: str) -> str:
         safe_char = char or ""
@@ -17,15 +16,13 @@ class SessionPersistence:
         <script>
             try {{
                 localStorage.setItem('radix_last_char', '{safe_char}');
-                console.log('[Radix] Auto-saved to storage: {safe_char}');
             }} catch (e) {{ console.error('Save failed', e); }}
         </script>
         """
 
-    # 2. RESUME BUTTON (Visible only if save found)
-    # Reads LocalStorage. If a character exists, shows a styled Link Button.
+    # 2. RESUME BUTTON (Now uses explicit BASE_URL)
     @staticmethod
-    def get_resume_component() -> str:
+    def get_resume_component(base_url: str) -> str:
         # Check for heartbeat loop script to keep session alive
         heartbeat_script = f"""
         <script>
@@ -43,6 +40,7 @@ class SessionPersistence:
         </script>
         """
         
+        # We pass base_url into JS so the link is absolute (e.g. https://app...?c=X)
         return f"""
         <div id="radix-resume-wrapper" style="text-align:center; margin-top:20px; display:none;">
             <a id="radix-resume-link" href="#" target="_top" style="
@@ -76,9 +74,12 @@ class SessionPersistence:
                         const link = document.getElementById('radix-resume-link');
                         const wrapper = document.getElementById('radix-resume-wrapper');
                         
-                        // Update link to point to the URL parameter
-                        // target="_top" breaks out of the iframe to reload the app
-                        link.href = "?c=" + encodeURIComponent(saved);
+                        // Construct ABSOLUTE URL to escape the iframe
+                        // We remove any trailing slash from base and adding query
+                        const baseUrl = "{base_url}".replace(/\\/$/, "");
+                        const fullUrl = baseUrl + "/?c=" + encodeURIComponent(saved);
+                        
+                        link.href = fullUrl;
                         link.innerHTML = "🔄 Resume Session: " + saved;
                         
                         // Reveal the button
@@ -107,27 +108,20 @@ class PersistenceManager:
     def __init__(self, state_manager):
         self.state = state_manager
     
+    # HARDCODED APP URL - Ensures links always go to the right place
+    BASE_URL = "https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app"
+    
     def auto_save(self):
-        """
-        Called at end of main loop. 
-        1. Ensures URL is synced (?c=...)
-        2. Writes to LocalStorage for crash recovery
-        """
+        """Called at end of main loop."""
         char = self.state.get_selected_component()
         if char:
-            # Inject invisible JS to save to LocalStorage
             st_html(SessionPersistence.get_auto_save_script(char), height=0)
     
     def try_restore(self):
-        """
-        Restore state from URL query parameters.
-        Run this BEFORE startup checks.
-        """
-        # If we already have a selection, do nothing
+        """Restore state from URL query parameters."""
         if self.state.get_selected_component():
             return
 
-        # Check URL
         char_param = st.query_params.get("c")
         
         if char_param:
@@ -140,15 +134,12 @@ class PersistenceManager:
                 st.toast(f"Restored from URL: {validated}", icon="🔄")
     
     def show_resume_option(self):
-        """
-        Render the 'Resume' button on Splash/Home screen.
-        """
-        st_html(SessionPersistence.get_resume_component(), height=100)
+        """Render the 'Resume' button on Splash/Home screen."""
+        # Pass the BASE_URL to the static method
+        st_html(SessionPersistence.get_resume_component(self.BASE_URL), height=100)
         
     def add_heartbeat(self):
-        """
-        Add heartbeat to keep the session alive.
-        """
+        """Add heartbeat to keep the session alive."""
         st_html(SessionPersistence.get_heartbeat_component(), height=0)
 
     def render_controls(self):
