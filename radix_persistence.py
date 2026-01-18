@@ -26,7 +26,24 @@ class SessionPersistence:
     # Reads LocalStorage. If a character exists, shows a styled Link Button.
     @staticmethod
     def get_resume_component() -> str:
-        return """
+        # Check for heartbeat loop script to keep session alive
+        heartbeat_script = f"""
+        <script>
+            (function() {{
+                const interval = 45000;
+                function ping() {{
+                    fetch(window.location.href, {{
+                        method: 'GET',
+                        headers: {{'Cache-Control': 'no-cache'}},
+                        credentials: 'same-origin'
+                    }}).catch(e => {{}});
+                }}
+                setInterval(ping, interval);
+            }})();
+        </script>
+        """
+        
+        return f"""
         <div id="radix-resume-wrapper" style="text-align:center; margin-top:20px; display:none;">
             <a id="radix-resume-link" href="#" target="_top" style="
                 text-decoration: none;
@@ -51,11 +68,11 @@ class SessionPersistence:
             </div>
         </div>
         <script>
-            (function() {
-                try {
+            (function() {{
+                try {{
                     const saved = localStorage.getItem('radix_last_char');
                     // Check if saved value is valid (1 character)
-                    if (saved && saved.length === 1 && saved !== 'null') {
+                    if (saved && saved.length === 1 && saved !== 'null') {{
                         const link = document.getElementById('radix-resume-link');
                         const wrapper = document.getElementById('radix-resume-wrapper');
                         
@@ -66,9 +83,21 @@ class SessionPersistence:
                         
                         // Reveal the button
                         wrapper.style.display = "block";
-                    }
-                } catch (e) { console.error('Resume check failed', e); }
-            })();
+                    }}
+                }} catch (e) {{ console.error('Resume check failed', e); }}
+            }})();
+        </script>
+        {heartbeat_script}
+        """
+
+    @staticmethod
+    def get_heartbeat_component() -> str:
+        """Simple keep-alive heartbeat for the main app view"""
+        return """
+        <script>
+            setInterval(() => {
+                fetch(window.location.href, {headers: {'Cache-Control': 'no-cache'}}).catch(()=>{});
+            }, 45000);
         </script>
         """
 
@@ -115,6 +144,12 @@ class PersistenceManager:
         Render the 'Resume' button on Splash/Home screen.
         """
         st_html(SessionPersistence.get_resume_component(), height=100)
+        
+    def add_heartbeat(self):
+        """
+        Add heartbeat to keep the session alive.
+        """
+        st_html(SessionPersistence.get_heartbeat_component(), height=0)
 
     def render_controls(self):
         """Render debug controls in sidebar"""
