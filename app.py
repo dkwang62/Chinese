@@ -114,6 +114,7 @@ def search_by_definition():
 
 def _render_phrase_html(c: str) -> str:
     from radix_state import DISPLAY_MODES
+    import html  # <-- replace pyhtml usage with built-in html.escape
 
     # Only show 2/3/4 in the radio (minimal UI change)
     display_modes_234 = [m for m in DISPLAY_MODES if m != "Single Character"]
@@ -149,7 +150,7 @@ def _render_phrase_html(c: str) -> str:
         for word in sorted(compounds):
             entry = phrases.get(word)
             if entry:
-                p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
+                p_mean = html.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
                 items_html_list.append(
                     f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'>"
                     f"<span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span>"
@@ -165,7 +166,6 @@ def _render_phrase_html(c: str) -> str:
                 f"{''.join(items_html_list)}</div>"
             )
     return ""
-
 
 def render_radix_row(c, context="detail", is_static=False, minimal=False):
     col_char, col_details = st.columns([2, 10])
