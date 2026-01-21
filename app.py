@@ -15,14 +15,10 @@ from radix_core import (
     sort_key_usage_primary, sort_key_frequency_primary, stats_cache,
     cc_t2s, cc_s2t, analyze_component_structure
 )
-
 from radix_state import (
     StateManager, ConfigManager, InputValidator,
-    PAGE_CONFIG, PAGE_SIZE, GRID_COLUMNS, DISPLAY_MODES  # Add DISPLAY_MODES here
+    PAGE_CONFIG, PAGE_SIZE, GRID_COLUMNS, DISPLAY_MODES
 )
-
-
-
 from radix_ui import (
     apply_styles, generate_clean_card_html, render_ipad_safe_download_html,
     render_copy_to_clipboard, get_stroke_order_sidebar_html,
@@ -113,37 +109,21 @@ def search_by_definition():
 # ==================== UI RENDERING HELPERS ====================
 
 def _render_phrase_html(c: str) -> str:
-    from radix_state import DISPLAY_MODES
-
-    # Only show 2/3/4 in the radio (minimal UI change)
-    display_modes_234 = [m for m in DISPLAY_MODES if m != "Single Character"]
-
-    # Radio buttons for phrase length selection
-    col1, col2 = st.columns([3, 7])
-    with col1:
-        current_mode = state.get_display_mode()
-        default_mode = current_mode if current_mode in display_modes_234 else "2-Characters"
-
-        st.radio(
-            "Phrase length:",  # label will be hidden
-            options=display_modes_234,
-            index=display_modes_234.index(default_mode),
-            key=f"phrase_mode_{c}",
-            horizontal=True,
-            label_visibility="collapsed",            # <-- hides "Phrase length:"
-            format_func=lambda x: x.split("-")[0],   # <-- shows 2 / 3 / 4
-            on_change=lambda: state.set("display_mode", st.session_state[f"phrase_mode_{c}"]),
-        )
-
     n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
     n = n_map.get(state.get_display_mode(), 2)
-
-    # Ignore 1-character
-    if n == 1:
-        return ""
-
-    compounds = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
-
+    
+    # 1. Try to get compounds from the current character
+    raw_compounds = component_map.get(c, {}).get("meta", {}).get("compounds", [])
+    
+    # 2. If empty and converter is available, try the Simplified equivalent
+    if not raw_compounds and cc_t2s:
+        s_c = cc_t2s.convert(c)
+        if s_c != c:
+            raw_compounds = component_map.get(s_c, {}).get("meta", {}).get("compounds", [])
+            
+    # 3. Filter by length
+    compounds = [w for w in (raw_compounds or []) if len(w) == n]
+    
     if compounds and (db := get_db_connection()):
         phrases = batch_get_phrase_details(sorted(compounds), db)
         items_html_list = []
@@ -151,36 +131,25 @@ def _render_phrase_html(c: str) -> str:
             entry = phrases.get(word)
             if entry:
                 p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
-                items_html_list.append(
-                    f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'>"
-                    f"<span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span>"
-                    f"<span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span>"
-                    f"<span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span>"
-                    f"</div>"
-                )
-
+                items_html_list.append(f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span></div>")
+        
         if items_html_list:
-            return (
-                # margin-top removed (was 10px) to remove the blank row/gap above the phrase table
-                f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:0px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>"
-                # header removed بالكامل (no more '2 containing ...' / '3 containing ...')
-                f"{''.join(items_html_list)}</div>"
-            )
-
-
+            return f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{state.get_display_mode()} containing {c}</div>{''.join(items_html_list)}</div>"
     return ""
 
 def render_radix_row(c, context="detail", is_static=False, minimal=False):
     col_char, col_details = st.columns([2, 10])
     is_preview = state.get_preview_component() == c
     is_active_focus = is_preview or (state.get_preview_component() is None and c == state.get_selected_component())
+    
+    # Generate UID at top level so both columns can use it for unique keys
+    uid = str(uuid.uuid4())[:8]
 
     with col_char:
         if is_static:
             st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
         else:
             st.markdown("<div class='char-btn-wrap'>", unsafe_allow_html=True)
-            uid = str(uuid.uuid4())[:8]
             st.button(
                 c,
                 key=f"explore_char_{context}_{c}_{ord(c)}_{uid}",
@@ -199,7 +168,34 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
         
     with col_details:
         st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c), is_static=is_static, minimal=minimal), unsafe_allow_html=True)
-        if not is_static and is_active_focus and state.get_display_mode() != "Single Character":
+        
+        if not is_static and is_active_focus:
+            # 1. Handle Display Mode State for Radio Button
+            current_mode_str = state.get_display_mode()
+            try:
+                current_int = int(current_mode_str[0])
+            except:
+                current_int = 2
+            
+            if current_int not in [2, 3, 4]:
+                current_int = 2
+
+            def update_phrase_len():
+                val = st.session_state[f"ph_len_rad_{c}_{uid}"]
+                state.set("display_mode", f"{val}-Characters")
+
+            # 2. Render Radio Button
+            st.radio(
+                "Phrase Length",
+                options=[2, 3, 4],
+                index=[2, 3, 4].index(current_int),
+                key=f"ph_len_rad_{c}_{uid}",
+                horizontal=True,
+                label_visibility="collapsed",
+                on_change=update_phrase_len
+            )
+
+            # 3. Render Phrase Table
             if html := _render_phrase_html(c):
                 st.markdown(html, unsafe_allow_html=True)
     
@@ -590,17 +586,6 @@ def render_sidebar():
                     idcs = sorted(stats_cache.get("idc_counts", {}).keys())
                     idc = state.get("component_idc")
                     st.selectbox("Structure (IDC)", options=["none"] + idcs, index=(["none"] + idcs).index(idc) if idc in idcs else 0, key="w_idc", on_change=sync_idc)
-                    
-                    st.markdown("### Sort Grid By")
-                    def update_grid_sort_mode():
-                        state.set("grid_sort_mode", "usage" if state.get("grid_sort_mode_radio") == "Component frequency" else "frequency")
-                        state.set("page", 1)
-                    st.radio("Sort key", options=["Component frequency", "Character frequency"], index=0 if state.get_grid_sort_mode() == "usage" else 1, key="grid_sort_mode_radio", on_change=update_grid_sort_mode)
-                    
-                    if state.get_grid_sort_mode() == "frequency":
-                        st.markdown("#### Script Preference")
-                        gsf = state.get("grid_script_filter")
-                        st.radio("Show characters in:", options=["Simplified", "Traditional", "Any"], index=["Simplified", "Traditional", "Any"].index(gsf), key="grid_script_radio", on_change=lambda: state.update(grid_script_filter=state.get("grid_script_radio"), page=1), horizontal=True)
 
 def render_stroke_view():
     st.markdown("### Stroke Order Animation")
@@ -682,6 +667,36 @@ def render_definition_search_results():
         st.info(f"No results found for '{state.get('definition_search_query')}'. Try different search terms.")
 
 def render_grid_view():
+    # --- MOVED SORT CONTROLS HERE ---
+    col_sort_1, col_sort_2 = st.columns([2, 3])
+    with col_sort_1:
+        def update_grid_sort_mode():
+            state.set("grid_sort_mode", "usage" if state.get("grid_sort_mode_radio") == "Component frequency" else "frequency")
+            state.set("page", 1)
+        
+        st.radio(
+            "Sort Grid By", 
+            options=["Component frequency", "Character frequency"], 
+            index=0 if state.get_grid_sort_mode() == "usage" else 1, 
+            key="grid_sort_mode_radio", 
+            on_change=update_grid_sort_mode,
+            horizontal=True
+        )
+    
+    with col_sort_2:
+        if state.get_grid_sort_mode() == "frequency":
+            gsf = state.get("grid_script_filter")
+            st.radio(
+                "Show characters in:", 
+                options=["Simplified", "Traditional", "Any"], 
+                index=["Simplified", "Traditional", "Any"].index(gsf), 
+                key="grid_script_radio", 
+                on_change=lambda: state.update(grid_script_filter=state.get("grid_script_radio"), page=1), 
+                horizontal=True
+            )
+    st.markdown("---")
+    # --------------------------------
+
     cur_min, cur_max = state.get_stroke_range()
     filter_parts = [f"<span class='status-tag'>Sort: {'Component' if state.get_grid_sort_mode() == 'usage' else 'Character'} frequency</span>"]
     max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
