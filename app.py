@@ -15,10 +15,14 @@ from radix_core import (
     sort_key_usage_primary, sort_key_frequency_primary, stats_cache,
     cc_t2s, cc_s2t, analyze_component_structure
 )
+
 from radix_state import (
     StateManager, ConfigManager, InputValidator,
-    PAGE_CONFIG, PAGE_SIZE, GRID_COLUMNS
+    PAGE_CONFIG, PAGE_SIZE, GRID_COLUMNS, DISPLAY_MODES  # Add DISPLAY_MODES here
 )
+
+
+
 from radix_ui import (
     apply_styles, generate_clean_card_html, render_ipad_safe_download_html,
     render_copy_to_clipboard, get_stroke_order_sidebar_html,
