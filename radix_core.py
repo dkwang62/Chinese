@@ -549,8 +549,17 @@ def get_stroke_order_view_html(primary_char: str, display_mode: str) -> tuple[st
     phrases_html = None
     if display_mode != "Single Character" and primary_char:
         n = {"2-Characters": 2, "3-Characters": 3, "4-Characters": 4}.get(display_mode, 0)
+        
+        # 1. Try primary character compounds
         meta_compounds = component_map.get(primary_char, {}).get("meta", {}).get("compounds", [])
-        relevant = [w for w in meta_compounds if isinstance(w, str) and len(w) == n]
+        
+        # 2. Fallback to simplified compounds if primary has none
+        if not meta_compounds and cc_t2s:
+            s_char = cc_t2s.convert(primary_char)
+            if s_char != primary_char:
+                meta_compounds = component_map.get(s_char, {}).get("meta", {}).get("compounds", [])
+
+        relevant = [w for w in (meta_compounds or []) if isinstance(w, str) and len(w) == n]
         if relevant:
             db_conn = get_db_connection()
             if db_conn:
