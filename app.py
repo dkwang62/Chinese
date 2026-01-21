@@ -114,24 +114,35 @@ def search_by_definition():
 
 def _render_phrase_html(c: str) -> str:
     from radix_state import DISPLAY_MODES
-    
+
+    # Only show 2/3/4 in the radio (minimal UI change)
+    display_modes_234 = [m for m in DISPLAY_MODES if m != "Single Character"]
+
     # Radio buttons for phrase length selection
     col1, col2 = st.columns([3, 7])
     with col1:
         current_mode = state.get_display_mode()
+        # default to 2-Characters if current_mode is Single Character or invalid
+        default_mode = current_mode if current_mode in display_modes_234 else "2-Characters"
+
         selected_mode = st.radio(
             "Phrase length:",
-            options=DISPLAY_MODES,
-            index=DISPLAY_MODES.index(current_mode) if current_mode in DISPLAY_MODES else 1,
+            options=display_modes_234,
+            index=display_modes_234.index(default_mode),
             key=f"phrase_mode_{c}",
             horizontal=True,
             on_change=lambda: state.set("display_mode", st.session_state[f"phrase_mode_{c}"])
         )
-    
+
     n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
     n = n_map.get(state.get_display_mode(), 2)
+
+    # Ignore 1-character (simple change)
+    if n == 1:
+        return ""
+
     compounds = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
-    
+
     if compounds and (db := get_db_connection()):
         phrases = batch_get_phrase_details(sorted(compounds), db)
         items_html_list = []
@@ -139,11 +150,22 @@ def _render_phrase_html(c: str) -> str:
             entry = phrases.get(word)
             if entry:
                 p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
-                items_html_list.append(f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span></div>")
-        
+                items_html_list.append(
+                    f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'>"
+                    f"<span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span>"
+                    f"<span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span>"
+                    f"<span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span>"
+                    f"</div>"
+                )
+
         if items_html_list:
-            return f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{state.get_display_mode()} containing {c}</div>{''.join(items_html_list)}</div>"
+            return (
+                f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>"
+                f"<div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{state.get_display_mode()} containing {c}</div>"
+                f"{''.join(items_html_list)}</div>"
+            )
     return ""
+
 
 def render_radix_row(c, context="detail", is_static=False, minimal=False):
     col_char, col_details = st.columns([2, 10])
