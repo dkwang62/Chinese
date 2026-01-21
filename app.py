@@ -15,14 +15,10 @@ from radix_core import (
     sort_key_usage_primary, sort_key_frequency_primary, stats_cache,
     cc_t2s, cc_s2t, analyze_component_structure
 )
-
 from radix_state import (
     StateManager, ConfigManager, InputValidator,
-    PAGE_CONFIG, PAGE_SIZE, GRID_COLUMNS, DISPLAY_MODES  # Add DISPLAY_MODES here
+    PAGE_CONFIG, PAGE_SIZE, GRID_COLUMNS
 )
-
-
-
 from radix_ui import (
     apply_styles, generate_clean_card_html, render_ipad_safe_download_html,
     render_copy_to_clipboard, get_stroke_order_sidebar_html,
@@ -113,75 +109,21 @@ def search_by_definition():
 # ==================== UI RENDERING HELPERS ====================
 
 def _render_phrase_html(c: str) -> str:
-    import streamlit as st
-    import pyhtml
-    from radix_state import DISPLAY_MODES  # kept import, but we won't use it directly
-
-    # Only allow 2, 3, 4-character phrases (ignore 1-character)
-    DISPLAY_MODES_234 = ["2-Characters", "3-Characters", "4-Characters"]
-
-    # Radio buttons for phrase length selection (2/3/4 only)
-    col1, col2 = st.columns([3, 7])
-    with col1:
-        current_mode = state.get_display_mode()
-        default_mode = current_mode if current_mode in DISPLAY_MODES_234 else "2-Characters"
-
-        selected_mode = st.radio(
-            "Phrase length:",
-            options=DISPLAY_MODES_234,
-            index=DISPLAY_MODES_234.index(default_mode),
-            key=f"phrase_mode_{c}",
-            horizontal=True,
-            on_change=lambda: state.set("display_mode", st.session_state[f"phrase_mode_{c}"]),
-        )
-
-    # Map mode -> desired length
-    n_map = {"2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
+    n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
     n = n_map.get(state.get_display_mode(), 2)
-
-    # Filter compounds by selected length (2/3/4). 1-char is implicitly ignored.
-    compounds = [
-        w
-        for w in component_map.get(c, {}).get("meta", {}).get("compounds", [])
-        if len(w) == n
-    ]
-
+    compounds = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
+    
     if compounds and (db := get_db_connection()):
         phrases = batch_get_phrase_details(sorted(compounds), db)
         items_html_list = []
-
         for word in sorted(compounds):
             entry = phrases.get(word)
             if entry:
-                meanings = entry.get("meanings", "") or ""
-                p_mean = pyhtml.escape(
-                    meanings[:130] + ("..." if len(meanings) > 130 else "")
-                )
-
-                # "All in one row" chip-style item
-                items_html_list.append(
-                    "<span style='display:inline-block; padding:6px 10px; margin:4px; "
-                    "border:1px solid #dcedc8; background:#fff; border-radius:999px; "
-                    "white-space:nowrap;'>"
-                    f"<span style='font-weight:700; font-size:1.0rem; margin-right:8px;'>{word}</span>"
-                    f"<span style='color:#d35400; font-size:0.85rem; font-family:monospace; font-weight:600; margin-right:8px;'>{entry.get('pinyin', '')}</span>"
-                    f"<span style='color:#444; font-size:0.85rem;'>{p_mean}</span>"
-                    "</span>"
-                )
-
+                p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
+                items_html_list.append(f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span></div>")
+        
         if items_html_list:
-            return (
-                "<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; "
-                "border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>"
-                f"<div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>"
-                f"{state.get_display_mode()} containing {c}</div>"
-                # One-row flex layout (wrap enabled). If you want strictly single-line scrolling,
-                # change flex-wrap:wrap to flex-wrap:nowrap; overflow-x:auto;
-                "<div style='display:flex; flex-wrap:wrap; align-items:center; gap:6px;'>"
-                f"{''.join(items_html_list)}"
-                "</div></div>"
-            )
-
+            return f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{state.get_display_mode()} containing {c}</div>{''.join(items_html_list)}</div>"
     return ""
 
 def render_radix_row(c, context="detail", is_static=False, minimal=False):
@@ -615,17 +557,6 @@ def render_sidebar():
                         st.markdown("#### Script Preference")
                         gsf = state.get("grid_script_filter")
                         st.radio("Show characters in:", options=["Simplified", "Traditional", "Any"], index=["Simplified", "Traditional", "Any"].index(gsf), key="grid_script_radio", on_change=lambda: state.update(grid_script_filter=state.get("grid_script_radio"), page=1), horizontal=True)
-
-        if not state.is_stroke_view_active():
-            with st.expander("📊 Phrase Display", expanded=False):
-                st.radio(
-                    "Show phrases with:",
-                    options=DISPLAY_MODES,
-                    index=DISPLAY_MODES.index(state.get_display_mode()),
-                    key="w_display_mode",
-                    on_change=lambda: state.set("display_mode", st.session_state.w_display_mode)
-                )
-                st.caption("Controls which phrases appear in character views")
 
 def render_stroke_view():
     st.markdown("### Stroke Order Animation")
