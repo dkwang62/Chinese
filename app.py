@@ -15,10 +15,14 @@ from radix_core import (
     sort_key_usage_primary, sort_key_frequency_primary, stats_cache,
     cc_t2s, cc_s2t, analyze_component_structure
 )
+
 from radix_state import (
     StateManager, ConfigManager, InputValidator,
-    PAGE_CONFIG, PAGE_SIZE, GRID_COLUMNS
+    PAGE_CONFIG, PAGE_SIZE, GRID_COLUMNS, DISPLAY_MODES  # Add DISPLAY_MODES here
 )
+
+
+
 from radix_ui import (
     apply_styles, generate_clean_card_html, render_ipad_safe_download_html,
     render_copy_to_clipboard, get_stroke_order_sidebar_html,
@@ -109,6 +113,21 @@ def search_by_definition():
 # ==================== UI RENDERING HELPERS ====================
 
 def _render_phrase_html(c: str) -> str:
+    from radix_state import DISPLAY_MODES
+    
+    # Radio buttons for phrase length selection
+    col1, col2 = st.columns([3, 7])
+    with col1:
+        current_mode = state.get_display_mode()
+        selected_mode = st.radio(
+            "Phrase length:",
+            options=DISPLAY_MODES,
+            index=DISPLAY_MODES.index(current_mode) if current_mode in DISPLAY_MODES else 1,
+            key=f"phrase_mode_{c}",
+            horizontal=True,
+            on_change=lambda: state.set("display_mode", st.session_state[f"phrase_mode_{c}"])
+        )
+    
     n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
     n = n_map.get(state.get_display_mode(), 2)
     compounds = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
@@ -557,6 +576,17 @@ def render_sidebar():
                         st.markdown("#### Script Preference")
                         gsf = state.get("grid_script_filter")
                         st.radio("Show characters in:", options=["Simplified", "Traditional", "Any"], index=["Simplified", "Traditional", "Any"].index(gsf), key="grid_script_radio", on_change=lambda: state.update(grid_script_filter=state.get("grid_script_radio"), page=1), horizontal=True)
+
+        if not state.is_stroke_view_active():
+            with st.expander("📊 Phrase Display", expanded=False):
+                st.radio(
+                    "Show phrases with:",
+                    options=DISPLAY_MODES,
+                    index=DISPLAY_MODES.index(state.get_display_mode()),
+                    key="w_display_mode",
+                    on_change=lambda: state.set("display_mode", st.session_state.w_display_mode)
+                )
+                st.caption("Controls which phrases appear in character views")
 
 def render_stroke_view():
     st.markdown("### Stroke Order Animation")
