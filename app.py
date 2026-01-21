@@ -161,11 +161,12 @@ def _render_phrase_html(c: str) -> str:
 
         if items_html_list:
             return (
-                f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>"
-                # changed title text to just: 2/3/4 containing 日
-                f"<div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{n} containing {c}</div>"
+                # margin-top removed (was 10px) to remove the blank row/gap above the phrase table
+                f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:0px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>"
+                # header removed بالكامل (no more '2 containing ...' / '3 containing ...')
                 f"{''.join(items_html_list)}</div>"
             )
+
 
     return ""
 
