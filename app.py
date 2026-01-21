@@ -113,6 +113,21 @@ def search_by_definition():
 # ==================== UI RENDERING HELPERS ====================
 
 def _render_phrase_html(c: str) -> str:
+    from radix_state import DISPLAY_MODES
+    
+    # Radio buttons for phrase length selection
+    col1, col2 = st.columns([3, 7])
+    with col1:
+        current_mode = state.get_display_mode()
+        selected_mode = st.radio(
+            "Phrase length:",
+            options=DISPLAY_MODES,
+            index=DISPLAY_MODES.index(current_mode) if current_mode in DISPLAY_MODES else 1,
+            key=f"phrase_mode_{c}",
+            horizontal=True,
+            on_change=lambda: state.set("display_mode", st.session_state[f"phrase_mode_{c}"])
+        )
+    
     n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
     n = n_map.get(state.get_display_mode(), 2)
     compounds = [w for w in component_map.get(c, {}).get("meta", {}).get("compounds", []) if len(w) == n]
