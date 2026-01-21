@@ -602,17 +602,6 @@ def render_sidebar():
                         gsf = state.get("grid_script_filter")
                         st.radio("Show characters in:", options=["Simplified", "Traditional", "Any"], index=["Simplified", "Traditional", "Any"].index(gsf), key="grid_script_radio", on_change=lambda: state.update(grid_script_filter=state.get("grid_script_radio"), page=1), horizontal=True)
 
-        if not state.is_stroke_view_active():
-            with st.expander("📊 Phrase Display", expanded=False):
-                st.radio(
-                    "Show phrases with:",
-                    options=DISPLAY_MODES,
-                    index=DISPLAY_MODES.index(state.get_display_mode()),
-                    key="w_display_mode",
-                    on_change=lambda: state.set("display_mode", st.session_state.w_display_mode)
-                )
-                st.caption("Controls which phrases appear in character views")
-
 def render_stroke_view():
     st.markdown("### Stroke Order Animation")
     main_html, _ = get_stroke_order_view_html(state.get("stroke_view_char"), state.get_display_mode())
