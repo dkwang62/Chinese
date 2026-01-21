@@ -493,9 +493,8 @@ def render_sidebar():
                 st.button("🏠 Root", on_click=state.go_to_root, use_container_width=True)
             st.markdown("---")
 
-        # Persistence controls
-        persistence.render_controls()
-
+        # Persistence controls REMOVED per user request
+        # persistence.render_controls()
 
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
         if current_char_for_sidebar:
@@ -667,7 +666,6 @@ def render_definition_search_results():
         st.info(f"No results found for '{state.get('definition_search_query')}'. Try different search terms.")
 
 def render_grid_view():
-    # --- MOVED SORT CONTROLS HERE ---
     col_sort_1, col_sort_2 = st.columns([2, 3])
     with col_sort_1:
         def update_grid_sort_mode():
@@ -695,7 +693,6 @@ def render_grid_view():
                 horizontal=True
             )
     st.markdown("---")
-    # --------------------------------
 
     cur_min, cur_max = state.get_stroke_range()
     filter_parts = [f"<span class='status-tag'>Sort: {'Component' if state.get_grid_sort_mode() == 'usage' else 'Character'} frequency</span>"]
