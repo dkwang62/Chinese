@@ -114,7 +114,6 @@ def search_by_definition():
 
 def _render_phrase_html(c: str) -> str:
     from radix_state import DISPLAY_MODES
-    import html  # <-- replace pyhtml usage with built-in html.escape
 
     # Only show 2/3/4 in the radio (minimal UI change)
     display_modes_234 = [m for m in DISPLAY_MODES if m != "Single Character"]
@@ -123,22 +122,23 @@ def _render_phrase_html(c: str) -> str:
     col1, col2 = st.columns([3, 7])
     with col1:
         current_mode = state.get_display_mode()
-        # default to 2-Characters if current_mode is Single Character or invalid
         default_mode = current_mode if current_mode in display_modes_234 else "2-Characters"
 
-        selected_mode = st.radio(
-            "Phrase length:",
+        st.radio(
+            "Phrase length:",  # label will be hidden
             options=display_modes_234,
             index=display_modes_234.index(default_mode),
             key=f"phrase_mode_{c}",
             horizontal=True,
-            on_change=lambda: state.set("display_mode", st.session_state[f"phrase_mode_{c}"])
+            label_visibility="collapsed",            # <-- hides "Phrase length:"
+            format_func=lambda x: x.split("-")[0],   # <-- shows 2 / 3 / 4
+            on_change=lambda: state.set("display_mode", st.session_state[f"phrase_mode_{c}"]),
         )
 
     n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
     n = n_map.get(state.get_display_mode(), 2)
 
-    # Ignore 1-character (simple change)
+    # Ignore 1-character
     if n == 1:
         return ""
 
@@ -150,7 +150,7 @@ def _render_phrase_html(c: str) -> str:
         for word in sorted(compounds):
             entry = phrases.get(word)
             if entry:
-                p_mean = html.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
+                p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
                 items_html_list.append(
                     f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'>"
                     f"<span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span>"
@@ -162,9 +162,11 @@ def _render_phrase_html(c: str) -> str:
         if items_html_list:
             return (
                 f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'>"
-                f"<div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{state.get_display_mode()} containing {c}</div>"
+                # changed title text to just: 2/3/4 containing 日
+                f"<div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{n} containing {c}</div>"
                 f"{''.join(items_html_list)}</div>"
             )
+
     return ""
 
 def render_radix_row(c, context="detail", is_static=False, minimal=False):
