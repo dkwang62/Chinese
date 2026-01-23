@@ -495,8 +495,14 @@ def render_sidebar():
 
         # 4. ACTION BUTTONS (Moved to Top)
         if current_char_for_sidebar:
-            # Show "Drill Down" if we are in Grid Mode (Preview) OR AI Link Mode
-            show_drill_down = state.is_showing_inputs() or state.is_stroke_view_active()
+            # Logic: 
+            # Show "Drill Down" if we are in Grid Mode (showing inputs), OR Stroke Mode, 
+            # OR if we are previewing a character different from the main selected one.
+            show_drill_down = (
+                state.is_showing_inputs() or 
+                state.is_stroke_view_active() or 
+                (current_char_for_sidebar != state.get_selected_component())
+            )
             
             # Show "AI Link" if we are NOT already in AI Link mode
             show_ai_link = not state.is_stroke_view_active()
@@ -507,6 +513,7 @@ def render_sidebar():
                     b1, b2 = st.columns(2)
                     with b1:
                         if st.button("✅ Drill Down", key="sb_btn_drill", use_container_width=True, type="primary"):
+                             # If navigation implies deep drilling (e.g. preview != current context), save history
                              if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
                                  history = state.get_history()
                                  history.append(state.get_selected_component())
