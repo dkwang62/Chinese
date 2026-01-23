@@ -160,11 +160,8 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
                 use_container_width=True
             )
             st.markdown(f"<div class='char-btn-hint {'previewing' if is_preview else ''}'>{'Click again to drill down' if is_preview else 'Click once to preview'}</div>", unsafe_allow_html=True)
-            
-            st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-            if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}_{uid}", help="Write AI prompt", use_container_width=True, on_click=lambda: state.enter_stroke_view(c)):
-                pass
-            st.markdown("</div></div>", unsafe_allow_html=True)
+            # REMOVED: "🧠 link" button from here
+            st.markdown("</div>", unsafe_allow_html=True)
         
     with col_details:
         st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c), is_static=is_static, minimal=minimal), unsafe_allow_html=True)
@@ -498,18 +495,31 @@ def render_sidebar():
 
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
         
-        # --- ADDED: Select & Drill Down Button (Visible during Preview or Stroke View) ---
-        if current_char_for_sidebar and (state.get_preview_component() or state.is_stroke_view_active()):
-            st.markdown("---")
-            if st.button("✅ Select & Drill Down", key="sidebar_select_drill", use_container_width=True, type="primary"):
-                # If we are navigating away from an existing detail view (deep drill down), save history
-                if state.get_selected_component() and not state.is_showing_inputs() and state.get_selected_component() != current_char_for_sidebar:
-                    history = state.get_history()
-                    history.append(state.get_selected_component())
-                    state.set("history", history)
+        # --- ACTION BUTTONS (Visible during Preview or Stroke View) ---
+        if current_char_for_sidebar:
+            is_preview = (state.get_preview_component() is not None)
+            is_active_stroke = state.is_stroke_view_active()
+            
+            # Show actions if we are previewing OR viewing stroke (but buttons might differ)
+            if is_preview or is_active_stroke:
+                st.markdown("---")
                 
-                state.enter_character_view(current_char_for_sidebar)
-                st.rerun()
+                # 1. Select & Drill Down (Only if not already deep drilled into this char)
+                # Logic: If previewing, allow drill down.
+                if is_preview and not is_active_stroke:
+                     if st.button("✅ Select & Drill Down", key="sidebar_select_drill", use_container_width=True, type="primary"):
+                        if state.get_selected_component() and not state.is_showing_inputs() and state.get_selected_component() != current_char_for_sidebar:
+                            history = state.get_history()
+                            history.append(state.get_selected_component())
+                            state.set("history", history)
+                        state.enter_character_view(current_char_for_sidebar)
+                        st.rerun()
+
+                # 2. Open Stroke View (Only if NOT already in stroke view)
+                if not is_active_stroke:
+                    if st.button("🧠 Open Stroke View", key="sidebar_open_stroke", use_container_width=True):
+                        state.enter_stroke_view(current_char_for_sidebar)
+                        st.rerun()
         # -----------------------------------------
 
         if current_char_for_sidebar:
