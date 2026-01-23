@@ -475,10 +475,10 @@ def render_sidebar():
         # 1. Breadcrumbs
         current_main_char = state.get("stroke_view_char") if state.is_stroke_view_active() else state.get_selected_component()
         if current_main_char:
-            path_items = ["🏠 Root"] + state.get_history() + ([f"<i>{current_main_char}</i> (🧠)"] if state.is_stroke_view_active() else [f"<b>{current_main_char}</b>"])
+            path_items = ["🏠 Grid"] + state.get_history() + ([f"<i>{current_main_char}</i> (🧠)"] if state.is_stroke_view_active() else [f"<b>{current_main_char}</b>"])
             st.markdown(f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>{' → '.join(path_items)}</div>", unsafe_allow_html=True)
         
-        # 2. Nav Buttons (Back/Root)
+        # 2. Nav Buttons (Back/Grid)
         if not state.is_showing_inputs() or state.is_stroke_view_active():
             nav_col1, nav_col2 = st.columns(2)
             with nav_col1:
@@ -487,7 +487,7 @@ def render_sidebar():
                 else:
                     st.button("← Back", on_click=state.go_back, use_container_width=True, type="primary")
             with nav_col2:
-                st.button("🏠 Root", on_click=state.go_to_root, use_container_width=True)
+                st.button("🏠 Grid", on_click=state.go_to_root, use_container_width=True)
             st.markdown("---")
 
         # 3. Determine Current Sidebar Char
@@ -527,7 +527,7 @@ def render_sidebar():
                 else:
                     # Full width single button
                     if show_drill_down:
-                        if st.button("✅ Select & Drill Down", key="sb_btn_drill_full", use_container_width=True, type="primary"):
+                        if st.button("✅ Drill Down", key="sb_btn_drill_full", use_container_width=True, type="primary"):
                              if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
                                  history = state.get_history()
                                  history.append(state.get_selected_component())
