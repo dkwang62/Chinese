@@ -488,7 +488,7 @@ def render_sidebar():
                     st.button("← Back", on_click=state.go_back, use_container_width=True, type="primary")
             with nav_col2:
                 st.button("🏠 Grid", on_click=state.go_to_root, use_container_width=True)
-            st.markdown("---")
+       #     st.markdown("---")
 
         # 3. Determine Current Sidebar Char
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
@@ -539,7 +539,7 @@ def render_sidebar():
                             state.enter_stroke_view(current_char_for_sidebar)
                             st.rerun()
                 
-                st.markdown("---")
+           #     st.markdown("---")
 
             # 5. VISUALS
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
