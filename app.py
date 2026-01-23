@@ -498,17 +498,17 @@ def render_sidebar():
 
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
         
-        # --- ADDED: Select & Drill Down Button ---
-        preview_char = state.get_preview_component()
-        if preview_char and not state.is_stroke_view_active():
+        # --- ADDED: Select & Drill Down Button (Visible during Preview or Stroke View) ---
+        if current_char_for_sidebar and (state.get_preview_component() or state.is_stroke_view_active()):
             st.markdown("---")
             if st.button("✅ Select & Drill Down", key="sidebar_select_drill", use_container_width=True, type="primary"):
-                if state.get_selected_component() and not state.is_showing_inputs():
-                    # We're in list view - add current to history
+                # If we are navigating away from an existing detail view (deep drill down), save history
+                if state.get_selected_component() and not state.is_showing_inputs() and state.get_selected_component() != current_char_for_sidebar:
                     history = state.get_history()
                     history.append(state.get_selected_component())
                     state.set("history", history)
-                state.enter_character_view(preview_char)
+                
+                state.enter_character_view(current_char_for_sidebar)
                 st.rerun()
         # -----------------------------------------
 
