@@ -735,7 +735,7 @@ def render_grid_view():
                 on_change=lambda: state.update(grid_script_filter=state.get("grid_script_radio"), page=1), 
                 horizontal=True
             )
-    st.markdown("---")
+    # st.markdown("---")
 
     cur_min, cur_max = state.get_stroke_range()
     filter_parts = [f"<span class='status-tag'>Sort: {'Component' if state.get_grid_sort_mode() == 'usage' else 'Character'} frequency</span>"]
