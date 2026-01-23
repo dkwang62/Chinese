@@ -160,11 +160,7 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
                 use_container_width=True
             )
             st.markdown(f"<div class='char-btn-hint {'previewing' if is_preview else ''}'>{'Click again to drill down' if is_preview else 'Click once to preview'}</div>", unsafe_allow_html=True)
-            
-            st.markdown("<div class='pen-btn-wrap'>", unsafe_allow_html=True)
-            if st.button("🧠 link", key=f"stroke_btn_{c}_{ord(c)}_{uid}", help="Write AI prompt", use_container_width=True, on_click=lambda: state.enter_stroke_view(c)):
-                pass
-            st.markdown("</div></div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         
     with col_details:
         st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c), is_static=is_static, minimal=minimal), unsafe_allow_html=True)
@@ -476,13 +472,14 @@ def render_splash():
 
 def render_sidebar():
     with st.sidebar:
+        # 1. Breadcrumbs
         current_main_char = state.get("stroke_view_char") if state.is_stroke_view_active() else state.get_selected_component()
-        
         if current_main_char:
             path_items = ["🏠 Root"] + state.get_history() + ([f"<i>{current_main_char}</i> (🧠)"] if state.is_stroke_view_active() else [f"<b>{current_main_char}</b>"])
             st.markdown(f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>{' → '.join(path_items)}</div>", unsafe_allow_html=True)
         
-        if not state.is_showing_inputs():
+        # 2. Nav Buttons (Back/Root)
+        if not state.is_showing_inputs() or state.is_stroke_view_active():
             nav_col1, nav_col2 = st.columns(2)
             with nav_col1:
                 if state.is_stroke_view_active():
@@ -493,38 +490,51 @@ def render_sidebar():
                 st.button("🏠 Root", on_click=state.go_to_root, use_container_width=True)
             st.markdown("---")
 
-        # Persistence controls REMOVED per user request
-        # persistence.render_controls()
-
+        # 3. Determine Current Sidebar Char
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
-        
-        # --- ACTION BUTTONS (Visible if character is selected/previewed) ---
+
+        # 4. ACTION BUTTONS (Moved to Top)
         if current_char_for_sidebar:
-            st.markdown("---")
+            # Show "Drill Down" if we are in Grid Mode (Preview) OR AI Link Mode
+            show_drill_down = state.is_showing_inputs() or state.is_stroke_view_active()
             
-            # 1. Select & Drill Down
-            # Show if: In Grid View (is_showing_inputs) OR in Stroke View (is_stroke_view_active)
-            # This allows user to enter the standard Detail View from either Grid or Stroke modes.
-            if state.is_showing_inputs() or state.is_stroke_view_active():
-                 if st.button("✅ Select & Drill Down", key="sidebar_select_drill", use_container_width=True, type="primary"):
-                    # Add to history if deep drilling from another view
-                    if state.get_selected_component() and not state.is_showing_inputs() and state.get_selected_component() != current_char_for_sidebar:
-                        history = state.get_history()
-                        history.append(state.get_selected_component())
-                        state.set("history", history)
-                    
-                    state.enter_character_view(current_char_for_sidebar)
-                    st.rerun()
+            # Show "AI Link" if we are NOT already in AI Link mode
+            show_ai_link = not state.is_stroke_view_active()
 
-            # 2. AI Link (Go to Stroke View)
-            # Show if: NOT already in Stroke View
-            if not state.is_stroke_view_active():
-                if st.button("🧠 AI Link", key="sidebar_ai_link", use_container_width=True):
-                    state.enter_stroke_view(current_char_for_sidebar)
-                    st.rerun()
-        # -----------------------------------------
+            if show_drill_down or show_ai_link:
+                # Group buttons in columns if both are visible
+                if show_drill_down and show_ai_link:
+                    b1, b2 = st.columns(2)
+                    with b1:
+                        if st.button("✅ Drill Down", key="sb_btn_drill", use_container_width=True, type="primary"):
+                             if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
+                                 history = state.get_history()
+                                 history.append(state.get_selected_component())
+                                 state.set("history", history)
+                             state.enter_character_view(current_char_for_sidebar)
+                             st.rerun()
+                    with b2:
+                        if st.button("🧠 AI Link", key="sb_btn_ai", use_container_width=True):
+                            state.enter_stroke_view(current_char_for_sidebar)
+                            st.rerun()
+                else:
+                    # Full width single button
+                    if show_drill_down:
+                        if st.button("✅ Select & Drill Down", key="sb_btn_drill_full", use_container_width=True, type="primary"):
+                             if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
+                                 history = state.get_history()
+                                 history.append(state.get_selected_component())
+                                 state.set("history", history)
+                             state.enter_character_view(current_char_for_sidebar)
+                             st.rerun()
+                    if show_ai_link:
+                        if st.button("🧠 AI Link", key="sb_btn_ai_full", use_container_width=True):
+                            state.enter_stroke_view(current_char_for_sidebar)
+                            st.rerun()
+                
+                st.markdown("---")
 
-        if current_char_for_sidebar:
+            # 5. VISUALS
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
             if sidebar_html:
                 st_html(sidebar_html, height=sidebar_height)
@@ -533,7 +543,7 @@ def render_sidebar():
             card_html = card_html.replace("search box at the top", "search box")
             st.markdown(f"<div style='margin-top: 15px;'>{card_html}</div>", unsafe_allow_html=True)
 
-            # Compact Analysis for Sidebar
+            # 6. Logic Breakdown
             analysis = analyze_component_structure(current_char_for_sidebar)
             if analysis['semantic'] or analysis['phonetic']:
                 s_txt = f"💡 <b>{analysis['semantic']}</b> = Meaning" if analysis['semantic'] else ""
@@ -554,7 +564,7 @@ def render_sidebar():
                 state.set("onboarding_done", False)
                 st.rerun()
 
-        # Sidebar Search with combined layout
+        # 7. Search & Filters (Expanders at bottom)
         with st.expander("🔍 Search", expanded=False):
             st.markdown("**Character Search**")
             col_sb_in, col_sb_btn = st.columns([3, 1])
@@ -575,7 +585,6 @@ def render_sidebar():
 
             st.markdown("<div style='margin: 15px 0; border-top: 1px dashed #ddd;'></div>", unsafe_allow_html=True)
             
-            # st.markdown("**English Definition Search**")
             search_key = render_definition_search_ui("sb")
             if st.button("Search Definitions", use_container_width=True, type="primary", key="sb_def_btn"):
                 state.set("w_def_search", state.get(search_key, ""))
