@@ -497,6 +497,21 @@ def render_sidebar():
         # persistence.render_controls()
 
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
+        
+        # --- ADDED: Select & Drill Down Button ---
+        preview_char = state.get_preview_component()
+        if preview_char and not state.is_stroke_view_active():
+            st.markdown("---")
+            if st.button("✅ Select & Drill Down", key="sidebar_select_drill", use_container_width=True, type="primary"):
+                if state.get_selected_component() and not state.is_showing_inputs():
+                    # We're in list view - add current to history
+                    history = state.get_history()
+                    history.append(state.get_selected_component())
+                    state.set("history", history)
+                state.enter_character_view(preview_char)
+                st.rerun()
+        # -----------------------------------------
+
         if current_char_for_sidebar:
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
             if sidebar_html:
