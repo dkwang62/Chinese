@@ -203,7 +203,7 @@ def render_startup_file_choice():
     st.markdown("""
     <div class="splash-wrap">
         <div class="splash-card">
-            <div class="splash-title">Radix 🈑 - Data Setup</div>
+            <div class="splash-title">Radix 🈁 - Data Setup</div>
             <div class="splash-sub" style="margin-top: 20px;">
                 Do you have a local Radix user data file you'd like to use?
             </div>
@@ -248,7 +248,7 @@ def render_startup_file_choice():
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_splash():
-    st.markdown("""<div class="palace-entrance-container"><div class="grand-torii">⛩️</div><div class="entrance-text">Grand Hall of Radix 🈑 Components</div></div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="palace-entrance-container"><div class="grand-torii">⛩️</div><div class="entrance-text">Grand Hall of Radix 🈁 Components</div></div>""", unsafe_allow_html=True)
     
     # === HERE IS THE NEW RESUME BUTTON ===
     persistence.show_resume_option()
@@ -279,7 +279,7 @@ def render_splash():
                     )
                 )
             with col_sp_btn:
-                if st.button("🔍", key="splash_search_btn", use_container_width=True):
+                if st.button("🔎", key="splash_search_btn", use_container_width=True):
                     if state.process_search_and_clear(st.session_state.splash_search, "splash_search", st.toast):
                         st.rerun()
 
@@ -488,7 +488,6 @@ def render_sidebar():
                     st.button("← Back", on_click=state.go_back, use_container_width=True, type="primary")
             with nav_col2:
                 st.button("🏠 Grid", on_click=state.go_to_root, use_container_width=True)
-       #     st.markdown("---")
 
         # 3. Determine Current Sidebar Char
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
@@ -538,8 +537,6 @@ def render_sidebar():
                         if st.button("🧠 AI Link", key="sb_btn_ai_full", use_container_width=True):
                             state.enter_stroke_view(current_char_for_sidebar)
                             st.rerun()
-                
-           #     st.markdown("---")
 
             # 5. VISUALS
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
@@ -554,7 +551,7 @@ def render_sidebar():
             analysis = analyze_component_structure(current_char_for_sidebar)
             if analysis['semantic'] or analysis['phonetic']:
                 s_txt = f"💡 <b>{analysis['semantic']}</b> = Meaning" if analysis['semantic'] else ""
-                p_txt = f"🔊 <b>{analysis['phonetic']}</b> = Sound" if analysis['phonetic'] else ""
+                p_txt = f"📊 <b>{analysis['phonetic']}</b> = Sound" if analysis['phonetic'] else ""
                 
                 st.markdown(f"""
                 <div style='background-color: #f0f2f6; padding: 12px; border-radius: 10px; margin-top: 15px; border: 1px solid #dce0e6;'>
@@ -571,7 +568,7 @@ def render_sidebar():
                 state.set("onboarding_done", False)
                 st.rerun()
 
-        # 7. Search & Filters (Expanders at bottom)
+        # 7. Search
         with st.expander("🔍 Search", expanded=False):
             st.markdown("**Character Search**")
             col_sb_in, col_sb_btn = st.columns([3, 1])
@@ -586,7 +583,7 @@ def render_sidebar():
                     )
                 )
             with col_sb_btn:
-                if st.button("🔍", key="sb_search_btn", use_container_width=True):
+                if st.button("🔎", key="sb_search_btn", use_container_width=True):
                     if state.process_search_and_clear(st.session_state.sb_search, "sb_search", st.toast):
                         st.rerun()
 
@@ -598,36 +595,6 @@ def render_sidebar():
                 search_by_definition()
                 st.rerun()
             st.caption("Search across meanings (e.g., 'fire')")
-
-        if not state.is_stroke_view_active():
-            with st.expander("📎 Filters", expanded=False):
-                if not state.is_showing_inputs():
-                    st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(state.get_script_filter()), key="w_script_filter", on_change=sync_script_filter)
-                if state.is_showing_inputs():
-                    st.slider("Stroke count", 1, 30, value=state.get_stroke_range(), key="w_stroke_range", on_change=sync_stroke_range)
-                    
-                    rad_groups = stats_cache.get("rad_groups", {})
-                    radical_options = ["none"]
-                    for stroke_count in sorted(rad_groups.keys()):
-                        rads_in_group = rad_groups[stroke_count]
-                        if rads_in_group:
-                            for rad in rads_in_group:
-                                radical_options.append(rad)
-                    
-                    def format_radical(rad):
-                        if rad == "none": return "none"
-                        rad_info = component_map.get(rad, {})
-                        strokes = rad_info.get('stroke_count')
-                        if strokes: return f"{rad} ({strokes} strokes)"
-                        return rad
-                    
-                    current_rad = state.get("radical")
-                    current_index = radical_options.index(current_rad) if current_rad in radical_options else 0
-                    st.selectbox("Radical", options=radical_options, format_func=format_radical, index=current_index, key="w_radical", on_change=sync_radical)
-                    
-                    idcs = sorted(stats_cache.get("idc_counts", {}).keys())
-                    idc = state.get("component_idc")
-                    st.selectbox("Structure (IDC)", options=["none"] + idcs, index=(["none"] + idcs).index(idc) if idc in idcs else 0, key="w_idc", on_change=sync_idc)
 
 def render_stroke_view():
     st.markdown("### Stroke Order Animation")
@@ -691,7 +658,7 @@ def render_stroke_view():
 
 def render_definition_search_results():
     results = state.get("definition_search_results")
-    st.markdown(f"<div class='status-line'><div style='font-size:1.2em; font-weight:700;'>Search Results for \"{pyhtml.escape(state.get('definition_search_query'))}\"</div><div class='status-text' style='font-size:0.85em; color:#666; margin-top:8px;'>Found {len(results['characters'])} characters and {len(results['phrases'])} phrases</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:1.2em; font-weight:700; margin-bottom:20px;'>Search Results for \"{pyhtml.escape(state.get('definition_search_query'))}\"</div><div style='font-size:0.85em; color:#666; margin-bottom:20px;'>Found {len(results['characters'])} characters and {len(results['phrases'])} phrases</div>", unsafe_allow_html=True)
     
     if results['characters']:
         st.markdown("<div class='lineage-header'>📖 Characters</div>", unsafe_allow_html=True)
@@ -709,6 +676,33 @@ def render_definition_search_results():
         st.info(f"No results found for '{state.get('definition_search_query')}'. Try different search terms.")
 
 def render_grid_view():
+    # Filters moved to top
+    with st.expander("🔎 Filters", expanded=False):
+        st.slider("Stroke count", 1, 30, value=state.get_stroke_range(), key="w_stroke_range", on_change=sync_stroke_range)
+        
+        rad_groups = stats_cache.get("rad_groups", {})
+        radical_options = ["none"]
+        for stroke_count in sorted(rad_groups.keys()):
+            rads_in_group = rad_groups[stroke_count]
+            if rads_in_group:
+                for rad in rads_in_group:
+                    radical_options.append(rad)
+        
+        def format_radical(rad):
+            if rad == "none": return "none"
+            rad_info = component_map.get(rad, {})
+            strokes = rad_info.get('stroke_count')
+            if strokes: return f"{rad} ({strokes} strokes)"
+            return rad
+        
+        current_rad = state.get("radical")
+        current_index = radical_options.index(current_rad) if current_rad in radical_options else 0
+        st.selectbox("Radical", options=radical_options, format_func=format_radical, index=current_index, key="w_radical", on_change=sync_radical)
+        
+        idcs = sorted(stats_cache.get("idc_counts", {}).keys())
+        idc = state.get("component_idc")
+        st.selectbox("Structure (IDC)", options=["none"] + idcs, index=(["none"] + idcs).index(idc) if idc in idcs else 0, key="w_idc", on_change=sync_idc)
+
     col_sort_1, col_sort_2 = st.columns([2, 3])
     with col_sort_1:
         def update_grid_sort_mode():
@@ -735,7 +729,6 @@ def render_grid_view():
                 on_change=lambda: state.update(grid_script_filter=state.get("grid_script_radio"), page=1), 
                 horizontal=True
             )
-    # st.markdown("---")
 
     cur_min, cur_max = state.get_stroke_range()
     filter_parts = [f"<span class='status-tag'>Sort: {'Component' if state.get_grid_sort_mode() == 'usage' else 'Character'} frequency</span>"]
@@ -751,7 +744,7 @@ def render_grid_view():
     if state.get_grid_sort_mode() == "usage": filter_parts.append("<span class='status-tag'>View: Components only</span>")
     if state.get_grid_sort_mode() == "frequency": filter_parts.append(f"<span class='status-tag'>Script: {state.get('grid_script_filter')}</span>")
     
-    st.markdown(f"<div class='status-line' style='display: flex; flex-direction: column; gap: 8px;'><div style='display: flex; justify-content: space-between; align-items: center;'><div style='display: flex; flex-wrap: wrap; gap: 8px;'><span style='font-weight: 800; margin-right: 5px;'>📎 Filters:</span> {''.join(filter_parts)}</div><div style='font-size: 0.8em; color: rgba(15, 81, 50, 0.7); font-weight: 700;'>Click once to preview; click again to drill down.</div></div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;'><div style='display: flex; justify-content: space-between; align-items: center;'><div style='display: flex; flex-wrap: wrap; gap: 8px;'><span style='font-weight: 800; margin-right: 5px;'>🔎 Active Filters:</span> {''.join(filter_parts)}</div><div style='font-size: 0.8em; color: #666; font-weight: 700;'>Click once to preview; click again to drill down.</div></div></div>", unsafe_allow_html=True)
 
     filtered = [c for c in component_map if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max and (state.get("radical") == "none" or component_map[c]["meta"].get("radical") == state.get("radical")) and (state.get("component_idc") == "none" or component_map[c]["meta"].get("decomposition", "").startswith(state.get("component_idc"))) and (state.get_grid_sort_mode() != "usage" or c in stats_cache["used_components"])]
     if state.get_grid_sort_mode() == "frequency": filtered = apply_script_filter(filtered, state.get("grid_script_filter"))
@@ -798,12 +791,11 @@ def render_grid_view():
                     )
                 )
             with col_btn:
-                if st.button("🔍 Search", key="w_text_btn", use_container_width=True):
+                if st.button("🔎 Search", key="w_text_btn", use_container_width=True):
                     if state.process_search_and_clear(st.session_state.w_text, "w_text", st.toast):
                         st.rerun()
             
             st.markdown("<div style='margin: 15px 0; border-top: 1px dashed #ddd;'></div>", unsafe_allow_html=True)
-            # st.markdown("**English Definition Search**")
             search_key = render_definition_search_ui("w")
             if st.button("Search Definitions", use_container_width=True, type="primary", key="w_def_btn_grid"):
                 state.set("w_def_search", state.get(search_key, ""))
@@ -816,6 +808,10 @@ def render_character_lineage_view():
     decomp = info.get("meta", {}).get("decomposition", "")
     parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
     parents = apply_script_filter(parents, state.get_script_filter())
+    
+    # Filters expander at top of lineage view
+    with st.expander("🔎 Filters", expanded=False):
+        st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(state.get_script_filter()), key="w_script_filter", on_change=sync_script_filter)
     
     if parents:
         st.markdown("<div class='lineage-header'>🧱 Components (How it's built)</div>", unsafe_allow_html=True)
