@@ -63,7 +63,7 @@ def tile_click(c):
 def list_tile_click(c):
     if state.get_preview_component() == c:
         if not state.get("has_drilled_down", False):
-            st.toast("Feature Discovered: You have entered the Character Lineage view!", icon="🌳")
+            st.toast("Feature Discovered: You have entered the Lineage view!", icon="🌳")
             state.set("has_drilled_down", True)
         if state.get_selected_component():
             history = state.get_history()
@@ -475,7 +475,7 @@ def render_sidebar():
         # 1. Breadcrumbs
         current_main_char = state.get("stroke_view_char") if state.is_stroke_view_active() else state.get_selected_component()
         if current_main_char:
-            path_items = ["🏠 Grid"] + state.get_history() + ([f"<i>{current_main_char}</i> (🧠)"] if state.is_stroke_view_active() else [f"<b>{current_main_char}</b>"])
+            path_items = ["🏠 Grid"] + state.get_history() + ([f"<i>{current_main_char}</i> (AI Link)"] if state.is_stroke_view_active() else [f"<b>{current_main_char}</b> (Lineage)"])
             st.markdown(f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>{' → '.join(path_items)}</div>", unsafe_allow_html=True)
         
         # 2. Nav Buttons (Back/Grid)
@@ -483,7 +483,7 @@ def render_sidebar():
             nav_col1, nav_col2 = st.columns(2)
             with nav_col1:
                 if state.is_stroke_view_active():
-                    st.button("← Back", on_click=state.exit_stroke_view, use_container_width=True, type="primary")
+                    st.button("← Lineage", on_click=state.exit_stroke_view, use_container_width=True, type="primary")
                 else:
                     st.button("← Back", on_click=state.go_back, use_container_width=True, type="primary")
             with nav_col2:
@@ -492,12 +492,11 @@ def render_sidebar():
         # 3. Determine Current Sidebar Char
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
 
-        # 4. ACTION BUTTONS (Moved to Top)
+        # 4. ACTION BUTTONS
         if current_char_for_sidebar:
-            # Logic: 
-            # Show "Drill Down" if we are in Grid Mode (showing inputs), OR Stroke Mode, 
+            # Show "Lineage" if we are in Grid Mode (showing inputs), OR AI Link Mode, 
             # OR if we are previewing a character different from the main selected one.
-            show_drill_down = (
+            show_lineage = (
                 state.is_showing_inputs() or 
                 state.is_stroke_view_active() or 
                 (current_char_for_sidebar != state.get_selected_component())
@@ -506,12 +505,12 @@ def render_sidebar():
             # Show "AI Link" if we are NOT already in AI Link mode
             show_ai_link = not state.is_stroke_view_active()
 
-            if show_drill_down or show_ai_link:
+            if show_lineage or show_ai_link:
                 # Group buttons in columns if both are visible
-                if show_drill_down and show_ai_link:
+                if show_lineage and show_ai_link:
                     b1, b2 = st.columns(2)
                     with b1:
-                        if st.button("✅ Drill Down", key="sb_btn_drill", use_container_width=True, type="primary"):
+                        if st.button("🌳 Lineage", key="sb_btn_lineage", use_container_width=True, type="primary"):
                              # If navigation implies deep drilling (e.g. preview != current context), save history
                              if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
                                  history = state.get_history()
@@ -525,8 +524,8 @@ def render_sidebar():
                             st.rerun()
                 else:
                     # Full width single button
-                    if show_drill_down:
-                        if st.button("✅ Drill Down", key="sb_btn_drill_full", use_container_width=True, type="primary"):
+                    if show_lineage:
+                        if st.button("🌳 Lineage", key="sb_btn_lineage_full", use_container_width=True, type="primary"):
                              if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
                                  history = state.get_history()
                                  history.append(state.get_selected_component())
