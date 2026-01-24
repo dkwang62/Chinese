@@ -478,7 +478,7 @@ def render_sidebar():
             path_items = ["🏠 Grid"] + state.get_history() + ([f"<i>{current_main_char}</i> (AI Link)"] if state.is_stroke_view_active() else [f"<b>{current_main_char}</b> (Lineage)"])
             st.markdown(f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>{' → '.join(path_items)}</div>", unsafe_allow_html=True)
         
-        # 2. Nav Buttons (Back/Grid)
+        # 2. Nav Buttons
         if not state.is_showing_inputs() or state.is_stroke_view_active():
             nav_col1, nav_col2 = st.columns(2)
             with nav_col1:
@@ -488,6 +488,19 @@ def render_sidebar():
                     st.button("← Back", on_click=state.go_back, use_container_width=True, type="primary")
             with nav_col2:
                 st.button("🏠 Grid", on_click=state.go_to_root, use_container_width=True)
+        
+        # Navigation buttons row
+        nav_row1, nav_row2 = st.columns(2)
+        with nav_row1:
+            if st.button("⭐ Favourites", use_container_width=True):
+                state.go_to_root()
+                state.set("onboarding_done", False)
+                st.rerun()
+        with nav_row2:
+            if st.button("⚙️ Setup", use_container_width=True):
+                state.set("onboarding_done", False)
+                state.set("startup_done", False)
+                st.rerun()
 
         # 3. Determine Current Sidebar Char
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
@@ -562,10 +575,6 @@ def render_sidebar():
             
             st.markdown("---")
             st.checkbox("Show in Favourites", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
-            if st.button("Show Favourites", use_container_width=True):
-                state.go_to_root()
-                state.set("onboarding_done", False)
-                st.rerun()
 
         # 7. Search
         with st.expander("🔍 Search", expanded=False):
