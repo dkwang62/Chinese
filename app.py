@@ -491,10 +491,14 @@ def render_sidebar():
         
         # Favourites button
         if st.button("⭐ Favourites", use_container_width=True):
+            # Reset to initial state to show splash screen
             state.set("show_inputs", True)
             state.set("selected_comp", "")
             state.set("preview_comp", None)
             state.set("history", [])
+            state.set("stroke_view_active", False)
+            state.set("stroke_view_char", None)
+            state.set("definition_search_mode", False)
             state.set("onboarding_done", False)
             st.rerun()
 
