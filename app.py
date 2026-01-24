@@ -806,9 +806,10 @@ def render_character_lineage_view():
     parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
     parents = apply_script_filter(parents, state.get_script_filter())
     
-    # Filters expander at top of lineage view
-    with st.expander("🔎 Filters", expanded=False):
-        st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(state.get_script_filter()), key="w_script_filter", on_change=sync_script_filter)
+    # Filter controls - always visible
+    st.markdown("<div style='background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+    st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(state.get_script_filter()), key="w_script_filter", on_change=sync_script_filter, horizontal=True)
+    st.markdown("</div>", unsafe_allow_html=True)
     
     if parents:
         st.markdown("<div class='lineage-header'>🧱 Components (How it's built)</div>", unsafe_allow_html=True)
