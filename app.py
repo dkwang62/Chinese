@@ -740,6 +740,9 @@ def render_grid_view():
     
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # Get current filter values
+    cur_min, cur_max = state.get_stroke_range()
+    
     filtered = [c for c in component_map if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max and (state.get("radical") == "none" or component_map[c]["meta"].get("radical") == state.get("radical")) and (state.get("component_idc") == "none" or component_map[c]["meta"].get("decomposition", "").startswith(state.get("component_idc"))) and (state.get_grid_sort_mode() != "usage" or c in stats_cache["used_components"])]
     if state.get_grid_sort_mode() == "frequency": filtered = apply_script_filter(filtered, state.get("grid_script_filter"))
     sorted_comps = sorted(filtered, key=sort_key_frequency_primary if state.get_grid_sort_mode() == "frequency" else sort_key_usage_primary)
