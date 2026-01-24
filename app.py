@@ -676,10 +676,44 @@ def render_definition_search_results():
         st.info(f"No results found for '{state.get('definition_search_query')}'. Try different search terms.")
 
 def render_grid_view():
-    # Filters moved to top
-    with st.expander("🔎 Filters", expanded=False):
-        st.slider("Stroke count", 1, 30, value=state.get_stroke_range(), key="w_stroke_range", on_change=sync_stroke_range)
+    # Filters section - clean and visible
+    st.markdown("<div style='background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
+    
+    # Row 1: Sort and Script filters
+    col_sort, col_script = st.columns([1, 1])
+    with col_sort:
+        def update_grid_sort_mode():
+            state.set("grid_sort_mode", "usage" if state.get("grid_sort_mode_radio") == "Component frequency" else "frequency")
+            state.set("page", 1)
         
+        st.radio(
+            "Sort by", 
+            options=["Component frequency", "Character frequency"], 
+            index=0 if state.get_grid_sort_mode() == "usage" else 1, 
+            key="grid_sort_mode_radio", 
+            on_change=update_grid_sort_mode,
+            horizontal=True
+        )
+    
+    with col_script:
+        if state.get_grid_sort_mode() == "frequency":
+            gsf = state.get("grid_script_filter")
+            st.radio(
+                "Script", 
+                options=["Simplified", "Traditional", "Any"], 
+                index=["Simplified", "Traditional", "Any"].index(gsf), 
+                key="grid_script_radio", 
+                on_change=lambda: state.update(grid_script_filter=state.get("grid_script_radio"), page=1), 
+                horizontal=True
+            )
+    
+    # Row 2: Stroke, Radical, and IDC filters
+    col_stroke, col_radical, col_idc = st.columns([2, 2, 2])
+    
+    with col_stroke:
+        st.slider("Strokes", 1, 30, value=state.get_stroke_range(), key="w_stroke_range", on_change=sync_stroke_range)
+    
+    with col_radical:
         rad_groups = stats_cache.get("rad_groups", {})
         radical_options = ["none"]
         for stroke_count in sorted(rad_groups.keys()):
@@ -698,53 +732,13 @@ def render_grid_view():
         current_rad = state.get("radical")
         current_index = radical_options.index(current_rad) if current_rad in radical_options else 0
         st.selectbox("Radical", options=radical_options, format_func=format_radical, index=current_index, key="w_radical", on_change=sync_radical)
-        
+    
+    with col_idc:
         idcs = sorted(stats_cache.get("idc_counts", {}).keys())
         idc = state.get("component_idc")
-        st.selectbox("Structure (IDC)", options=["none"] + idcs, index=(["none"] + idcs).index(idc) if idc in idcs else 0, key="w_idc", on_change=sync_idc)
-
-    col_sort_1, col_sort_2 = st.columns([2, 3])
-    with col_sort_1:
-        def update_grid_sort_mode():
-            state.set("grid_sort_mode", "usage" if state.get("grid_sort_mode_radio") == "Component frequency" else "frequency")
-            state.set("page", 1)
-        
-        st.radio(
-            "Sort Grid By", 
-            options=["Component frequency", "Character frequency"], 
-            index=0 if state.get_grid_sort_mode() == "usage" else 1, 
-            key="grid_sort_mode_radio", 
-            on_change=update_grid_sort_mode,
-            horizontal=True
-        )
+        st.selectbox("Structure", options=["none"] + idcs, index=(["none"] + idcs).index(idc) if idc in idcs else 0, key="w_idc", on_change=sync_idc)
     
-    with col_sort_2:
-        if state.get_grid_sort_mode() == "frequency":
-            gsf = state.get("grid_script_filter")
-            st.radio(
-                "Show characters in:", 
-                options=["Simplified", "Traditional", "Any"], 
-                index=["Simplified", "Traditional", "Any"].index(gsf), 
-                key="grid_script_radio", 
-                on_change=lambda: state.update(grid_script_filter=state.get("grid_script_radio"), page=1), 
-                horizontal=True
-            )
-
-    cur_min, cur_max = state.get_stroke_range()
-    filter_parts = [f"<span class='status-tag'>Sort: {'Component' if state.get_grid_sort_mode() == 'usage' else 'Character'} frequency</span>"]
-    max_s_val = max((get_stroke_count(c) for c in component_map if get_stroke_count(c) is not None), default=30)
-    if not (cur_min == 1 and cur_max == max_s_val):
-        if cur_min == cur_max: filter_parts.append(f"<span class='status-tag'>{cur_min} strokes</span>")
-        elif cur_min == 1: filter_parts.append(f"<span class='status-tag'>≤ {cur_max} strokes</span>")
-        elif cur_max == max_s_val: filter_parts.append(f"<span class='status-tag'>≥ {cur_min} strokes</span>")
-        else: filter_parts.append(f"<span class='status-tag'>{cur_min}–{cur_max} strokes</span>")
-    
-    if state.get("radical") != "none": filter_parts.append(f"<span class='status-tag'>Rad. {state.get('radical')}</span>")
-    if state.get("component_idc") != "none": filter_parts.append(f"<span class='status-tag'>{state.get('component_idc')}</span>")
-    if state.get_grid_sort_mode() == "usage": filter_parts.append("<span class='status-tag'>View: Components only</span>")
-    if state.get_grid_sort_mode() == "frequency": filter_parts.append(f"<span class='status-tag'>Script: {state.get('grid_script_filter')}</span>")
-    
-    st.markdown(f"<div style='display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;'><div style='display: flex; justify-content: space-between; align-items: center;'><div style='display: flex; flex-wrap: wrap; gap: 8px;'><span style='font-weight: 800; margin-right: 5px;'>🔎 Active Filters:</span> {''.join(filter_parts)}</div><div style='font-size: 0.8em; color: #666; font-weight: 700;'>Click once to preview; click again to drill down.</div></div></div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     filtered = [c for c in component_map if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max and (state.get("radical") == "none" or component_map[c]["meta"].get("radical") == state.get("radical")) and (state.get("component_idc") == "none" or component_map[c]["meta"].get("decomposition", "").startswith(state.get("component_idc"))) and (state.get_grid_sort_mode() != "usage" or c in stats_cache["used_components"])]
     if state.get_grid_sort_mode() == "frequency": filtered = apply_script_filter(filtered, state.get("grid_script_filter"))
