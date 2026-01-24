@@ -489,18 +489,14 @@ def render_sidebar():
             with nav_col2:
                 st.button("🏠 Grid", on_click=state.go_to_root, use_container_width=True)
         
-        # Navigation buttons row
-        nav_row1, nav_row2 = st.columns(2)
-        with nav_row1:
-            if st.button("⭐ Favourites", use_container_width=True):
-                state.go_to_root()
-                state.set("onboarding_done", False)
-                st.rerun()
-        with nav_row2:
-            if st.button("⚙️ Setup", use_container_width=True):
-                state.set("onboarding_done", False)
-                state.set("startup_done", False)
-                st.rerun()
+        # Favourites button
+        if st.button("⭐ Favourites", use_container_width=True):
+            state.set("show_inputs", True)
+            state.set("selected_comp", "")
+            state.set("preview_comp", None)
+            state.set("history", [])
+            state.set("onboarding_done", False)
+            st.rerun()
 
         # 3. Determine Current Sidebar Char
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
