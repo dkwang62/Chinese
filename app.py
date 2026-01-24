@@ -254,6 +254,25 @@ def render_splash():
     persistence.show_resume_option()
     # =====================================
 
+    # Show favourites section first if coming from favourites button
+    if demos := state.get_favourites():
+        st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
+        st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+        unique_demos = list(dict.fromkeys(demos))
+        for r in range((len(unique_demos) + 5 - 1) // 5):
+            cols = st.columns(5)
+            for j in range(5):
+                idx = r * 5 + j
+                if idx < len(unique_demos):
+                    ch = unique_demos[idx]
+                    with cols[j]:
+                        if st.button(f"Explore {ch}", key=f"v4_splash_btn_{idx}_{ord(ch)}", use_container_width=True, type="primary"):
+                            state.complete_onboarding()
+                            state.enter_character_view(ch)
+                            st.rerun()
+                        st.caption(f"used in {component_usage_count(ch)} characters")
+        st.markdown("</div>", unsafe_allow_html=True)
+
     _, c, _ = st.columns([1, 1, 1])
     if c.button("🚪 Enter", key="entrance_btn", use_container_width=True, type="primary"):
         state.complete_onboarding()
@@ -451,24 +470,6 @@ def render_splash():
                     st.rerun()
     
     st.markdown("</div>", unsafe_allow_html=True)
-
-    if demos := state.get_favourites():
-        st.markdown("<h4 style='text-align:center; color:#666; margin-top:20px;'>Quick Access Favourites</h4>", unsafe_allow_html=True)
-        st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
-        unique_demos = list(dict.fromkeys(demos))
-        for r in range((len(unique_demos) + 5 - 1) // 5):
-            cols = st.columns(5)
-            for j in range(5):
-                idx = r * 5 + j
-                if idx < len(unique_demos):
-                    ch = unique_demos[idx]
-                    with cols[j]:
-                        if st.button(f"Explore {ch}", key=f"v4_splash_btn_{idx}_{ord(ch)}", use_container_width=True, type="primary"):
-                            state.complete_onboarding()
-                            state.enter_character_view(ch)
-                            st.rerun()
-                        st.caption(f"used in {component_usage_count(ch)} characters")
-        st.markdown("</div>", unsafe_allow_html=True)
 
 def render_sidebar():
     with st.sidebar:
