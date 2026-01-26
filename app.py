@@ -264,10 +264,10 @@ def render_sidebar():
                 </div>
                 """, unsafe_allow_html=True)
             
-            st.markdown("---")
-            st.checkbox("⭐ Favourite", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
+     
+            st.checkbox("⭐ Add to Favourite", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
         
-        st.markdown("---")
+    
         
         # 4. Search (Combined Character + Definition)
         with st.expander("🔍 Search", expanded=False):
@@ -294,7 +294,7 @@ def render_sidebar():
                 st.rerun()
             st.caption("Search across meanings (e.g., 'fire', 'mountain')")
 
-        st.markdown("---")
+
         
         # 5. User Data
         with st.expander("💾 User Data", expanded=False):
