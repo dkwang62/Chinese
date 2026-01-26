@@ -1,5 +1,5 @@
 # app.py
-# Main Streamlit app for Radix - Streamlined Edition (Grid-first + Definition Search)
+# Main Streamlit app for Radix - Streamlined Edition (3 Tabs)
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -7,6 +7,7 @@ import math
 import html as pyhtml
 import uuid
 import re
+import unicodedata  # Required for fuzzy pinyin normalization
 from radix_core import (
     component_map, get_db_connection, batch_get_phrase_details,
     search_phrases_by_definition, get_stroke_count, component_usage_count,
@@ -37,6 +38,19 @@ config = ConfigManager(state)
 persistence = PersistenceManager(state)
 
 
+# ==================== HELPERS ====================
+
+def normalize_pinyin(pinyin_str):
+    """
+    Remove tone marks from pinyin for fuzzy search (e.g., 'nǐ' -> 'ni').
+    Robust against None, non-strings, or other data types.
+    """
+    if not isinstance(pinyin_str, str):
+        return ""
+    # Decompose unicode characters and strip combining diacritical marks
+    return ''.join(c for c in unicodedata.normalize('NFD', pinyin_str) if unicodedata.category(c) != 'Mn').lower()
+
+
 # ==================== CALLBACKS ====================
 
 def tile_click(c):
@@ -65,7 +79,7 @@ def toggle_favourite(char):
         state.remove_from_favourites(char)
 
 def search_by_definition():
-    """Execute search for English definitions."""
+    """Execute search for English definitions (Legacy/Sidebar version)."""
     query = state.get("sidebar_def_search", "").strip()
     is_valid, error_msg = InputValidator.validate_definition_search(query)
     
@@ -264,12 +278,12 @@ def render_sidebar():
                 </div>
                 """, unsafe_allow_html=True)
             
-     
-            st.checkbox("⭐ Add to Favourite", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
+            st.markdown("---")
+            st.checkbox("⭐ Favourite", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
         
-    
+        st.markdown("---")
         
-        # 4. Search (Combined Character + Definition)
+        # 4. Search
         with st.expander("🔍 Search", expanded=False):
             # Character Search
             st.markdown("**Character Search**")
@@ -294,7 +308,7 @@ def render_sidebar():
                 st.rerun()
             st.caption("Search across meanings (e.g., 'fire', 'mountain')")
 
-
+        st.markdown("---")
         
         # 5. User Data
         with st.expander("💾 User Data", expanded=False):
@@ -312,14 +326,86 @@ def render_sidebar():
                     st.success("✓ Current file active")
 
 def render_grid():
-    """Render the main grid view with Tabs."""
-    tab1, tab2 = st.tabs(["📊 All Components", "⭐ Favourites"])
+    """Render the main grid view with 3 Tabs."""
+    # Changed from 2 tabs to 3
+    tab1, tab2, tab3 = st.tabs(["📊 Filter", "⭐ Favourites", "🔍 Smart Search"])
     
     with tab1:
         render_all_components_grid()
     
     with tab2:
         render_favourites_grid()
+
+    with tab3:
+        render_smart_search()
+
+def render_smart_search():
+    """Render the combined Fuzzy Pinyin + Meaning search tab."""
+    st.markdown("<div style='background: #e3f2fd; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #bbdefb;'>", unsafe_allow_html=True)
+    st.markdown("### 🔍 Smart Search")
+    st.markdown("Search by **Fuzzy Pinyin** (e.g., 'jiong' finds 'jiǒng') OR **English Meaning** (e.g., 'fire').")
+    
+    query = st.text_input("Enter Pinyin or Meaning", key="smart_search_input", placeholder="e.g. ma, ni, horse, water")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if query:
+        query = query.strip()
+        if len(query) < 2:
+            st.warning("Please enter at least 2 characters.")
+            return
+
+        results = []
+        # Normalize the query for pinyin comparison (e.g. "jiong")
+        query_norm = normalize_pinyin(query)
+        query_lower = query.lower()
+
+        # Iterate through all components
+        for char, info in component_map.items():
+            meta = info.get("meta", {})
+            
+            # 1. Pinyin Match (Fuzzy)
+            # 'pinyin' in meta can be a list ["kān"] or string "kān"
+            pinyin_data = meta.get("pinyin", [])
+            pinyin_match = False
+            
+            if isinstance(pinyin_data, list):
+                # Check if ANY pronunciation matches
+                for p in pinyin_data:
+                    if normalize_pinyin(p) == query_norm:
+                        pinyin_match = True
+                        break
+            elif isinstance(pinyin_data, str):
+                if normalize_pinyin(pinyin_data) == query_norm:
+                    pinyin_match = True
+            
+            if pinyin_match:
+                results.append(char)
+                continue # Matched pinyin, skip checking definition to avoid duplicates in list
+
+            # 2. Definition Match (English)
+            definition = meta.get("definition", "")
+            if isinstance(definition, str) and query_lower in definition.lower():
+                results.append(char)
+                continue
+
+        # Display Results
+        if not results:
+            st.info(f"No matches found for '{query}'.")
+        else:
+            st.success(f"Found {len(results)} matches.")
+            st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+            
+            # Pagination for search results if too many (limit to first 100 for speed)
+            display_results = results[:100]
+            
+            cols = st.columns(GRID_COLUMNS)
+            for i, ch in enumerate(display_results):
+                with cols[i % GRID_COLUMNS]:
+                    st.button(ch, key=f"smart_res_{ch}_{i}", type="primary" if state.get_preview_component() == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            if len(results) > 100:
+                st.caption(f"Showing first 100 of {len(results)} results.")
 
 def render_all_components_grid():
     st.markdown("<div style='background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
@@ -458,7 +544,7 @@ def render_favourites_grid():
     st.markdown("</div>", unsafe_allow_html=True)
 
 def render_definition_search_results():
-    """Render the results of an English definition search."""
+    """Render the results of an English definition search (Legacy Sidebar)."""
     results = state.get("definition_search_results")
     if not results:
         st.error("No results state found.")
