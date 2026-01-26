@@ -288,30 +288,12 @@ def render_sidebar():
         
         # TAB 1: FILTER
         with tab_filter:
-            # Grid settings (only show when in grid mode)
-            if state.is_showing_inputs():
-                st.markdown("**Grid Settings**")
-                
-                stroke_min_val = state.get("stroke_min", 1)
-                stroke_max_val = state.get("stroke_max", 30)
-                freq_min_val = state.get("freq_min", 0)
-                freq_max_val = state.get("freq_max", 99)
-                sort_method = st.selectbox(
-                    "Sort by", ["Usage", "Frequency"],
-                    index=0 if state.get("sort_by") == "usage" else 1,
-                    key="sort_by_select"
-                )
-                state.set("sort_by", sort_method.lower())
-                
-                st.slider("Stroke Count", 1, 30, (stroke_min_val, stroke_max_val), key="stroke_range")
-                state.set("stroke_min", st.session_state.stroke_range[0])
-                state.set("stroke_max", st.session_state.stroke_range[1])
-                
-                st.slider("Frequency Rank (0 = most common)", 0, 99, (freq_min_val, freq_max_val), key="freq_range")
-                state.set("freq_min", st.session_state.freq_range[0])
-                state.set("freq_max", st.session_state.freq_range[1])
-            else:
-                st.caption("Grid settings available when viewing grid")
+            st.caption("Filter controls are available in the main grid view when you return to the grid.")
+            
+            if not state.is_showing_inputs():
+                if st.button("↩️ Return to Grid", use_container_width=True, key="filter_return_grid"):
+                    state.return_to_inputs()
+                    st.rerun()
         
         # TAB 2: FAVOURITES
         with tab_favourites:
@@ -357,7 +339,7 @@ def render_sidebar():
                 st.rerun()
         
         if state.is_definition_search_active():
-            if st.button("↩️ Return to Grid", use_container_width=True):
+            if st.button("↩️ Return to Grid", use_container_width=True, key="def_search_return"):
                 state.return_to_inputs()
                 st.rerun()
         
