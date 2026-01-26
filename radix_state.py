@@ -17,7 +17,7 @@ PROFILE_FILENAME = "radix_user_data.json"
 
 PAGE_SIZE = 120
 GRID_COLUMNS = 10
-MAX_FAVOURITES = 20
+# MAX_FAVOURITES was removed to allow unlimited favourites
 MAX_DERIVATIVES_DISPLAY = 120
 
 DISPLAY_MODES = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
@@ -162,7 +162,6 @@ class StateManager:
         if char:
             st.query_params["c"] = char
 
-        # FIXED: Removed 'history=[]' so the breadcrumb trail is preserved!
         self.update(
             script_filter="Any",
             selected_comp=char,
@@ -256,14 +255,11 @@ class StateManager:
     
     # --- List Operations ---
     def add_to_favourites(self, char: str):
+        """Add character to favourites list (Unlimited)."""
         favs = self.get_favourites()
         if char not in favs:
-            if len(favs) < MAX_FAVOURITES:
-                favs.append(char)
-            else:
-                idx = self.state.get("fav_cursor", 0)
-                favs[idx] = char
-                self.state["fav_cursor"] = (idx + 1) % MAX_FAVOURITES
+            # Simply append; no limit check or cursor replacement
+            favs.append(char)
             self.set("favourites_list", favs)
     
     def remove_from_favourites(self, char: str):
