@@ -7,7 +7,7 @@ import math
 import html as pyhtml
 import uuid
 import re
-import unicodedata  # Added for pinyin normalization
+import unicodedata  # Required for fuzzy pinyin
 from radix_core import (
     component_map, get_db_connection, batch_get_phrase_details,
     search_phrases_by_definition, get_stroke_count, component_usage_count,
@@ -41,8 +41,11 @@ persistence = PersistenceManager(state)
 # ==================== HELPERS ====================
 
 def normalize_pinyin(pinyin_str):
-    """Remove tone marks from pinyin for fuzzy search (e.g., 'nǐ' -> 'ni')."""
-    if not pinyin_str:
+    """
+    Remove tone marks from pinyin for fuzzy search (e.g., 'nǐ' -> 'ni').
+    Robust against None or non-string inputs to prevent TypeErrors.
+    """
+    if not isinstance(pinyin_str, str):
         return ""
     # Decompose unicode characters and strip combining diacritical marks
     return ''.join(c for c in unicodedata.normalize('NFD', pinyin_str) if unicodedata.category(c) != 'Mn').lower()
@@ -123,12 +126,16 @@ def _render_phrase_html(c: str) -> str:
     n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
     n = n_map.get(state.get_display_mode(), 2)
     
+    # 1. Try to get compounds from the current character
     raw_compounds = component_map.get(c, {}).get("meta", {}).get("compounds", [])
+    
+    # 2. If empty and converter is available, try the Simplified equivalent
     if not raw_compounds and cc_t2s:
         s_c = cc_t2s.convert(c)
         if s_c != c:
             raw_compounds = component_map.get(s_c, {}).get("meta", {}).get("compounds", [])
             
+    # 3. Filter by length
     compounds = [w for w in (raw_compounds or []) if len(w) == n]
     
     if compounds and (db := get_db_connection()):
@@ -149,6 +156,7 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
     is_preview = state.get_preview_component() == c
     is_active_focus = is_preview or (state.get_preview_component() is None and c == state.get_selected_component())
     
+    # Generate UID at top level so both columns can use it for unique keys
     uid = str(uuid.uuid4())[:8]
 
     with col_char:
@@ -172,6 +180,7 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
         st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c), is_static=is_static, minimal=minimal), unsafe_allow_html=True)
         
         if not is_static and is_active_focus:
+            # 1. Handle Display Mode State for Radio Button
             current_mode_str = state.get_display_mode()
             try:
                 current_int = int(current_mode_str[0])
@@ -185,6 +194,7 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
                 val = st.session_state[f"ph_len_rad_{c}_{uid}"]
                 state.set("display_mode", f"{val}-Characters")
 
+            # 2. Render Radio Button
             st.radio(
                 "Phrase Length",
                 options=[2, 3, 4],
@@ -195,6 +205,7 @@ def render_radix_row(c, context="detail", is_static=False, minimal=False):
                 on_change=update_phrase_len
             )
 
+            # 3. Render Phrase Table
             if html := _render_phrase_html(c):
                 st.markdown(html, unsafe_allow_html=True)
     
@@ -253,7 +264,9 @@ def render_startup_file_choice():
 def render_splash():
     st.markdown("""<div class="palace-entrance-container"><div class="grand-torii">⛩️</div><div class="entrance-text">Grand Hall of Radix 🈁 Components</div></div>""", unsafe_allow_html=True)
     
+    # === HERE IS THE NEW RESUME BUTTON ===
     persistence.show_resume_option()
+    # =====================================
 
     _, c, _ = st.columns([1, 1, 1])
     if c.button("🚪 Enter", key="entrance_btn", use_container_width=True, type="primary"):
@@ -266,6 +279,7 @@ def render_splash():
     
     with col_search:
         with st.expander("🔍 Search", expanded=False):
+            # --- CHARACTER SEARCH ---
             st.markdown("**Character Search**")
             col_sp_in, col_sp_btn = st.columns([4, 1])
             with col_sp_in:
@@ -286,6 +300,7 @@ def render_splash():
             st.caption("Enter one Hanzi to jump to its details")
             st.markdown("<div style='margin: 15px 0; border-top: 1px dashed #ddd;'></div>", unsafe_allow_html=True)
             
+            # --- DEFINITION SEARCH ---
             search_key = render_definition_search_ui("splash")
             if st.button("Search Definitions", use_container_width=True, type="primary", key="splash_def_btn"):
                 state.set("w_def_search", state.get(search_key, ""))
@@ -493,18 +508,24 @@ def render_sidebar():
 
         # 4. ACTION BUTTONS
         if current_char_for_sidebar:
+            # Show "Lineage" if we are in Grid Mode (showing inputs), OR AI Link Mode, 
+            # OR if we are previewing a character different from the main selected one.
             show_lineage = (
                 state.is_showing_inputs() or 
                 state.is_stroke_view_active() or 
                 (current_char_for_sidebar != state.get_selected_component())
             )
+            
+            # Show "AI Link" if we are NOT already in AI Link mode
             show_ai_link = not state.is_stroke_view_active()
 
             if show_lineage or show_ai_link:
+                # Group buttons in columns if both are visible
                 if show_lineage and show_ai_link:
                     b1, b2 = st.columns(2)
                     with b1:
                         if st.button("🌳 Lineage", key="sb_btn_lineage", use_container_width=True, type="primary"):
+                             # If navigation implies deep drilling (e.g. preview != current context), save history
                              if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
                                  history = state.get_history()
                                  history.append(state.get_selected_component())
@@ -516,6 +537,7 @@ def render_sidebar():
                             state.enter_stroke_view(current_char_for_sidebar)
                             st.rerun()
                 else:
+                    # Full width single button
                     if show_lineage:
                         if st.button("🌳 Lineage", key="sb_btn_lineage_full", use_container_width=True, type="primary"):
                              if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
@@ -543,6 +565,7 @@ def render_sidebar():
             if analysis['semantic'] or analysis['phonetic']:
                 s_txt = f"💡 <b>{analysis['semantic']}</b> = Meaning" if analysis['semantic'] else ""
                 p_txt = f"📊 <b>{analysis['phonetic']}</b> = Sound" if analysis['phonetic'] else ""
+                
                 st.markdown(f"""
                 <div style='background-color: #f0f2f6; padding: 12px; border-radius: 10px; margin-top: 15px; border: 1px solid #dce0e6;'>
                     <div style='font-weight:bold; margin-bottom:6px; color: #31333F; font-size: 0.9em;'>🧠 Logic Breakdown</div>
@@ -666,7 +689,7 @@ def render_definition_search_results():
         st.info(f"No results found for '{state.get('definition_search_query')}'. Try different search terms.")
 
 def render_grid_view():
-    tab_browse, tab_search = st.tabs(["🧩 Browse & Filter", "🔍 Search (Pinyin/Meaning)"])
+    tab_browse, tab_search = st.tabs(["🧩 Browse & Filter", "🔍 Smart Search"])
 
     with tab_browse:
         # Filters section - clean and visible
