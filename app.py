@@ -109,162 +109,6 @@ def search_by_definition():
         preview_comp=None
     )
 
-def execute_smart_search():
-    """Execute Smart Search with pinyin and English meaning matches."""
-    query = state.get("smart_search_input", "").strip()
-    
-    if not query:
-        st.toast("Please enter a search term")
-        return
-    
-    is_valid, error_msg = InputValidator.validate_definition_search(query)
-    if not is_valid:
-        st.toast(error_msg)
-        return
-    
-    # Normalize query for pinyin matching
-    query_lower = query.lower()
-    query_normalized_pinyin = normalize_pinyin(query)
-    
-    # 1. Search Characters - separate pinyin and English matches
-    char_pinyin_matches = []
-    char_english_matches = []
-    
-    for char, info in component_map.items():
-        meta = info.get("meta", {})
-        pinyin = meta.get("pinyin", "")
-        definition = meta.get("definition", "")
-        
-        # Check pinyin match
-        if isinstance(pinyin, str):
-            normalized_char_pinyin = normalize_pinyin(pinyin)
-            if query_normalized_pinyin in normalized_char_pinyin or query_lower in pinyin.lower():
-                char_pinyin_matches.append(char)
-                continue
-        
-        # Check English definition match
-        if isinstance(definition, str) and query_lower in definition.lower():
-            char_english_matches.append(char)
-    
-    # 2. Search Phrases - separate pinyin and English matches
-    db_conn = get_db_connection()
-    phrase_pinyin_matches = []
-    phrase_english_matches = []
-    
-    if db_conn:
-        # Get all phrase results from definition search
-        all_phrase_results = search_phrases_by_definition(query, db_conn, limit=400) or []
-        
-        # Categorize phrases
-        for phrase_data in all_phrase_results:
-            phrase_pinyin = phrase_data.get('pinyin', '')
-            phrase_meanings = phrase_data.get('meanings', '')
-            
-            # Check if it's a pinyin match
-            if isinstance(phrase_pinyin, str):
-                normalized_phrase_pinyin = normalize_pinyin(phrase_pinyin)
-                if query_normalized_pinyin in normalized_phrase_pinyin or query_lower in phrase_pinyin.lower():
-                    phrase_pinyin_matches.append(phrase_data)
-                    continue
-            
-            # Otherwise it's an English match
-            phrase_english_matches.append(phrase_data)
-    
-    # 3. Combine results: Pinyin matches first, then English matches
-    combined_char_results = char_pinyin_matches[:60] + char_english_matches[:60]
-    combined_phrase_results = phrase_pinyin_matches[:100] + phrase_english_matches[:100]
-    
-    # 4. Update State
-    state.update(
-        definition_search_mode=True,
-        definition_search_query=query,
-        definition_search_results={
-            "characters": combined_char_results[:120], 
-            "phrases": combined_phrase_results[:200]
-        },
-        show_inputs=False,
-        selected_comp="",
-        preview_comp=None
-    )
-
-def execute_smart_search_sidebar():
-    """Execute Smart Search from sidebar with pinyin and English meaning matches."""
-    query = state.get("sidebar_smart_search_input", "").strip()
-    
-    if not query:
-        st.toast("Please enter a search term")
-        return
-    
-    is_valid, error_msg = InputValidator.validate_definition_search(query)
-    if not is_valid:
-        st.toast(error_msg)
-        return
-    
-    # Normalize query for pinyin matching
-    query_lower = query.lower()
-    query_normalized_pinyin = normalize_pinyin(query)
-    
-    # 1. Search Characters - separate pinyin and English matches
-    char_pinyin_matches = []
-    char_english_matches = []
-    
-    for char, info in component_map.items():
-        meta = info.get("meta", {})
-        pinyin = meta.get("pinyin", "")
-        definition = meta.get("definition", "")
-        
-        # Check pinyin match
-        if isinstance(pinyin, str):
-            normalized_char_pinyin = normalize_pinyin(pinyin)
-            if query_normalized_pinyin in normalized_char_pinyin or query_lower in pinyin.lower():
-                char_pinyin_matches.append(char)
-                continue
-        
-        # Check English definition match
-        if isinstance(definition, str) and query_lower in definition.lower():
-            char_english_matches.append(char)
-    
-    # 2. Search Phrases - separate pinyin and English matches
-    db_conn = get_db_connection()
-    phrase_pinyin_matches = []
-    phrase_english_matches = []
-    
-    if db_conn:
-        # Get all phrase results from definition search
-        all_phrase_results = search_phrases_by_definition(query, db_conn, limit=400) or []
-        
-        # Categorize phrases
-        for phrase_data in all_phrase_results:
-            phrase_pinyin = phrase_data.get('pinyin', '')
-            phrase_meanings = phrase_data.get('meanings', '')
-            
-            # Check if it's a pinyin match
-            if isinstance(phrase_pinyin, str):
-                normalized_phrase_pinyin = normalize_pinyin(phrase_pinyin)
-                if query_normalized_pinyin in normalized_phrase_pinyin or query_lower in phrase_pinyin.lower():
-                    phrase_pinyin_matches.append(phrase_data)
-                    continue
-            
-            # Otherwise it's an English match
-            phrase_english_matches.append(phrase_data)
-    
-    # 3. Combine results: Pinyin matches first, then English matches
-    combined_char_results = char_pinyin_matches[:60] + char_english_matches[:60]
-    combined_phrase_results = phrase_pinyin_matches[:100] + phrase_english_matches[:100]
-    
-    # 4. Update State
-    state.update(
-        definition_search_mode=True,
-        definition_search_query=query,
-        definition_search_results={
-            "characters": combined_char_results[:120], 
-            "phrases": combined_phrase_results[:200]
-        },
-        show_inputs=False,
-        selected_comp="",
-        preview_comp=None
-    )
-
 
 # ==================== HTML HELPERS ====================
 
@@ -356,78 +200,130 @@ def render_radix_row(c, is_static=False, minimal=False):
 # ==================== VIEW RENDERERS ====================
 
 def render_sidebar():
-    """Render the sidebar with 3 tabs: Filter, Favourites, Smart Search."""
     with st.sidebar:
-        st.title("🧠 Radix")
-        st.caption("_Chinese Decomposition Toolkit_")
+        st.markdown("# 🈳 Radix")
         
-        # Create 3 tabs
-        tab_filter, tab_favourites, tab_smart_search = st.tabs(["Filter", "Favourites", "Smart Search"])
-        
-        # TAB 1: FILTER
-        with tab_filter:
-            st.caption("Filter controls are available in the main grid view when you return to the grid.")
-            
-            if not state.is_showing_inputs():
-                if st.button("↩️ Return to Grid", use_container_width=True, key="filter_return_grid"):
-                    state.return_to_inputs()
-                    st.rerun()
-        
-        # TAB 2: FAVOURITES
-        with tab_favourites:
-            st.markdown("**⭐ Favourites**")
-            current_favs = state.get_favourites()
-            
-            if current_favs:
-                fav_display_list = current_favs[::-1]
-                fav_cols = st.columns(8)
-                for idx, fchar in enumerate(fav_display_list):
-                    col_idx = idx % 8
-                    with fav_cols[col_idx]:
-                        if st.button(fchar, key=f"fav_sb_{fchar}", help=f"View {fchar}", use_container_width=True):
-                            state.enter_character_view(fchar)
-                            st.rerun()
+        # 1. Breadcrumbs
+        current_char = state.get("stroke_view_char") if state.is_stroke_view_active() else state.get_selected_component()
+        if current_char:
+            path_items = ["🏠 Grid"] + state.get_history()
+            if state.is_stroke_view_active():
+                path_items.append(f"<i>{current_char}</i> (AI)")
             else:
-                st.caption("No favourites yet. Click ⭐ to add.")
+                path_items.append(f"<b>{current_char}</b>")
+            st.markdown(f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>{' → '.join(path_items)}</div>", unsafe_allow_html=True)
+        
+        # 2. Navigation
+        if not state.is_showing_inputs() or state.is_stroke_view_active():
+            nav_col1, nav_col2 = st.columns(2)
+            with nav_col1:
+                if state.is_stroke_view_active():
+                    st.button("← Lineage", on_click=state.exit_stroke_view, use_container_width=True, type="primary")
+                else:
+                    st.button("← Back", on_click=state.go_back, use_container_width=True, type="primary")
+            with nav_col2:
+                st.button("🏠 Grid", on_click=state.go_to_root, use_container_width=True)
+
+        # 3. Action Buttons & Character Details
+        current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
+
+        if current_char_for_sidebar:
+            # Action Buttons
+            show_lineage = state.is_showing_inputs() or state.is_stroke_view_active() or (current_char_for_sidebar != state.get_selected_component())
+            show_ai_link = not state.is_stroke_view_active()
+
+            if show_lineage or show_ai_link:
+                if show_lineage and show_ai_link:
+                    b1, b2 = st.columns(2)
+                    with b1:
+                        if st.button("🌳 Lineage", key="sb_btn_lin", use_container_width=True, type="primary"):
+                             if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
+                                 history = state.get_history()
+                                 history.append(state.get_selected_component())
+                                 state.set("history", history)
+                             state.enter_character_view(current_char_for_sidebar)
+                             st.rerun()
+                    with b2:
+                        if st.button("🧠 AI Link", key="sb_btn_ai", use_container_width=True):
+                            state.enter_stroke_view(current_char_for_sidebar)
+                            st.rerun()
+                else:
+                    if show_lineage:
+                        if st.button("🌳 Lineage", key="sb_btn_lin_full", use_container_width=True, type="primary"):
+                             state.enter_character_view(current_char_for_sidebar)
+                             st.rerun()
+                    if show_ai_link:
+                        if st.button("🧠 AI Link", key="sb_btn_ai_full", use_container_width=True):
+                            state.enter_stroke_view(current_char_for_sidebar)
+                            st.rerun()
+
+            # Visuals
+            sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
+            if sidebar_html:
+                st_html(sidebar_html, height=sidebar_height)
+            
+            card_html = generate_clean_card_html(current_char_for_sidebar, usage_count=component_usage_count(current_char_for_sidebar), is_static=True)
+            st.markdown(f"<div style='margin-top: 15px;'>{card_html}</div>", unsafe_allow_html=True)
+
+            # Logic Breakdown
+            analysis = analyze_component_structure(current_char_for_sidebar)
+            if analysis['semantic'] or analysis['phonetic']:
+                s_txt = f"💡 <b>{analysis['semantic']}</b> = Meaning" if analysis['semantic'] else ""
+                p_txt = f"📊 <b>{analysis['phonetic']}</b> = Sound" if analysis['phonetic'] else ""
+                st.markdown(f"""
+                <div style='background-color: #f0f2f6; padding: 12px; border-radius: 10px; margin-top: 15px; border: 1px solid #dce0e6;'>
+                    <div style='font-weight:bold; margin-bottom:6px; color: #31333F; font-size: 0.9em;'>🧠 Logic Breakdown</div>
+                    <div style='font-size: 0.85em; color: #31333F; margin-bottom: 4px; line-height: 1.4;'>{s_txt}</div>
+                    <div style='font-size: 0.85em; color: #31333F; line-height: 1.4;'>{p_txt}</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             st.markdown("---")
-            st.markdown("**📥 Export Favourites**")
-            if current_favs:
-                dl_html = render_ipad_safe_download_html(current_favs, filename="favourites.txt")
-                st.markdown(dl_html, unsafe_allow_html=True)
-            else:
-                st.caption("Add favourites first.")
+            st.checkbox("⭐ Favourite", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
         
-        # TAB 3: SMART SEARCH
-        with tab_smart_search:
-            # Instructions in blue info box
-            st.info("💡 Enter pinyin (e.g., 'ni') or English meaning (e.g., 'water'). Results show pinyin matches first, then English matches.")
-            
-            st.text_input("Search...", key="sidebar_smart_search_input", placeholder="e.g., ni or water")
-            if st.button("Search", use_container_width=True, key="sidebar_smart_search_btn"):
-                execute_smart_search_sidebar()
-        
-        # Navigation section (outside tabs)
         st.markdown("---")
-        st.markdown("**Navigation**")
         
-        if not state.is_showing_inputs() and state.get_selected_component():
-            if st.button("↩️ Return to Grid", use_container_width=True):
-                state.return_to_inputs()
+        # 4. Search
+        with st.expander("🔍 Search", expanded=False):
+            # Character Search
+            st.markdown("**Character Search**")
+            col_sb_in, col_sb_btn = st.columns([3, 1])
+            with col_sb_in:
+                st.text_input("One Hanzi", key="sidebar_char_search", placeholder="e.g., 水", label_visibility="collapsed")
+            with col_sb_btn:
+                if st.button("🔎", key="sidebar_char_btn", use_container_width=True):
+                    validated = InputValidator.validate_character_input(st.session_state.sidebar_char_search, st.toast)
+                    if validated:
+                        state.state["sidebar_char_search"] = ""
+                        state.enter_character_view(validated)
+                        st.rerun()
+
+            st.markdown("<div style='margin: 15px 0; border-top: 1px dashed #ddd;'></div>", unsafe_allow_html=True)
+            
+            # Definition Search
+            st.markdown("**English Definition Search**")
+            st.text_input("English meaning", key="sidebar_def_search", placeholder="e.g. water, fire", label_visibility="collapsed")
+            if st.button("Search Definitions", use_container_width=True, type="primary", key="sidebar_def_btn"):
+                search_by_definition()
                 st.rerun()
+            st.caption("Search across meanings (e.g., 'fire', 'mountain')")
+
+        st.markdown("---")
         
-        if state.is_definition_search_active():
-            if st.button("↩️ Return to Grid", use_container_width=True, key="def_search_return"):
-                state.return_to_inputs()
-                st.rerun()
-        
-        history_items = state.get_history()
-        if history_items:
-            st.markdown("**Recent**")
-            for h_idx, h_char in enumerate(history_items[::-1][:6]):
-                if st.button(h_char, key=f"hst_{h_idx}_{h_char}", help=f"Return to {h_char}", use_container_width=True):
-                    state.enter_character_view(h_char)
-                    st.rerun()
+        # 5. User Data
+        with st.expander("💾 User Data", expanded=False):
+            st.markdown(render_ipad_safe_download_html(config.export_profile_str(), "radix_user_data.json", "📥 Download"), unsafe_allow_html=True)
+            if uf := st.file_uploader("📤 Upload JSON", type=["json"], key="sidebar_uploader", label_visibility="collapsed"):
+                import hashlib
+                hash_val = hashlib.sha256(uf.getvalue()).hexdigest()
+                if hash_val != state.get('_last_upload_hash', ''):
+                    st.warning("⚠️ New file detected")
+                    if st.button("✅ Apply Now", use_container_width=True, type="primary", key="apply_upload"):
+                        state.set("_last_upload_hash", hash_val)
+                        config.import_profile_bytes(uf.getvalue())
+                        st.rerun()
+                else:
+                    st.success("✓ Current file active")
 
 def render_grid():
     """Render the main grid view with 3 Tabs."""
@@ -445,12 +341,9 @@ def render_grid():
 
 def render_smart_search():
     """Render the combined Fuzzy Pinyin + Meaning search tab."""
-    st.markdown("<div style='background: #e3f2fd; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #bbdefb;'>", unsafe_allow_html=True)
-    st.markdown("### 🔍 Smart Search")
-    st.markdown("Search by **Fuzzy Pinyin** (e.g., 'jiong' finds 'jiǒng') OR **English Meaning** (e.g., 'fire').")
+    st.info("💡 Search by **Fuzzy Pinyin** (e.g., 'jiong' finds 'jiǒng') OR **English Meaning** (e.g., 'fire'). Results show pinyin matches first, then English matches.")
     
     query = st.text_input("Enter Pinyin or Meaning", key="smart_search_input", placeholder="e.g. ma, ni, horse, water")
-    st.markdown("</div>", unsafe_allow_html=True)
 
     if query:
         query = query.strip()
@@ -458,7 +351,10 @@ def render_smart_search():
             st.warning("Please enter at least 2 characters.")
             return
 
-        results = []
+        # Separate results: pinyin matches first, then English matches
+        pinyin_results = []
+        english_results = []
+        
         # Normalize the query for pinyin comparison (e.g. "jiong")
         query_norm = normalize_pinyin(query)
         query_lower = query.lower()
@@ -483,14 +379,17 @@ def render_smart_search():
                     pinyin_match = True
             
             if pinyin_match:
-                results.append(char)
+                pinyin_results.append(char)
                 continue # Matched pinyin, skip checking definition to avoid duplicates in list
 
             # 2. Definition Match (English)
             definition = meta.get("definition", "")
             if isinstance(definition, str) and query_lower in definition.lower():
-                results.append(char)
+                english_results.append(char)
                 continue
+
+        # Combine results: pinyin matches first, then English matches
+        results = pinyin_results + english_results
 
         # Display Results
         if not results:
