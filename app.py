@@ -187,6 +187,84 @@ def execute_smart_search():
         preview_comp=None
     )
 
+def execute_smart_search_sidebar():
+    """Execute Smart Search from sidebar with pinyin and English meaning matches."""
+    query = state.get("sidebar_smart_search_input", "").strip()
+    
+    if not query:
+        st.toast("Please enter a search term")
+        return
+    
+    is_valid, error_msg = InputValidator.validate_definition_search(query)
+    if not is_valid:
+        st.toast(error_msg)
+        return
+    
+    # Normalize query for pinyin matching
+    query_lower = query.lower()
+    query_normalized_pinyin = normalize_pinyin(query)
+    
+    # 1. Search Characters - separate pinyin and English matches
+    char_pinyin_matches = []
+    char_english_matches = []
+    
+    for char, info in component_map.items():
+        meta = info.get("meta", {})
+        pinyin = meta.get("pinyin", "")
+        definition = meta.get("definition", "")
+        
+        # Check pinyin match
+        if isinstance(pinyin, str):
+            normalized_char_pinyin = normalize_pinyin(pinyin)
+            if query_normalized_pinyin in normalized_char_pinyin or query_lower in pinyin.lower():
+                char_pinyin_matches.append(char)
+                continue
+        
+        # Check English definition match
+        if isinstance(definition, str) and query_lower in definition.lower():
+            char_english_matches.append(char)
+    
+    # 2. Search Phrases - separate pinyin and English matches
+    db_conn = get_db_connection()
+    phrase_pinyin_matches = []
+    phrase_english_matches = []
+    
+    if db_conn:
+        # Get all phrase results from definition search
+        all_phrase_results = search_phrases_by_definition(query, db_conn, limit=400) or []
+        
+        # Categorize phrases
+        for phrase_data in all_phrase_results:
+            phrase_pinyin = phrase_data.get('pinyin', '')
+            phrase_meanings = phrase_data.get('meanings', '')
+            
+            # Check if it's a pinyin match
+            if isinstance(phrase_pinyin, str):
+                normalized_phrase_pinyin = normalize_pinyin(phrase_pinyin)
+                if query_normalized_pinyin in normalized_phrase_pinyin or query_lower in phrase_pinyin.lower():
+                    phrase_pinyin_matches.append(phrase_data)
+                    continue
+            
+            # Otherwise it's an English match
+            phrase_english_matches.append(phrase_data)
+    
+    # 3. Combine results: Pinyin matches first, then English matches
+    combined_char_results = char_pinyin_matches[:60] + char_english_matches[:60]
+    combined_phrase_results = phrase_pinyin_matches[:100] + phrase_english_matches[:100]
+    
+    # 4. Update State
+    state.update(
+        definition_search_mode=True,
+        definition_search_query=query,
+        definition_search_results={
+            "characters": combined_char_results[:120], 
+            "phrases": combined_phrase_results[:200]
+        },
+        show_inputs=False,
+        selected_comp="",
+        preview_comp=None
+    )
+
 
 # ==================== HTML HELPERS ====================
 
@@ -325,9 +403,9 @@ def render_sidebar():
             # Instructions in blue info box
             st.info("💡 Enter pinyin (e.g., 'ni') or English meaning (e.g., 'water'). Results show pinyin matches first, then English matches.")
             
-            st.text_input("Search...", key="smart_search_input", placeholder="e.g., ni or water")
-            if st.button("Search", use_container_width=True, key="smart_search_btn"):
-                execute_smart_search()
+            st.text_input("Search...", key="sidebar_smart_search_input", placeholder="e.g., ni or water")
+            if st.button("Search", use_container_width=True, key="sidebar_smart_search_btn"):
+                execute_smart_search_sidebar()
         
         # Navigation section (outside tabs)
         st.markdown("---")
