@@ -1,4 +1,5 @@
-# app.py - Streamlined Radix (Grid-first, no splash screens)
+# app.py
+# Main Streamlit app for Radix - Streamlined Edition (Grid-first + Definition Search)
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -8,10 +9,11 @@ import uuid
 import re
 from radix_core import (
     component_map, get_db_connection, batch_get_phrase_details,
-    get_stroke_count, component_usage_count, apply_script_filter,
-    get_char_definition_en, render_combined_prompt, get_stroke_order_view_html,
-    SCRIPT_FILTERS, IDC_CHARS, sort_key_usage_primary, sort_key_frequency_primary,
-    stats_cache, cc_t2s, cc_s2t, analyze_component_structure
+    search_phrases_by_definition, get_stroke_count, component_usage_count,
+    apply_script_filter, get_char_definition_en, render_combined_prompt,
+    get_stroke_order_view_html, SCRIPT_FILTERS, IDC_CHARS,
+    sort_key_usage_primary, sort_key_frequency_primary, stats_cache,
+    cc_t2s, cc_s2t, analyze_component_structure
 )
 from radix_state import (
     StateManager, ConfigManager, InputValidator,
@@ -24,7 +26,8 @@ from radix_ui import (
 )
 from radix_persistence import PersistenceManager
 
-# Configure
+
+# Configure Streamlit
 st.set_page_config(**PAGE_CONFIG)
 apply_styles()
 
@@ -33,15 +36,18 @@ state = StateManager()
 config = ConfigManager(state)
 persistence = PersistenceManager(state)
 
+
 # ==================== CALLBACKS ====================
 
 def tile_click(c):
+    """Handle click on a grid tile."""
     if state.is_showing_inputs() and state.get_preview_component() == c:
         state.enter_character_view(c)
     else:
         state.set("preview_comp", c)
 
 def list_tile_click(c):
+    """Handle click on a list/lineage tile."""
     if state.get_preview_component() == c:
         if state.get_selected_component():
             history = state.get_history()
@@ -52,44 +58,81 @@ def list_tile_click(c):
         state.set("preview_comp", c)
 
 def toggle_favourite(char):
+    """Toggle favourite status via checkbox."""
     if state.get(f"fav_chk_{char}", False):
         state.add_to_favourites(char)
     else:
         state.remove_from_favourites(char)
 
-# ==================== PHRASE HTML ====================
+def search_by_definition():
+    """Execute search for English definitions."""
+    query = state.get("sidebar_def_search", "").strip()
+    is_valid, error_msg = InputValidator.validate_definition_search(query)
+    
+    if not is_valid:
+        st.toast(error_msg)
+        return
+    
+    # 1. Search Characters
+    char_results = []
+    query_lower = query.lower()
+    for char, info in component_map.items():
+        definition = info.get("meta", {}).get("definition", "")
+        if isinstance(definition, str) and query_lower in definition.lower():
+            char_results.append(char)
+    
+    # 2. Search Phrases
+    db_conn = get_db_connection()
+    phrase_results = search_phrases_by_definition(query, db_conn, limit=200) if db_conn else []
+    
+    # 3. Update State
+    state.update(
+        definition_search_mode=True,
+        definition_search_query=query,
+        definition_search_results={"characters": char_results[:120], "phrases": phrase_results[:200]},
+        show_inputs=False,
+        selected_comp="",
+        preview_comp=None
+    )
+
+
+# ==================== HTML HELPERS ====================
 
 def _render_phrase_html(c: str) -> str:
+    """Render phrases containing the character."""
     n_map = {"Single Character": 1, "2-Characters": 2, "3-Characters": 3, "4-Characters": 4}
     n = n_map.get(state.get_display_mode(), 2)
     
     raw_compounds = component_map.get(c, {}).get("meta", {}).get("compounds", [])
+    
     if not raw_compounds and cc_t2s:
         s_c = cc_t2s.convert(c)
         if s_c != c:
             raw_compounds = component_map.get(s_c, {}).get("meta", {}).get("compounds", [])
-    
+            
     compounds = [w for w in (raw_compounds or []) if len(w) == n]
     
     if compounds and (db := get_db_connection()):
         phrases = batch_get_phrase_details(sorted(compounds), db)
-        items = []
+        items_html_list = []
         for word in sorted(compounds):
             entry = phrases.get(word)
             if entry:
                 p_mean = pyhtml.escape(entry.get('meanings', '')[:130] + ('...' if len(entry.get('meanings', '')) > 130 else ''))
-                items.append(f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span></div>")
+                items_html_list.append(f"<div style='display:flex; align-items:baseline; padding:5px 8px; border-bottom:1px solid #eee;'><span style='font-weight:700; font-size:1.0rem; min-width:65px;'>{word}</span><span style='color:#d35400; font-size:0.85rem; font-family:monospace; margin-right:12px; font-weight:600;'>{entry.get('pinyin', '')}</span><span style='color:#444; font-size:0.85rem; flex:1; line-height:1.2;'>{p_mean}</span></div>")
         
-        if items:
-            return f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{state.get_display_mode()} containing {c}</div>{''.join(items)}</div>"
+        if items_html_list:
+            return f"<div style='padding:12px; background:#f1f8e9; border-radius:8px; margin-top:10px; border:1px solid #dcedc8; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; font-size:0.8rem; margin-bottom:8px; color:#2e7d32; text-transform:uppercase;'>{state.get_display_mode()} containing {c}</div>{''.join(items_html_list)}</div>"
     return ""
 
 def render_radix_row(c, is_static=False, minimal=False):
+    """Render a standard list row for a character."""
     col_char, col_details = st.columns([2, 10])
     is_preview = state.get_preview_component() == c
     is_active_focus = is_preview or (state.get_preview_component() is None and c == state.get_selected_component())
-    uid = str(uuid.uuid4())[:8]
     
+    uid = str(uuid.uuid4())[:8]
+
     with col_char:
         if is_static:
             st.markdown(f"<div class='char-static-box'>{c}</div>", unsafe_allow_html=True)
@@ -106,7 +149,7 @@ def render_radix_row(c, is_static=False, minimal=False):
             )
             st.markdown(f"<div class='char-btn-hint {'previewing' if is_preview else ''}'>{'Click again to drill down' if is_preview else 'Click once to preview'}</div>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
-    
+        
     with col_details:
         st.markdown(generate_clean_card_html(c, usage_count=component_usage_count(c), is_static=is_static, minimal=minimal), unsafe_allow_html=True)
         
@@ -119,11 +162,11 @@ def render_radix_row(c, is_static=False, minimal=False):
             
             if current_int not in [2, 3, 4]:
                 current_int = 2
-            
+
             def update_phrase_len():
                 val = st.session_state[f"ph_len_{c}_{uid}"]
                 state.set("display_mode", f"{val}-Characters")
-            
+
             st.radio(
                 "Phrase Length",
                 options=[2, 3, 4],
@@ -133,19 +176,20 @@ def render_radix_row(c, is_static=False, minimal=False):
                 label_visibility="collapsed",
                 on_change=update_phrase_len
             )
-            
+
             if html := _render_phrase_html(c):
                 st.markdown(html, unsafe_allow_html=True)
     
     st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
-# ==================== SIDEBAR ====================
+
+# ==================== VIEW RENDERERS ====================
 
 def render_sidebar():
     with st.sidebar:
         st.markdown("# 🈳 Radix")
         
-        # Breadcrumbs
+        # 1. Breadcrumbs
         current_char = state.get("stroke_view_char") if state.is_stroke_view_active() else state.get_selected_component()
         if current_char:
             path_items = ["🏠 Grid"] + state.get_history()
@@ -153,9 +197,9 @@ def render_sidebar():
                 path_items.append(f"<i>{current_char}</i> (AI)")
             else:
                 path_items.append(f"<b>{current_char}</b>")
-            st.markdown(f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600;'>{' → '.join(path_items)}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>{' → '.join(path_items)}</div>", unsafe_allow_html=True)
         
-        # Navigation buttons
+        # 2. Navigation
         if not state.is_showing_inputs() or state.is_stroke_view_active():
             nav_col1, nav_col2 = st.columns(2)
             with nav_col1:
@@ -165,57 +209,49 @@ def render_sidebar():
                     st.button("← Back", on_click=state.go_back, use_container_width=True, type="primary")
             with nav_col2:
                 st.button("🏠 Grid", on_click=state.go_to_root, use_container_width=True)
-        
-        # Character preview
+
+        # 3. Action Buttons & Character Details
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
-        
+
         if current_char_for_sidebar:
-            show_lineage = (
-                state.is_showing_inputs() or 
-                state.is_stroke_view_active() or 
-                (current_char_for_sidebar != state.get_selected_component())
-            )
+            # Action Buttons
+            show_lineage = state.is_showing_inputs() or state.is_stroke_view_active() or (current_char_for_sidebar != state.get_selected_component())
             show_ai_link = not state.is_stroke_view_active()
-            
+
             if show_lineage or show_ai_link:
                 if show_lineage and show_ai_link:
                     b1, b2 = st.columns(2)
                     with b1:
-                        if st.button("🌳 Lineage", key="sb_lineage", use_container_width=True, type="primary"):
-                            if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
-                                history = state.get_history()
-                                history.append(state.get_selected_component())
-                                state.set("history", history)
-                            state.enter_character_view(current_char_for_sidebar)
-                            st.rerun()
+                        if st.button("🌳 Lineage", key="sb_btn_lin", use_container_width=True, type="primary"):
+                             if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
+                                 history = state.get_history()
+                                 history.append(state.get_selected_component())
+                                 state.set("history", history)
+                             state.enter_character_view(current_char_for_sidebar)
+                             st.rerun()
                     with b2:
-                        if st.button("🧠 AI", key="sb_ai", use_container_width=True):
+                        if st.button("🧠 AI Link", key="sb_btn_ai", use_container_width=True):
                             state.enter_stroke_view(current_char_for_sidebar)
                             st.rerun()
                 else:
                     if show_lineage:
-                        if st.button("🌳 Lineage", key="sb_lineage_full", use_container_width=True, type="primary"):
-                            if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
-                                history = state.get_history()
-                                history.append(state.get_selected_component())
-                                state.set("history", history)
-                            state.enter_character_view(current_char_for_sidebar)
-                            st.rerun()
+                        if st.button("🌳 Lineage", key="sb_btn_lin_full", use_container_width=True, type="primary"):
+                             state.enter_character_view(current_char_for_sidebar)
+                             st.rerun()
                     if show_ai_link:
-                        if st.button("🧠 AI", key="sb_ai_full", use_container_width=True):
+                        if st.button("🧠 AI Link", key="sb_btn_ai_full", use_container_width=True):
                             state.enter_stroke_view(current_char_for_sidebar)
                             st.rerun()
-            
-            # Stroke order animation
+
+            # Visuals
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
             if sidebar_html:
                 st_html(sidebar_html, height=sidebar_height)
             
-            # Character card
             card_html = generate_clean_card_html(current_char_for_sidebar, usage_count=component_usage_count(current_char_for_sidebar), is_static=True)
             st.markdown(f"<div style='margin-top: 15px;'>{card_html}</div>", unsafe_allow_html=True)
-            
-            # Logic breakdown
+
+            # Logic Breakdown
             analysis = analyze_component_structure(current_char_for_sidebar)
             if analysis['semantic'] or analysis['phonetic']:
                 s_txt = f"💡 <b>{analysis['semantic']}</b> = Meaning" if analysis['semantic'] else ""
@@ -231,22 +267,38 @@ def render_sidebar():
             st.markdown("---")
             st.checkbox("⭐ Favourite", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
         
-        # Search
         st.markdown("---")
-        st.markdown("### 🔍 Search")
-        search_input = st.text_input("Character", key="sidebar_search", placeholder="e.g., 水", label_visibility="collapsed")
-        if st.button("Search", use_container_width=True, type="primary", key="sidebar_search_btn"):
-            validated = InputValidator.validate_character_input(search_input, st.toast)
-            if validated:
-                state.state["sidebar_search"] = ""
-                state.enter_character_view(validated)
-                st.rerun()
         
-        # User data management
+        # 4. Search (Combined Character + Definition)
+        with st.expander("🔍 Search", expanded=False):
+            # Character Search
+            st.markdown("**Character Search**")
+            col_sb_in, col_sb_btn = st.columns([3, 1])
+            with col_sb_in:
+                st.text_input("One Hanzi", key="sidebar_char_search", placeholder="e.g., 水", label_visibility="collapsed")
+            with col_sb_btn:
+                if st.button("🔎", key="sidebar_char_btn", use_container_width=True):
+                    validated = InputValidator.validate_character_input(st.session_state.sidebar_char_search, st.toast)
+                    if validated:
+                        state.state["sidebar_char_search"] = ""
+                        state.enter_character_view(validated)
+                        st.rerun()
+
+            st.markdown("<div style='margin: 15px 0; border-top: 1px dashed #ddd;'></div>", unsafe_allow_html=True)
+            
+            # Definition Search
+            st.markdown("**English Definition Search**")
+            st.text_input("English meaning", key="sidebar_def_search", placeholder="e.g. water, fire", label_visibility="collapsed")
+            if st.button("Search Definitions", use_container_width=True, type="primary", key="sidebar_def_btn"):
+                search_by_definition()
+                st.rerun()
+            st.caption("Search across meanings (e.g., 'fire', 'mountain')")
+
         st.markdown("---")
+        
+        # 5. User Data
         with st.expander("💾 User Data", expanded=False):
             st.markdown(render_ipad_safe_download_html(config.export_profile_str(), "radix_user_data.json", "📥 Download"), unsafe_allow_html=True)
-            
             if uf := st.file_uploader("📤 Upload JSON", type=["json"], key="sidebar_uploader", label_visibility="collapsed"):
                 import hashlib
                 hash_val = hashlib.sha256(uf.getvalue()).hexdigest()
@@ -259,9 +311,8 @@ def render_sidebar():
                 else:
                     st.success("✓ Current file active")
 
-# ==================== GRID VIEW ====================
-
 def render_grid():
+    """Render the main grid view with Tabs."""
     tab1, tab2 = st.tabs(["📊 All Components", "⭐ Favourites"])
     
     with tab1:
@@ -271,32 +322,21 @@ def render_grid():
         render_favourites_grid()
 
 def render_all_components_grid():
-    # Filters
     st.markdown("<div style='background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
     
+    # Row 1: Sort and Script
     col_sort, col_script = st.columns([1, 1])
     with col_sort:
-        sort_choice = st.radio(
-            "Sort by",
-            options=["Component frequency", "Character frequency"],
-            index=0 if state.get_grid_sort_mode() == "usage" else 1,
-            horizontal=True,
-            key="grid_sort_radio"
-        )
+        sort_choice = st.radio("Sort by", options=["Component frequency", "Character frequency"], index=0 if state.get_grid_sort_mode() == "usage" else 1, horizontal=True, key="grid_sort_radio")
         state.set("grid_sort_mode", "usage" if "Component" in sort_choice else "frequency")
     
     with col_script:
         if state.get_grid_sort_mode() == "frequency":
             gsf = state.get("grid_script_filter", "Any")
-            script_choice = st.radio(
-                "Script",
-                options=["Simplified", "Traditional", "Any"],
-                index=["Simplified", "Traditional", "Any"].index(gsf),
-                horizontal=True,
-                key="grid_script_radio"
-            )
+            script_choice = st.radio("Script", options=["Simplified", "Traditional", "Any"], index=["Simplified", "Traditional", "Any"].index(gsf), horizontal=True, key="grid_script_radio")
             state.set("grid_script_filter", script_choice)
     
+    # Row 2: Filters
     col_stroke, col_radical, col_idc = st.columns([2, 2, 2])
     
     with col_stroke:
@@ -313,12 +353,10 @@ def render_all_components_grid():
                     radical_options.append(rad)
         
         def format_radical(rad):
-            if rad == "none":
-                return "none"
+            if rad == "none": return "none"
             rad_info = component_map.get(rad, {})
             strokes = rad_info.get('stroke_count')
-            if strokes:
-                return f"{rad} ({strokes} strokes)"
+            if strokes: return f"{rad} ({strokes} strokes)"
             return rad
         
         current_rad = state.get("radical", "none")
@@ -333,9 +371,10 @@ def render_all_components_grid():
         state.set("component_idc", idc_choice)
     
     st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Filter components
+
+    # Filter Logic
     cur_min, cur_max = state.get_stroke_range()
+    
     filtered = [c for c in component_map if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max]
     
     if state.get("radical") != "none":
@@ -345,17 +384,17 @@ def render_all_components_grid():
         filtered = [c for c in filtered if component_map[c]["meta"].get("decomposition", "").startswith(state.get("component_idc"))]
     
     if state.get_grid_sort_mode() == "usage":
-        filtered = [c for c in filtered if c in stats_cache["used_components"]]
+         filtered = [c for c in filtered if c in stats_cache["used_components"]]
     
     if state.get_grid_sort_mode() == "frequency":
         filtered = apply_script_filter(filtered, state.get("grid_script_filter"))
     
     sorted_comps = sorted(filtered, key=sort_key_frequency_primary if state.get_grid_sort_mode() == "frequency" else sort_key_usage_primary)
-    
+
     if not sorted_comps:
         st.info("No components match filters.")
         return
-    
+
     # Pagination
     total = len(sorted_comps)
     max_page = max(1, math.ceil(total / PAGE_SIZE))
@@ -373,8 +412,8 @@ def render_all_components_grid():
         if st.button("Next ▶", disabled=page >= max_page, use_container_width=True, key="grid_next"):
             state.set("page", page + 1)
             st.rerun()
-    
-    # Grid
+
+    # Tiles
     st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
     cols = st.columns(GRID_COLUMNS)
     for i, ch in enumerate(sorted_comps[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]):
@@ -384,14 +423,12 @@ def render_all_components_grid():
 
 def render_favourites_grid():
     favs = state.get_favourites()
-    
     if not favs:
         st.info("No favourites yet. Click the ⭐ button in the sidebar to add characters.")
         return
-    
+
     st.markdown(f"### {len(favs)} Favourites")
     
-    # Bulk editor
     with st.expander("📝 Edit Favourites List", expanded=False):
         fav_txt = st.text_area("Edit (space/newline separated)", value=" ".join(favs), height=90, key="fav_bulk_editor")
         c1, c2 = st.columns([1, 1])
@@ -412,8 +449,7 @@ def render_favourites_grid():
                 state.set("favourites_list", [])
                 st.toast("Cleared.", icon="✅")
                 st.rerun()
-    
-    # Display as grid
+
     st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
     cols = st.columns(GRID_COLUMNS)
     for i, ch in enumerate(favs):
@@ -421,19 +457,42 @@ def render_favourites_grid():
             st.button(ch, key=f"fav_{ch}_{i}", type="primary" if state.get_preview_component() == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ==================== LINEAGE VIEW ====================
+def render_definition_search_results():
+    """Render the results of an English definition search."""
+    results = state.get("definition_search_results")
+    if not results:
+        st.error("No results state found.")
+        return
+
+    st.markdown(f"<div style='font-size:1.2em; font-weight:700; margin-bottom:20px;'>Search Results for \"{pyhtml.escape(state.get('definition_search_query'))}\"</div><div style='font-size:0.85em; color:#666; margin-bottom:20px;'>Found {len(results['characters'])} characters and {len(results['phrases'])} phrases</div>", unsafe_allow_html=True)
+    
+    if results['characters']:
+        st.markdown("<div class='lineage-header'>📖 Characters</div>", unsafe_allow_html=True)
+        for char in results['characters'][:30]:
+            render_radix_row(char)
+    
+    if results['phrases']:
+        st.markdown("<div class='lineage-header'>💬 Phrases</div>", unsafe_allow_html=True)
+        st.markdown("<div style='max-width:900px; margin:0 auto;'>", unsafe_allow_html=True)
+        for phrase_data in results['phrases']:
+            st.markdown(f"<div class='compound-item' style='margin-bottom:15px;'><span class='cp-word' style='font-size:1.4em;'>{phrase_data['word']}</span><span class='cp-pinyin'>{phrase_data['pinyin']}</span><span class='cp-mean'>{pyhtml.escape(phrase_data['meanings'][:200] + ('...' if len(phrase_data['meanings']) > 200 else ''))}</span></div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    if not results['characters'] and not results['phrases']:
+        st.info(f"No results found for '{state.get('definition_search_query')}'. Try different search terms.")
 
 def render_lineage():
+    """Render the lineage/list view."""
     sel = state.get_selected_component()
     info = component_map.get(sel, {})
     
-    # Script filter
+    # Filter
     st.markdown("<div style='background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px;'>", unsafe_allow_html=True)
-    script_choice = st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(state.get_script_filter())), horizontal=True, key="lineage_script_filter")
-    state.set("script_filter", script_choice[0])
+    script_choice = st.radio("Filter Results", options=SCRIPT_FILTERS, index=SCRIPT_FILTERS.index(state.get_script_filter()), horizontal=True, key="lineage_script_filter")
+    state.set("script_filter", script_choice)
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Parents (components)
+    # Parents
     decomp = info.get("meta", {}).get("decomposition", "")
     parents = [p for p in decomp if p in component_map and p not in IDC_CHARS and p not in ["?", "—"] and p != sel]
     parents = apply_script_filter(parents, state.get_script_filter())
@@ -442,43 +501,42 @@ def render_lineage():
         st.markdown("<div class='lineage-header'>🧱 Components (How it's built)</div>", unsafe_allow_html=True)
         for p in parents:
             render_radix_row(p)
-    
-    # Current selection
+
+    # Current
     st.markdown("<div class='lineage-header'>🎯 Current Selection</div>", unsafe_allow_html=True)
     focus_group = [sel]
     if cc_t2s and cc_s2t:
-        s_cand = cc_t2s.convert(sel)
-        t_cand = cc_s2t.convert(sel)
+        s_cand, t_cand = cc_t2s.convert(sel), cc_s2t.convert(sel)
         variant = s_cand if s_cand != sel else t_cand
         if variant != sel and variant in component_map:
             focus_group.append(variant)
     for f in apply_script_filter(focus_group, state.get_script_filter()):
         render_radix_row(f)
-    
-    # Derivatives (children)
+
+    # Children
     rel = info.get("related_characters", [])
     children = [c for c in rel if isinstance(c, str) and len(c) == 1 and c in component_map and c != sel]
-    
+
     if children:
         visible_children = apply_script_filter(sorted(children, key=sort_key_usage_primary), state.get_script_filter())
         unique_visible = list(dict.fromkeys(visible_children))
-        BATCH_SIZE = 25
-        total_derivs = len(unique_visible)
+        BATCH_SIZE, total_derivs = 25, len(unique_visible)
+        
         current_page = min(state.get("derivative_page", 0), max(0, math.ceil(total_derivs / BATCH_SIZE) - 1))
         start_idx = current_page * BATCH_SIZE
         end_idx = min(start_idx + BATCH_SIZE, total_derivs)
         current_batch = unique_visible[start_idx:end_idx]
-        
+
         st.markdown(f"<div class='lineage-header'>🌲 Derivatives (Used in {total_derivs} characters)</div>", unsafe_allow_html=True)
         
         nav_c1, nav_c2, nav_c3 = st.columns([1, 2, 1])
         with nav_c1:
             if current_page > 0:
-                if st.button("⬅️ Previous 25", key="deriv_prev", use_container_width=True):
+                if st.button("⬅️ Prev 25", key="deriv_prev", use_container_width=True):
                     state.set("derivative_page", current_page - 1)
                     st.rerun()
         with nav_c2:
-            st.markdown(f"<div style='text-align:center; padding:8px; font-weight:600;'>Batch {current_page + 1} · Showing {start_idx + 1}–{end_idx}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; padding:8px; font-weight:600; color:#666;'>Batch {current_page + 1} · {start_idx + 1}–{end_idx}</div>", unsafe_allow_html=True)
         with nav_c3:
             if end_idx < total_derivs:
                 if st.button("Next 25 ➡️", key="deriv_next", use_container_width=True):
@@ -486,21 +544,20 @@ def render_lineage():
                     st.rerun()
         
         chars_html = "".join([f"<span style='display:inline-block; margin: 2px 6px; font-size: 1.4em; font-weight: bold; color: #444;'>{c}</span>" for c in current_batch])
-        st.markdown(f"""<div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: center;"><div style="font-size: 0.85em; color: #888; margin-bottom: 8px; text-transform: uppercase; font-weight: 700;">Batch {current_page + 1} &middot; Showing {start_idx + 1}–{end_idx}</div><div style="line-height: 1.6;">{chars_html}</div></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: center;"><div style="font-size: 0.85em; color: #888; margin-bottom: 8px; text-transform: uppercase; font-weight: 700;">Visible in this batch</div><div style="line-height: 1.6;">{chars_html}</div></div>""", unsafe_allow_html=True)
         
         for child in current_batch:
             render_radix_row(child, minimal=True)
 
-# ==================== AI LINK VIEW ====================
-
 def render_ai_link():
+    """Render the AI Link / Stroke View."""
     char = state.get("stroke_view_char")
     
     st.markdown("### Stroke Order Animation")
     main_html, _ = get_stroke_order_view_html(char, state.get_display_mode())
     st_html(main_html, height=450)
     
-    # Learning insights
+    # Insights
     insights_result = render_learning_insights_html(char)
     if isinstance(insights_result, tuple):
         if len(insights_result) == 3:
@@ -510,7 +567,7 @@ def render_ai_link():
             prompt_text = None
         else:
             insights_html, insights_height, prompt_text = None, 0, None
-        
+            
         if insights_html:
             st_html(insights_html, height=insights_height)
         if prompt_text:
@@ -522,19 +579,21 @@ def render_ai_link():
     if state.get_display_mode() != "Single Character":
         if phrase_html := _render_phrase_html(char):
             st.markdown(phrase_html, unsafe_allow_html=True)
-    
-    # ChatGPT Prompt
+
     st.markdown("---")
     st.markdown("### ChatGPT Prompt")
+    
+    # Prompt Config
     config.normalize_prompt_state()
     cfg = state.get("prompt_config")
     tasks = cfg.get("tasks", []) or []
     all_task_ids = [t.get("id") for t in tasks if t.get("id")]
+    
     cur_sel = [tid for tid in (state.get("prompt_selected_task_ids") or []) if tid in all_task_ids]
     if not cur_sel:
         cur_sel = list(state.get("prompt_ui").get("default_selected_task_ids", all_task_ids)) or list(all_task_ids)
     state.set("prompt_selected_task_ids", cur_sel)
-    
+
     with st.expander("Prompt tasks (choose what to include)", expanded=False):
         if st.button("Select all tasks", key="select_all_prompt_tasks"):
             state.set("prompt_selected_task_ids", list(all_task_ids))
@@ -547,7 +606,7 @@ def render_ai_link():
             if tid and st.checkbox(t.get("title", tid), key=f"prompt_task_cb_{tid}"):
                 sel.append(tid)
         state.set("prompt_selected_task_ids", sel)
-    
+
     prompt_text = render_combined_prompt(
         char=char,
         prompt_config=state.get("prompt_config"),
@@ -557,31 +616,31 @@ def render_ai_link():
     st.text_area("Copy this prompt into ChatGPT", value=prompt_text, height=320, label_visibility="collapsed")
     render_copy_to_clipboard(prompt_text, str(hash(char)))
 
+
 # ==================== MAIN ====================
 
 def main():
-    """Main application entry point."""
     if not component_map:
         st.error("Component dataset not loaded.")
         st.stop()
-    
+
     # Initialize
     state.initialize()
     config.load_server_data()
     config.initialize_prompt_config()
-    
-    # Try restore from URL
+
+    # Restore from URL
     persistence.try_restore()
-    
-    # Render sidebar
+
+    # Layout
     render_sidebar()
-    
-    # Add heartbeat
     persistence.add_heartbeat()
-    
-    # Route main content
+
+    # Routing
     if state.is_stroke_view_active():
         render_ai_link()
+    elif state.is_definition_search_active():
+        render_definition_search_results()
     elif state.is_showing_inputs():
         render_grid()
     else:
