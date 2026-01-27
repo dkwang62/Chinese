@@ -371,8 +371,8 @@ def get_default_prompt_config() -> dict:
                 "template": (
                     "Task 1 — Character Analysis\n\n"
                     "For the Hanzi below, provide:\n"
-                    "\t1.\tOriginal meaning\n"
-                    "\t2.\tCore semantic concept\n"
+                    "\t1.\tDecompose character into nameable components\n"
+                    "\t2.\tOriginal meaning. Core semantic concept\n"
                     "\t3.\tWhy it is used in compound characters\n"
                     "\t4.\tThree example words\n"
                     "\t5.\tOne modern usage sentence\n\n"
