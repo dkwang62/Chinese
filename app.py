@@ -368,6 +368,7 @@ def render_smart_search():
         # Separate results: pinyin matches first, then English matches
         pinyin_results = []
         english_results = []
+        phrase_results = []
         
         # Normalize the query for pinyin comparison (e.g. "jiong")
         query_norm = normalize_pinyin(query)
@@ -406,27 +407,64 @@ def render_smart_search():
                     english_results.append(char)
                     continue
 
+        # 3. Search phrases by English meaning (if query is likely English, not Chinese)
+        if not all('\u4e00' <= c <= '\u9fff' for c in query):
+            db_conn = get_db_connection()
+            if db_conn:
+                # Search phrases with strict word boundary matching
+                all_phrase_results = search_phrases_by_definition(query, db_conn, limit=200) or []
+                
+                # Filter to only include phrases where the query matches as a whole word
+                pattern = r'\b' + re.escape(query_lower) + r'\b'
+                for phrase_data in all_phrase_results:
+                    meanings = phrase_data.get('meanings', '')
+                    if isinstance(meanings, str) and re.search(pattern, meanings.lower()):
+                        phrase_results.append(phrase_data)
+
         # Combine results: pinyin matches first, then English matches
         results = pinyin_results + english_results
 
         # Display Results
-        if not results:
+        if not results and not phrase_results:
             st.info(f"No matches found for '{query}'.")
         else:
-            st.success(f"Found {len(results)} matches.")
-            st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+            # Show character results
+            if results:
+                st.success(f"Found {len(results)} character matches.")
+                st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+                
+                # Pagination for search results if too many (limit to first 100 for speed)
+                display_results = results[:100]
+                
+                cols = st.columns(GRID_COLUMNS)
+                for i, ch in enumerate(display_results):
+                    with cols[i % GRID_COLUMNS]:
+                        st.button(ch, key=f"smart_res_{ch}_{i}", type="primary" if state.get_preview_component() == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+                if len(results) > 100:
+                    st.caption(f"Showing first 100 of {len(results)} results.")
             
-            # Pagination for search results if too many (limit to first 100 for speed)
-            display_results = results[:100]
-            
-            cols = st.columns(GRID_COLUMNS)
-            for i, ch in enumerate(display_results):
-                with cols[i % GRID_COLUMNS]:
-                    st.button(ch, key=f"smart_res_{ch}_{i}", type="primary" if state.get_preview_component() == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-            if len(results) > 100:
-                st.caption(f"Showing first 100 of {len(results)} results.")
+            # Show phrase results
+            if phrase_results:
+                st.markdown("---")
+                st.success(f"Found {len(phrase_results)} phrase matches.")
+                st.markdown("<div style='max-width:900px; margin:0 auto;'>", unsafe_allow_html=True)
+                for phrase_data in phrase_results[:50]:  # Limit to 50 phrases
+                    phrase_word = phrase_data['word']
+                    st.markdown(f"<div class='compound-item' style='margin-bottom:15px; cursor:pointer;'><span class='cp-word' style='font-size:1.4em;'>{phrase_word}</span><span class='cp-pinyin'>{phrase_data['pinyin']}</span><span class='cp-mean'>{pyhtml.escape(phrase_data['meanings'][:200] + ('...' if len(phrase_data['meanings']) > 200 else ''))}</span></div>", unsafe_allow_html=True)
+                    
+                    # Show clickable characters from this phrase
+                    chars_in_phrase = [c for c in phrase_word if c in component_map]
+                    if chars_in_phrase:
+                        cols = st.columns(len(chars_in_phrase) if len(chars_in_phrase) <= 8 else 8)
+                        for i, ch in enumerate(chars_in_phrase[:8]):
+                            with cols[i]:
+                                st.button(ch, key=f"phrase_result_{phrase_word}_{ch}_{i}", type="secondary", on_click=tile_click, args=(ch,), use_container_width=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
+                if len(phrase_results) > 50:
+                    st.caption(f"Showing first 50 of {len(phrase_results)} phrase results.")
 
 def render_all_components_grid():
     st.markdown("<div style='background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
