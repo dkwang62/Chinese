@@ -283,16 +283,10 @@ def render_sidebar():
         
         st.markdown("---")
         
-        # 4. Search
-        with st.expander("🔍 Search", expanded=False):
-            # Definition Search
-            st.markdown("**English Definition Search**")
-            st.text_input("English meaning", key="sidebar_def_search", placeholder="e.g. water, fire", label_visibility="collapsed")
-            if st.button("Search Definitions", use_container_width=True, type="primary", key="sidebar_def_btn"):
-                search_by_definition()
-                st.rerun()
-            st.caption("Search across meanings (e.g., 'fire', 'mountain')")
-
+        # 4. Search - Button to go to Grid Search tab
+        if st.button("🔍 Go to Smart Search", use_container_width=True, type="primary", key="sidebar_search_btn"):
+            state.return_to_inputs()
+            st.rerun()
 
         st.markdown("---")
         
