@@ -206,7 +206,7 @@ def render_sidebar():
         # 1. Breadcrumbs
         current_char = state.get("stroke_view_char") if state.is_stroke_view_active() else state.get_selected_component()
         if current_char:
-            path_items = ["🏠 Grid"] + state.get_history()
+            path_items = ["🏠 Search"] + state.get_history()
             if state.is_stroke_view_active():
                 path_items.append(f"<i>{current_char}</i> (AI)")
             else:
@@ -222,7 +222,7 @@ def render_sidebar():
                 else:
                     st.button("← Back", on_click=state.go_back, use_container_width=True, type="primary")
             with nav_col2:
-                st.button("🏠 Grid", on_click=state.go_to_root, use_container_width=True)
+                st.button("🔍 Search", on_click=state.go_to_root, use_container_width=True)
 
         # 3. Action Buttons & Character Details
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
@@ -283,14 +283,7 @@ def render_sidebar():
         
         st.markdown("---")
         
-        # 4. Search - Button to go to Grid Search tab
-        if st.button("🔍 Go to Smart Search", use_container_width=True, type="primary", key="sidebar_search_btn"):
-            state.go_to_root()
-            st.rerun()
-
-        st.markdown("---")
-        
-        # 5. User Data
+        # 4. User Data
         with st.expander("💾 User Data", expanded=False):
             st.markdown(render_ipad_safe_download_html(config.export_profile_str(), "radix_user_data.json", "📥 Download"), unsafe_allow_html=True)
             if uf := st.file_uploader("📤 Upload JSON", type=["json"], key="sidebar_uploader", label_visibility="collapsed"):
