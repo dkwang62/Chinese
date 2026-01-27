@@ -1,17 +1,20 @@
-# radix_core.py
-# All non-UI logic, data loading, helpers and HTML generators for Radix
+# radix_core.py - CLEANED VERSION
+# Core logic using consolidated utilities from radix_utils
 
 import json
 import math
 import html
 import sqlite3
-import unicodedata
 import gc
-import base64
-import json as json_module  # for dumps in HTML
+import json as json_module
 from typing import List, Dict, Optional
-import copy
-import re
+
+# Import new utilities
+from radix_utils import (
+    normalize_stroke_count, get_char_field, get_variant_char,
+    get_both_variants, clean_field as util_clean_field, deduplicate_list
+)
+from radix_html import build_phrase_list
 
 # --- Optional: OpenCC for Traditional/Simplified Conversion ---
 try:
@@ -26,21 +29,20 @@ IDC_CHARS = {"⿰", "⿱", "⿲", "⿳", "⿴", "⿵", "⿶", "⿷", "⿸", "⿹
 SCRIPT_FILTERS = ["Any", "Simplified", "Traditional"]
 
 # --- Global SUBTLEX-CH frequency dict ---
-SUBTLEX_FREQ: Dict[str, float] = {}  # simplified char -> freq per million
+SUBTLEX_FREQ: Dict[str, float] = {}
 
-# --- SUBTLEX-CH Frequency Badge (Percentile-Based) ---
 FREQ_PERCENTILES = {
-    'p95': 8500,  # Top 5%
-    'p75': 3200,  # Top 25%
-    'p50': 800,   # Top 50%
-    'p25': 150    # Bottom 25%
+    'p95': 8500,
+    'p75': 3200,
+    'p50': 800,
+    'p25': 150
 }
 
 def load_subtlex_freq():
     global SUBTLEX_FREQ
     try:
         with open("SUBTLEX-CH-CHR.txt", "r", encoding="gbk") as f:
-            for line_num, line in enumerate(f, 1):
+            for line in f:
                 line = line.strip()
                 if not line or line.startswith("Character") or line.startswith("Total"):
                     continue
@@ -54,13 +56,13 @@ def load_subtlex_freq():
                         SUBTLEX_FREQ[char] = freq_per_million
                 except ValueError:
                     continue
-        print(f"[Radix] Loaded {len(SUBTLEX_FREQ)} characters from SUBTLEX-CH frequency list")
+        print(f"[Radix] Loaded {len(SUBTLEX_FREQ)} characters from SUBTLEX-CH")
     except FileNotFoundError:
-        print("[Radix] SUBTLEX-CH-CHR.txt not found — frequency badges disabled")
+        print("[Radix] SUBTLEX-CH-CHR.txt not found")
     except Exception as e:
-        print(f"[Radix] Error loading SUBTLEX-CH frequencies: {e}")
+        print(f"[Radix] Error loading frequencies: {e}")
 
-# Standard radical order based on Xinhua Zidian
+# Standard radical order
 XINHUA_RADICAL_ORDER = [
     '一', '丨', '丿', '丶', '乙', '二', '亠', '人', '儿', '入', '八', '冂', '冖', '冫', '几', '凵', '刀', '力', '勹', '匕', '匚', '卜', '卩', '厂', '厶', '又', '十', '讠', '阝', '刂',
     '口', '囗', '土', '士', '夂', '夊', '夕', '大', '女', '子', '宀', '寸', '小', '尢', '尸', '屮', '山', '川', '工', '己', '巾', '干', '幺', '广', '廴', '廾', '弋', '弓', '彐', '彡', '彳', '扌', '艹', '艸',
@@ -75,17 +77,14 @@ XINHUA_RADICAL_ORDER = [
 
 RADICAL_SORT_INDEX = {rad: idx for idx, rad in enumerate(XINHUA_RADICAL_ORDER)}
 
-# --- Data Loading & Augmentation ---
+# --- Data Loading ---
 def load_and_augment_map():
     try:
         filename = "enhanced_component_map_with_etymology.json"
         with open(filename, "r", encoding="utf-8") as f:
-            content = f.read()
-            data = json.loads(content)
-    except json.JSONDecodeError as e:
-        print(f"\n[Radix Critical Error] JSON Syntax Error in {filename}")
-        return {}
-    except FileNotFoundError:
+            data = json.loads(f.read())
+    except (json.JSONDecodeError, FileNotFoundError) as e:
+        print(f"[Radix] Error loading {filename}: {e}")
         return {}
 
     load_subtlex_freq()
@@ -95,18 +94,11 @@ def load_and_augment_map():
         rel = info.get("related_characters", [])
         info['usage_count'] = len({c for c in rel if isinstance(c, str) and len(c) == 1})
 
-        s = meta.get("strokes")
-        try:
-            if isinstance(s, (int, float)) and s > 0:
-                info['stroke_count'] = int(s)
-            elif isinstance(s, str) and s.isdigit():
-                info['stroke_count'] = int(s)
-            else:
-                info['stroke_count'] = None
-        except:
-            info['stroke_count'] = None
+        # Use consolidated stroke count normalizer
+        info['stroke_count'] = normalize_stroke_count(meta.get("strokes"))
 
-        lookup_char = cc_t2s.convert(char) if cc_t2s else char
+        # Use utility for variant conversion
+        lookup_char = get_variant_char(char, prefer="simplified")
         info['freq_per_million'] = SUBTLEX_FREQ.get(lookup_char, 0.0)
 
     gc.collect()
@@ -118,23 +110,24 @@ def get_component_stats(_component_map):
     used_comps = set()
 
     for c, data in _component_map.items():
-        r = data.get("meta", {}).get("radical")
+        # Use utility instead of nested get()
+        r = get_char_field(c, "meta", "radical")
         if r:
             gs = _component_map.get(r, {}).get('stroke_count') or 999
             r_groups.setdefault(gs, []).append(r)
 
-        d = data.get("meta", {}).get("decomposition", "")
+        d = get_char_field(c, "meta", "decomposition", default="")
         if d and d[0] in IDC_CHARS:
-            idc = d[0]
-            idc_counts[idc] = idc_counts.get(idc, 0) + 1
+            idc_counts[d[0]] = idc_counts.get(d[0], 0) + 1
 
         for ch in d:
             if ch not in IDC_CHARS:
                 used_comps.add(ch)
 
     for gs in r_groups:
+        # Use utility for deduplication
         r_groups[gs] = sorted(
-            list(set(r_groups[gs])),
+            deduplicate_list(r_groups[gs]),
             key=lambda rad: (RADICAL_SORT_INDEX.get(rad, len(XINHUA_RADICAL_ORDER) + 1000), rad)
         )
     
@@ -151,8 +144,7 @@ stats_cache = get_component_stats(component_map) if component_map else {}
 # --- Database ---
 def get_db_connection():
     try:
-        conn = sqlite3.connect("phrases.db", check_same_thread=False)
-        return conn
+        return sqlite3.connect("phrases.db", check_same_thread=False)
     except Exception:
         return None
 
@@ -183,12 +175,15 @@ def search_phrases_by_definition(search_term: str, conn, limit: int = 50):
 
 # --- Pure Helpers ---
 def get_stroke_count(char):
+    """Get stroke count for character."""
     return component_map.get(char, {}).get("stroke_count")
 
 def component_usage_count(comp: str) -> int:
+    """Get usage count (how many characters use this component)."""
     return component_map.get(comp, {}).get("usage_count", 0)
 
 def sort_key_usage_primary(ch: str):
+    """Sort key prioritizing usage count."""
     info = component_map.get(ch, {})
     use = info.get('usage_count', 0)
     freq = info.get('freq_per_million', 0.0)
@@ -200,6 +195,7 @@ def sort_key_usage_primary(ch: str):
         return (group, -freq, strokes, ch)
 
 def sort_key_frequency_primary(ch: str):
+    """Sort key prioritizing frequency."""
     info = component_map.get(ch, {})
     freq = info.get('freq_per_million', 0.0)
     use = info.get('usage_count', 0)
@@ -207,6 +203,7 @@ def sort_key_frequency_primary(ch: str):
     return (-freq, -use, strokes, ch)
 
 def apply_script_filter(chars: List[str], script_filter: str) -> List[str]:
+    """Filter characters by script type."""
     if script_filter == "Any":
         return chars
     if script_filter == "Simplified":
@@ -214,9 +211,11 @@ def apply_script_filter(chars: List[str], script_filter: str) -> List[str]:
     return [c for c in chars if not cc_s2t or cc_s2t.convert(c) == c]
 
 def clean_field(field):
+    """Clean field value - kept for backwards compatibility."""
     return field[0] if isinstance(field, list) and field else field or "—"
 
 def get_etymology_text(meta):
+    """Extract etymology text from metadata."""
     etymology = meta.get("etymology", {})
     hint = clean_field(etymology.get("hint", ""))
     if not hint or hint.lower() == "no hint":
@@ -228,10 +227,14 @@ def get_etymology_text(meta):
     return "; ".join(parts) if parts else None
 
 def format_decomposition(char):
-    d = component_map.get(char, {}).get("meta", {}).get("decomposition", "")
+    """Format decomposition string."""
+    # Use utility
+    d = get_char_field(char, "meta", "decomposition", default="")
     return "—" if not d or "?" in d else d
 
 def normalize_single_hanzi(raw: str) -> str:
+    """Normalize input to single hanzi character."""
+    import unicodedata
     if not raw:
         return ""
     s = unicodedata.normalize("NFC", raw)
@@ -239,43 +242,36 @@ def normalize_single_hanzi(raw: str) -> str:
     return chars[0] if len(chars) == 1 else ""
 
 def resolve_to_known_variant(ch: str) -> str:
+    """Resolve character to known variant in component_map."""
     if not ch:
         return ""
     if ch in component_map:
         return ch
-    if cc_s2t:
-        t = cc_s2t.convert(ch)
-        if t in component_map:
-            return t
-    if cc_t2s:
-        s = cc_t2s.convert(ch)
-        if s in component_map:
-            return s
+    
+    # Use utility for variant lookup
+    variants = get_both_variants(ch)
+    for variant in variants:
+        if variant in component_map:
+            return variant
     return ""
 
 def get_char_definition_en(char: str) -> str:
+    """Get English definition for character."""
     char = (char or "").strip()[:1]
-    meta = component_map.get(char, {}).get("meta", {})
-    return clean_field(meta.get("definition", ""))
+    # Use utility
+    return clean_field(get_char_field(char, "meta", "definition", default=""))
 
 # --- PHONETIC & SEMANTIC ANALYSIS ---
 
 def analyze_component_structure(char: str) -> dict:
     """
-    Analyze character to identify Semantic (Radical) and Phonetic components.
-    RESTRICTION: Only analyzes Left-Right (⿰) or Top-Bottom (⿱) structures 
-    to avoid false positives in complex or single-body characters.
+    Analyze character to identify Semantic and Phonetic components.
+    Only analyzes ⿰ (Left-Right) or ⿱ (Top-Bottom) structures.
     """
-    info = component_map.get(char, {})
-    meta = info.get("meta", {})
+    # Use utility to get decomposition
+    decomp_str = get_char_field(char, "meta", "decomposition", default="")
     
-    # 1. VALIDATE STRUCTURE FIRST
-    # We only want to guess logic for clear binary compounds.
-    # ⿰ = Left-Right, ⿱ = Top-Bottom
     ALLOWED_IDCS = {'⿰', '⿱'}
-    decomp_str = meta.get("decomposition", "")
-    
-    # If decomposition is missing or doesn't start with allowed IDC, skip analysis.
     if not decomp_str or decomp_str[0] not in ALLOWED_IDCS:
         return {
             "char": char,
@@ -285,11 +281,12 @@ def analyze_component_structure(char: str) -> dict:
             "is_sound_match": False
         }
     
-    # 2. Identify Semantic (Radical)
-    radical = clean_field(meta.get("radical", ""))
-    if radical == "—": radical = None
+    # Identify Semantic (Radical)
+    radical = clean_field(get_char_field(char, "meta", "radical", default=""))
+    if radical == "—":
+        radical = None
     
-    # 3. Identify Phonetic Candidate
+    # Identify Phonetic Candidate
     parts = [c for c in decomp_str if c not in IDC_CHARS and c != char]
     
     phonetic = None
@@ -297,20 +294,16 @@ def analyze_component_structure(char: str) -> dict:
     is_match = False
     
     if radical and parts:
-        # Try to find the part that ISN'T the radical
         potential_phonetics = [p for p in parts if p != radical]
         
-        # Heuristic: If multiple parts remain, take the one with highest stroke count or first one
         if potential_phonetics:
-            phonetic = potential_phonetics[0] 
+            phonetic = potential_phonetics[0]
             
-            # Check for sound similarity
-            char_pinyin = clean_field(meta.get("pinyin", ""))
-            phonetic_data = component_map.get(phonetic, {})
-            phonetic_pinyin = clean_field(phonetic_data.get("meta", {}).get("pinyin", ""))
+            # Check sound similarity
+            char_pinyin = clean_field(get_char_field(char, "meta", "pinyin", default=""))
+            phonetic_pinyin = clean_field(get_char_field(phonetic, "meta", "pinyin", default=""))
             
             if char_pinyin and phonetic_pinyin and char_pinyin != "—" and phonetic_pinyin != "—":
-                # Clean tones for comparison
                 import re
                 cp_plain = re.sub(r'[0-9]', '', char_pinyin).lower()
                 pp_plain = re.sub(r'[0-9]', '', phonetic_pinyin).lower()
@@ -326,7 +319,7 @@ def analyze_component_structure(char: str) -> dict:
     }
 
 def get_pronunciation_family(char: str, limit: int = 8) -> list:
-    """Find other characters that share the same phonetic component."""
+    """Find characters sharing the same phonetic component."""
     analysis = analyze_component_structure(char)
     phonetic = analysis.get("phonetic")
     
@@ -334,9 +327,11 @@ def get_pronunciation_family(char: str, limit: int = 8) -> list:
         return []
         
     family = []
-    for c, info in component_map.items():
-        if c == char: continue
-        d = info.get("meta", {}).get("decomposition", "")
+    for c in component_map:
+        if c == char:
+            continue
+        # Use utility
+        d = get_char_field(c, "meta", "decomposition", default="")
         if phonetic in d:
             family.append(c)
             
@@ -344,15 +339,17 @@ def get_pronunciation_family(char: str, limit: int = 8) -> list:
     return family[:limit]
 
 def get_semantic_family(char: str, limit: int = 8) -> list:
-    """Find other characters with the same radical."""
-    radical = component_map.get(char, {}).get("meta", {}).get("radical")
+    """Find characters with the same radical."""
+    # Use utility
+    radical = get_char_field(char, "meta", "radical")
     if not radical or radical == "—":
         return []
         
     family = []
-    for c, info in component_map.items():
-        if c == char: continue
-        if info.get("meta", {}).get("radical") == radical:
+    for c in component_map:
+        if c == char:
+            continue
+        if get_char_field(c, "meta", "radical") == radical:
             family.append(c)
             
     family.sort(key=lambda x: component_map.get(x, {}).get("freq_per_million", 0), reverse=True)
@@ -361,6 +358,7 @@ def get_semantic_family(char: str, limit: int = 8) -> list:
 # --- PROMPT GENERATION ---
 
 def get_default_prompt_config() -> dict:
+    """Get default prompt configuration."""
     return {
         "version": 1,
         "preamble": "You are a bilingual Chinese dictionary editor and teacher.\n\nExplain a single Chinese character in depth for language learners.\n\n⸻\n\n",
@@ -371,8 +369,8 @@ def get_default_prompt_config() -> dict:
                 "template": (
                     "Task 1 — Character Analysis\n\n"
                     "For the Hanzi below, provide:\n"
-                    "\t1.\tDecompose character into nameable components\n"
-                    "\t2.\tOriginal meaning. Core semantic concept\n"
+                    "\t1.\tOriginal meaning\n"
+                    "\t2.\tCore semantic concept\n"
                     "\t3.\tWhy it is used in compound characters\n"
                     "\t4.\tThree example words\n"
                     "\t5.\tOne modern usage sentence\n\n"
@@ -382,67 +380,21 @@ def get_default_prompt_config() -> dict:
             {
                 "id": "task2",
                 "title": "Task 2 — Example Sentences and Images",
-                "template": (
-                    "Task 2 — Example Sentences and Images\n\n"
-                    "Provide two example sentences that best illustrate modern usage.\n\n"
-                    "⸻\n\n"
-                ),
+                "template": "Task 2 — Example Sentences and Images\n\nProvide two example sentences.\n\n⸻\n\n",
             },
             {
                 "id": "task3",
                 "title": "Task 3 — Conceptual Contrast",
-                "template": (
-                    "Task 3 — Conceptual Contrast\n\n"
-                    "Compare this character with 2–3 other characters of similar meaning.\n\n"
-                    "⸻\n\n"
-                ),
+                "template": "Task 3 — Conceptual Contrast\n\nCompare with 2–3 similar characters.\n\n⸻\n\n",
             },
             {
                 "id": "task4",
                 "title": "Task 4 — Logic & Pattern Tutor",
                 "template": """Task 4 — Logic & Pattern Tutor
 
-You are a Chinese character structure tutor. Your job is to explain Radix’s “Character Logic & Patterns” panel clearly and conservatively (do not invent etymology; if uncertain, say so).
+INPUT: char={char}, def_en={def_en}, decomposition={decomposition}, semantic={semantic}, phonetic={phonetic}, phonetic_pinyin={phonetic_pinyin}, is_sound_match={is_sound_match}, pronunciation_family={pronunciation_family}, semantic_family={semantic_family}
 
-INPUT (fields provided by the app):
-- char: {char}
-- def_en: {def_en}
-- decomposition: {decomposition}
-- semantic: {semantic}
-- phonetic: {phonetic}
-- phonetic_pinyin: {phonetic_pinyin}
-- is_sound_match: {is_sound_match}
-- pronunciation_family: {pronunciation_family}
-- semantic_family: {semantic_family}
-
-TASK:
-Explain (1) why semantic vs phonetic were assigned, and (2) what the two families mean, INCLUDING checking for false friends in the pronunciation_family list.
-
-OUTPUT REQUIREMENTS:
-
-1) Component Roles
-- If semantic exists: explain what semantic/radical contributes conceptually.
-- If phonetic exists: explain what phonetic contributes (sound hint).
-- Interpret is_sound_match:
-  - If True: strong phonetic cue.
-  - If False: phonetic candidate but sound does not match; give reasons if confident.
-
-2) Pronunciation Family (share {phonetic})
-For each character in pronunciation_family, produce ONE line:
-- Character: Classification (Likely true member / Visual only / Simplification artefact / Uncertain) - Short Reason.
-Add 1 summary sentence on if this is a "Sound family" or "Component family".
-
-3) Meaning Family (share {semantic})
-- Provide a 1-2 sentence “theme” for {semantic}.
-- For each char, give ONE short line describing how the theme applies.
-
-4) Learner Takeaway (2 bullets max)
-- Rule-of-thumb about radicals
-- Rule-of-thumb about phonetics
-
-5) UI Tooltip Copy
-- Tooltip for “Meaning (Radical)” (<= 18 words)
-- Tooltip for “Sound Match / Sound Component” (<= 18 words)
+TASK: Explain component roles and families conservatively.
 
 ⸻
 """
@@ -452,17 +404,18 @@ Add 1 summary sentence on if this is a "Sound family" or "Component family".
     }
 
 def normalize_prompt_config(cfg: dict | None) -> dict:
+    """Normalize prompt configuration."""
     base = get_default_prompt_config()
     if not isinstance(cfg, dict):
         return base
+    
     out = {
         "version": base.get("version", 1),
-        "preamble": base.get("preamble", ""),
-        "epilogue": base.get("epilogue", ""),
+        "preamble": cfg.get("preamble") if isinstance(cfg.get("preamble"), str) else base.get("preamble", ""),
+        "epilogue": cfg.get("epilogue") if isinstance(cfg.get("epilogue"), str) else base.get("epilogue", ""),
         "tasks": list(base.get("tasks", [])),
     }
-    if isinstance(cfg.get("preamble"), str): out["preamble"] = cfg["preamble"]
-    if isinstance(cfg.get("epilogue"), str): out["epilogue"] = cfg["epilogue"]
+    
     if isinstance(cfg.get("tasks"), list):
         cleaned = []
         seen = set()
@@ -470,20 +423,24 @@ def normalize_prompt_config(cfg: dict | None) -> dict:
             if isinstance(t, dict) and t.get("id") and t.get("id") not in seen:
                 seen.add(t.get("id"))
                 cleaned.append(t)
-        if cleaned: out["tasks"] = cleaned
+        if cleaned:
+            out["tasks"] = cleaned
+    
     return out
 
 def render_combined_prompt(char: str, prompt_config: dict | None, selected_task_ids: list[str] | None, definition_en: str = "") -> str:
+    """Render combined prompt for ChatGPT."""
     cfg = normalize_prompt_config(prompt_config)
     char = (char or "").strip()[:1]
     
-    # Analyze data for Task 4
+    # Analyze
     analysis = analyze_component_structure(char)
     semantic = analysis.get("semantic") or "None"
     phonetic = analysis.get("phonetic") or "None"
     phonetic_pinyin = analysis.get("phonetic_pinyin") or "None"
     is_sound_match = str(analysis.get("is_sound_match", False))
-    decomposition = component_map.get(char, {}).get("meta", {}).get("decomposition", "None")
+    # Use utility
+    decomposition = get_char_field(char, "meta", "decomposition", default="None")
     
     p_fam = get_pronunciation_family(char)
     p_fam_str = ", ".join(p_fam) if p_fam else "None"
@@ -491,7 +448,7 @@ def render_combined_prompt(char: str, prompt_config: dict | None, selected_task_
     s_fam = get_semantic_family(char)
     s_fam_str = ", ".join(s_fam) if s_fam else "None"
 
-    # Build prompt parts
+    # Build prompt
     parts = []
     selected_set = set(selected_task_ids or [])
     for t in cfg.get("tasks", []):
@@ -501,7 +458,7 @@ def render_combined_prompt(char: str, prompt_config: dict | None, selected_task_
     full = cfg.get("preamble", "") + "".join(parts) + cfg.get("epilogue", "")
     
     return full.format(
-        char=char, 
+        char=char,
         def_en=definition_en or "",
         decomposition=decomposition,
         semantic=semantic,
@@ -513,6 +470,7 @@ def render_combined_prompt(char: str, prompt_config: dict | None, selected_task_
     )
 
 def build_chatgpt_prompt(char: str) -> str:
+    """Build default ChatGPT prompt for character."""
     char = (char or "").strip()[:1]
     cfg = get_default_prompt_config()
     selected = [t.get("id") for t in cfg.get("tasks", []) if t.get("id")]
@@ -522,14 +480,17 @@ def build_chatgpt_prompt(char: str) -> str:
 # --- Stroke Order & HTML ---
 
 def get_stroke_order_view_html(primary_char: str, display_mode: str) -> tuple[str, Optional[str]]:
+    """Generate stroke order animation HTML."""
     primary_char = (primary_char or "").strip()[:1]
     if not primary_char:
         return "<p>No character selected.</p>", None
 
-    s_char = cc_t2s.convert(primary_char) if cc_t2s else primary_char
-    t_char = cc_s2t.convert(primary_char) if cc_s2t else primary_char
-    chars_to_show = list(dict.fromkeys([c for c in [s_char, t_char] if c]))
+    # Use utility for variants
+    chars_to_show = deduplicate_list(get_both_variants(primary_char))
     BOX_SIZE = 280
+    
+    s_char = chars_to_show[0] if chars_to_show else primary_char
+    t_char = chars_to_show[1] if len(chars_to_show) > 1 else s_char
     
     container_html = ""
     for i, c in enumerate(chars_to_show):
@@ -537,7 +498,8 @@ def get_stroke_order_view_html(primary_char: str, display_mode: str) -> tuple[st
         if s_char != t_char:
             label_text = "Simplified" if c == s_char else "Traditional"
         label_html = f"<div style='text-align:center; font-weight:bold; color:#555; margin-bottom:5px;'>{label_text}</div>" if label_text else ""
-        pinyin = clean_field(component_map.get(c, {}).get("meta", {}).get("pinyin", ""))
+        # Use utility
+        pinyin = clean_field(get_char_field(c, "meta", "pinyin", default=""))
         container_html += f"""
         <div style="display:flex; flex-direction:column; align-items:center;">
             {label_html}
@@ -550,30 +512,32 @@ def get_stroke_order_view_html(primary_char: str, display_mode: str) -> tuple[st
     if display_mode != "Single Character" and primary_char:
         n = {"2-Characters": 2, "3-Characters": 3, "4-Characters": 4}.get(display_mode, 0)
         
-        # 1. Try primary character compounds
-        meta_compounds = component_map.get(primary_char, {}).get("meta", {}).get("compounds", [])
+        # Get compounds - use utility
+        meta_compounds = get_char_field(primary_char, "meta", "compounds", default=[])
         
-        # 2. Fallback to simplified compounds if primary has none
-        if not meta_compounds and cc_t2s:
-            s_char = cc_t2s.convert(primary_char)
+        # Fallback to simplified
+        if not meta_compounds:
+            s_char = get_variant_char(primary_char, prefer="simplified")
             if s_char != primary_char:
-                meta_compounds = component_map.get(s_char, {}).get("meta", {}).get("compounds", [])
+                meta_compounds = get_char_field(s_char, "meta", "compounds", default=[])
 
         relevant = [w for w in (meta_compounds or []) if isinstance(w, str) and len(w) == n]
-        if relevant:
-            db_conn = get_db_connection()
-            if db_conn:
-                phrases_map = batch_get_phrase_details(sorted(relevant), db_conn)
-                items = []
-                for word in sorted(relevant):
-                    entry = phrases_map.get(word)
-                    if entry:
-                        pinyin = entry.get("pinyin", "")
-                        meanings = html.escape(entry.get("meanings", "")[:100] + ("..." if len(entry.get("meanings", "")) > 100 else ""))
-                        items.append(f"<div class='compound-item'><span class='cp-word'>{word}</span><span class='cp-pinyin'>{pinyin}</span><span class='cp-mean'>{meanings}</span></div>")
-                    else:
-                        items.append(f"<div class='compound-item'><span class='cp-word'>{word}</span></div>")
-                phrases_html = f"<div style='padding:15px; background:#f1f8e9; border-radius:8px; margin:10px auto; border:1px solid #dcedc8; max-width:800px; max-height:400px; overflow-y:auto;'><div style='font-weight:bold; margin-bottom:10px; color:#2e7d32; border-bottom:2px solid #a5d6a7; padding-bottom:5px; text-align:center;'>{display_mode} containing {primary_char}</div>{''.join(items)}</div>"
+        if relevant and (db_conn := get_db_connection()):
+            phrases_map = batch_get_phrase_details(sorted(relevant), db_conn)
+            phrase_list = []
+            for word in sorted(relevant):
+                entry = phrases_map.get(word)
+                if entry:
+                    phrase_list.append({
+                        'word': word,
+                        'pinyin': entry.get("pinyin", ""),
+                        'meanings': entry.get("meanings", "")
+                    })
+            
+            if phrase_list:
+                # Use consolidated HTML builder
+                title = f"{display_mode} containing {primary_char}"
+                phrases_html = build_phrase_list(phrase_list, title)
 
     full_html = f"""
     <div style="display:flex; gap:15px; align-items:flex-start; flex-wrap:wrap; justify-content:center;">{container_html}</div>
