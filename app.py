@@ -285,7 +285,7 @@ def render_sidebar():
         
         # 4. Search - Button to go to Grid Search tab
         if st.button("🔍 Go to Smart Search", use_container_width=True, type="primary", key="sidebar_search_btn"):
-            state.return_to_inputs()
+            state.go_to_root()
             st.rerun()
 
         st.markdown("---")
