@@ -307,17 +307,17 @@ def render_sidebar():
 
 def render_grid():
     """Render the main grid view with 3 Tabs."""
-    # Changed from 2 tabs to 3
-    tab1, tab2, tab3 = st.tabs(["📊 Filter", "⭐ Favourites", "🔍 Smart Search"])
+    # Reordered so Smart Search appears first
+    tab1, tab2, tab3 = st.tabs(["🔍 Smart Search", "📊 Filter", "⭐ Favourites"])
     
     with tab1:
-        render_all_components_grid()
+        render_smart_search()
     
     with tab2:
-        render_favourites_grid()
+        render_all_components_grid()
 
     with tab3:
-        render_smart_search()
+        render_favourites_grid()
 
 def render_smart_search():
     """Render the combined Fuzzy Pinyin + Meaning search tab."""
@@ -396,11 +396,15 @@ def render_smart_search():
                 pinyin_results.append(char)
                 continue # Matched pinyin, skip checking definition to avoid duplicates in list
 
-            # 2. Definition Match (English)
+            # 2. Definition Match (English) - Strict word boundary matching
             definition = meta.get("definition", "")
-            if isinstance(definition, str) and query_lower in definition.lower():
-                english_results.append(char)
-                continue
+            if isinstance(definition, str):
+                # Use word boundaries to match whole words only
+                # This ensures "car" doesn't match "carve" or "carriage"
+                pattern = r'\b' + re.escape(query_lower) + r'\b'
+                if re.search(pattern, definition.lower()):
+                    english_results.append(char)
+                    continue
 
         # Combine results: pinyin matches first, then English matches
         results = pinyin_results + english_results
