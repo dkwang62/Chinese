@@ -285,21 +285,6 @@ def render_sidebar():
         
         # 4. Search
         with st.expander("🔍 Search", expanded=False):
-            # Character Search
-            st.markdown("**Character Search**")
-            col_sb_in, col_sb_btn = st.columns([3, 1])
-            with col_sb_in:
-                st.text_input("One Hanzi", key="sidebar_char_search", placeholder="e.g., 水", label_visibility="collapsed")
-            with col_sb_btn:
-                if st.button("🔎", key="sidebar_char_btn", use_container_width=True):
-                    validated = InputValidator.validate_character_input(st.session_state.sidebar_char_search, st.toast)
-                    if validated:
-                        state.state["sidebar_char_search"] = ""
-                        state.enter_character_view(validated)
-                        st.rerun()
-
-            st.markdown("<div style='margin: 15px 0; border-top: 1px dashed #ddd;'></div>", unsafe_allow_html=True)
-            
             # Definition Search
             st.markdown("**English Definition Search**")
             st.text_input("English meaning", key="sidebar_def_search", placeholder="e.g. water, fire", label_visibility="collapsed")
@@ -307,6 +292,7 @@ def render_sidebar():
                 search_by_definition()
                 st.rerun()
             st.caption("Search across meanings (e.g., 'fire', 'mountain')")
+
 
         st.markdown("---")
         
@@ -341,16 +327,50 @@ def render_grid():
 
 def render_smart_search():
     """Render the combined Fuzzy Pinyin + Meaning search tab."""
-    st.info("💡 Search by **Fuzzy Pinyin** (e.g., 'jiong' finds 'jiǒng') OR **English Meaning** (e.g., 'fire'). Results show pinyin matches first, then English matches.")
+    st.info("💡 Search by **Character** (e.g., '水'), **Phrase** (e.g., '你好'), **Fuzzy Pinyin** (e.g., 'jiong' finds 'jiǒng') OR **English Meaning** (e.g., 'fire'). Results show pinyin matches first, then English matches.")
     
-    query = st.text_input("Enter Pinyin or Meaning", key="smart_search_input", placeholder="e.g. ma, ni, horse, water")
+    query = st.text_input("Enter Character, Phrase, Pinyin or Meaning", key="smart_search_input", placeholder="e.g. 水, 你好, ma, ni, horse, water")
 
     if query:
         query = query.strip()
-        if len(query) < 2:
-            st.warning("Please enter at least 2 characters.")
+        if len(query) < 1:
+            st.warning("Please enter at least 1 character.")
             return
 
+        # Check if query is a single Chinese character - if so, show it directly
+        if len(query) == 1 and query in component_map:
+            state.enter_character_view(query)
+            st.rerun()
+            return
+        
+        # Check if query is a multi-character Chinese phrase
+        # If all characters are Chinese, try to look it up as a phrase
+        if len(query) > 1 and all('\u4e00' <= c <= '\u9fff' for c in query):
+            db_conn = get_db_connection()
+            if db_conn:
+                phrase_data = batch_get_phrase_details([query], db_conn)
+                if query in phrase_data:
+                    # Found the phrase! Show its details and the characters
+                    entry = phrase_data[query]
+                    st.success(f"📖 Found phrase: **{query}**")
+                    st.markdown(f"**Pinyin:** {entry.get('pinyin', '')}")
+                    st.markdown(f"**Meaning:** {entry.get('meanings', '')}")
+                    st.markdown("---")
+                    st.markdown("### Characters in this phrase:")
+                    
+                    # Show each character from the phrase
+                    chars_in_phrase = [c for c in query if c in component_map]
+                    
+                    if chars_in_phrase:
+                        st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
+                        cols = st.columns(GRID_COLUMNS)
+                        for i, ch in enumerate(chars_in_phrase):
+                            with cols[i % GRID_COLUMNS]:
+                                st.button(ch, key=f"phrase_char_{ch}_{i}", type="primary" if state.get_preview_component() == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
+                        st.markdown("</div>", unsafe_allow_html=True)
+                    return
+
+        # If not a phrase match, proceed with regular search
         # Separate results: pinyin matches first, then English matches
         pinyin_results = []
         english_results = []
