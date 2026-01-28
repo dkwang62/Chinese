@@ -1,14 +1,12 @@
-# radix_state.py - CLEANED VERSION
-# State management using templates and utilities
+# radix_state.py
+# Consolidated state management, configuration, and validation
 
 import streamlit as st
 import json
+import uuid
 from typing import Any, Dict, List, Optional, Callable
 from radix_core import normalize_single_hanzi, resolve_to_known_variant
 import streamlit.components.v1 as components
-
-# Import utilities
-from radix_utils import deduplicate_list
 
 
 # ==================== CONSTANTS ====================
@@ -19,6 +17,7 @@ PROFILE_FILENAME = "radix_user_data.json"
 
 PAGE_SIZE = 120
 GRID_COLUMNS = 10
+# MAX_FAVOURITES was removed to allow unlimited favourites
 MAX_DERIVATIVES_DISPLAY = 120
 
 DISPLAY_MODES = ["Single Character", "2-Characters", "3-Characters", "4-Characters"]
@@ -52,38 +51,7 @@ DEFAULT_STATE = {
     "definition_search_results": None,
     "grid_sort_mode": "usage",
     "grid_script_filter": "Any",
-    "derivative_page": 0,
-}
-
-# State update templates - consolidates duplicate patterns
-STATE_TEMPLATES = {
-    'character_view': {
-        'script_filter': 'Any',
-        'show_inputs': False,
-        'preview_comp': None,
-        'stroke_view_active': False,
-        'stroke_view_char': '',
-        'display_mode': '2-Characters',
-        'definition_search_mode': False,
-        'definition_search_results': None,
-        'derivative_page': 0,
-        'text_input_warning': None,
-    },
-    'inputs_view': {
-        'show_inputs': True,
-        'selected_comp': '',
-        'last_valid_selected_comp': '',
-        'preview_comp': None,
-        'stroke_view_active': False,
-        'stroke_view_char': '',
-        'definition_search_mode': False,
-        'definition_search_results': None,
-    },
-    'stroke_view': {
-        'stroke_view_active': True,
-        'show_inputs': False,
-        'definition_search_mode': False,
-    },
+    "derivative_page": 0,  # Track derivatives pagination
 }
 
 # ==================== INPUT VALIDATION ====================
@@ -119,7 +87,7 @@ class InputValidator:
 # ==================== STATE MANAGER ====================
 
 class StateManager:
-    """Centralized session state management with templates."""
+    """Centralized session state management."""
     
     def __init__(self):
         self.state = st.session_state
@@ -187,48 +155,92 @@ class StateManager:
     def is_definition_search_active(self) -> bool:
         return self.state.get("definition_search_mode", False)
 
-    # --- Navigation Actions (Using Templates) ---
+    # --- Navigation Actions ---
     def enter_character_view(self, char: str):
         """Enter character view with given character."""
+        # Update URL for persistence
         if char:
             st.query_params["c"] = char
 
-        # Use template and override with character-specific values
-        template = STATE_TEMPLATES['character_view'].copy()
-        template.update({
-            'selected_comp': char,
-            'last_valid_selected_comp': char,
-            'text_input_comp': char,
-        })
-        self.update(**template)
+        self.update(
+            script_filter="Any",
+            selected_comp=char,
+            last_valid_selected_comp=char,
+            text_input_comp=char,
+            text_input_warning=None,
+            show_inputs=False,
+            preview_comp=None,
+            stroke_view_active=False,
+            stroke_view_char="",
+            display_mode="2-Characters",
+            definition_search_mode=False,
+            definition_search_results=None,
+            derivative_page=0
+        )
     
     def go_back(self):
         """Navigate back in history."""
+        self.update(
+            preview_comp=None,
+            stroke_view_active=False,
+            stroke_view_char="",
+            definition_search_mode=False,
+            definition_search_results=None,
+            text_input_warning=None
+        )
+        
         history = self.get_history()
         if history:
             prev = history.pop()
-            self.set("history", history)
-            self.enter_character_view(prev)
+            # Update URL to previous character
+            st.query_params["c"] = prev
+            
+            self.update(
+                history=history,
+                selected_comp=prev,
+                last_valid_selected_comp=prev,
+                script_filter="Any",
+                show_inputs=False,
+                derivative_page=0
+            )
         else:
-            self.show_inputs()
+            self.set("show_inputs", True)
+            # Clear URL when going back to input list
+            if "c" in st.query_params:
+                del st.query_params["c"]
     
-    def show_inputs(self):
-        """Show input grid."""
-        # Use template
-        self.update(**STATE_TEMPLATES['inputs_view'])
-        st.query_params.clear()
+    def go_to_root(self):
+        """Navigate to root/grid view."""
+        # Clear URL for persistence
+        if "c" in st.query_params:
+            del st.query_params["c"]
+
+        self.update(
+            history=[],
+            preview_comp=None,
+            stroke_view_active=False,
+            stroke_view_char="",
+            text_input_comp="",
+            text_input_warning=None,
+            selected_comp="",
+            show_inputs=True,
+            script_filter="Any",
+            display_mode="2-Characters",
+            definition_search_mode=False,
+            definition_search_results=None
+        )
     
     def enter_stroke_view(self, char: str):
         """Enter stroke view for character."""
-        if char:
-            # Use template and override
-            template = STATE_TEMPLATES['stroke_view'].copy()
-            template.update({
-                'stroke_view_char': char,
-                'selected_comp': char,
-                'last_valid_selected_comp': char,
-            })
-            self.update(**template)
+        self.update(
+            stroke_view_char=char,
+            stroke_view_active=True,
+            show_inputs=False
+        )
+        if not self.get_selected_component():
+            self.state["selected_comp"] = char
+            self.state["last_valid_selected_comp"] = char
+            # Ensure URL is set if we entered stroke view directly
             st.query_params["c"] = char
     
     def exit_stroke_view(self):
@@ -243,54 +255,38 @@ class StateManager:
     
     # --- List Operations ---
     def add_to_favourites(self, char: str):
-        """Add character to favourites list."""
+        """Add character to favourites list (Unlimited)."""
         favs = self.get_favourites()
         if char not in favs:
+            # Simply append; no limit check or cursor replacement
             favs.append(char)
             self.set("favourites_list", favs)
     
     def remove_from_favourites(self, char: str):
-        """Remove character from favourites."""
         favs = self.get_favourites()
         if char in favs:
             favs.remove(char)
             self.set("favourites_list", favs)
     
-    def toggle_favourite(self, char: str):
-        """Toggle favourite status."""
-        if char in self.get_favourites():
-            self.remove_from_favourites(char)
-        else:
-            self.add_to_favourites(char)
-    
-    def clear_widgets_by_prefix(self, prefixes: List[str]):
-        """Clear widget states by prefix - consolidates duplicate loops."""
-        keys_to_clear = [
-            k for k in list(self.state.keys())
-            if any(k.startswith(prefix) or k == prefix for prefix in prefixes)
-        ]
-        for k in keys_to_clear:
-            self.state.pop(k, None)
-    
     def clear_derived_widget_state(self):
         """Clear all derived UI widget states."""
-        prefixes = [
-            "fav_bulk_editor",
-            "pt_title_",
-            "pt_tpl_",
-            "prompt_task_cb_",
-            "prompt_selected_task_ids",
-            "prompt_default_sel_editor",
-            "fav_chk_",
-        ]
-        self.clear_widgets_by_prefix(prefixes)
+        keys_to_clear = [k for k in list(self.state.keys()) if (
+            k == "fav_bulk_editor" or k.startswith("pt_title_") or 
+            k.startswith("pt_tpl_") or k.startswith("prompt_task_cb_") or 
+            k == "prompt_selected_task_ids" or k == "prompt_default_sel_editor" or 
+            k.startswith("fav_chk_")
+        )]
+        for k in keys_to_clear:
+            self.state.pop(k, None)
 
     def process_search_and_clear(self, raw_input: str, widget_key: str, error_callback=None):
-        """Process search, clear widget, and handle onboarding completion."""
+        """Processes search, clears widget, and handles onboarding completion."""
+        # Use local import to avoid circular dependency at module level
+        from radix_state import InputValidator 
         validated = InputValidator.validate_character_input(raw_input, error_callback)
         if validated:
-            self.state[widget_key] = ""
-            self.set("onboarding_done", True)
+            self.state[widget_key] = "" # Clear the sticky widget
+            self.set("onboarding_done", True) # Ensure we move past splash
             self.enter_character_view(validated)
             return True
         return False
@@ -369,17 +365,17 @@ class ConfigManager:
         except FileNotFoundError:
             pass
         except Exception as e:
-            st.error(f"Error loading {PROFILE_FILENAME}: {e}")
+            st.error(f"Error loading server {PROFILE_FILENAME}: {e}")
     
     def get_default_prompt_config(self) -> Dict:
         """Get default prompt configuration."""
         return {
             "version": 1,
-            "preamble": "You are a bilingual Chinese dictionary editor and teacher.\n\nExplain a single Chinese character in depth for language learners.\n\n⸻\n\n",
+            "preamble": "You are a bilingual Chinese dictionary editor and teacher.\n\nExplain a single Chinese character in depth for language learners. Focus on modern usage, and if the character is rare, show its more widely used modern equivalent while noting the original character.\n\n⸻\n\n",
             "tasks": [
-                {"id": "task1", "title": "Task 1 – Character Analysis", "template": "Task 1 — Character Analysis\n\n⸻\n\n"},
-                {"id": "task2", "title": "Task 2 – Example Sentences", "template": "Task 2 — Example Sentences\n\n⸻\n\n"},
-                {"id": "task3", "title": "Task 3 – Conceptual Contrast", "template": "Task 3 — Conceptual Contrast\n\n⸻\n\n"},
+                {"id": "task1", "title": "Task 1 – Character Analysis", "template": "Task 1 – Character Analysis\n\nFor the Hanzi below, provide:\n\t1.\tOriginal meaning – Decompose character into nameable components. Briefly note the ancient form or origin only if it helps understand modern usage.\n\t2.\tCore semantic concept – summarize the main idea in modern context.\n\t3.\tWhy it is used in compound characters – explain how it contributes meaning to words in everyday or contemporary Chinese.\n\t4.\tThree example words – include pinyin and natural English meanings, using modern common usage.\n\t5.\tOne modern usage sentence – show the character in real-life context; if the character is rare, use the modern equivalent and note it.\n\n⸻\n\n"},
+                {"id": "task2", "title": "Task 2 – Example Sentences and Images", "template": "Task 2 – Example Sentences and Images\n\nProvide two example sentences that best illustrate modern, everyday usage of the character (or its modern equivalent if the original is rare). For each sentence, include:\na) Traditional Chinese\nb) Simplified Chinese\nc) Natural English translation\nd) Target word/phrase (must include the character or its modern equivalent)\ne) Read-aloud pinyin of the full sentence (with tone marks and natural word grouping)\n\nImages:\n\t•\tIf the character represents a concrete object, generate a realistic image showing its material, context, and typical use.\n\t•\tIf the character represents an abstract concept, quality, or person, do not generate an image.\n\nNote: Only generate images in Task 2 to avoid overlap with analysis or conceptual comparisons.\n\n⸻\n\n"},
+                {"id": "task3", "title": "Task 3 – Conceptual Contrast", "template": "Task 3 – Conceptual Contrast\n\nCompare this character with 2–3 other characters of similar meaning or usage, including pinyin. Explain:\n\t•\tHow Chinese divides this concept into different semantic or conceptual systems in modern language usage.\n\t•\tHow the characters differ in real-life usage, highlighting subtle distinctions learners should know.\n\t•\tDo not repeat example sentences from Task 2; only discuss relationships and usage distinctions.\n\n⸻\n\n"},
             ],
             "epilogue": "Hanzi: {char}\n- English definition: {def_en}\n",
         }
@@ -389,7 +385,7 @@ class ConfigManager:
         cfg = self.state.get("prompt_config") or {}
         tasks = cfg.get("tasks", []) or []
         
-        # Clean tasks - use utility for deduplication
+        # Clean tasks
         cleaned_tasks = []
         seen_ids = set()
         for t in tasks:
