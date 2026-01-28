@@ -1,5 +1,5 @@
 # app.py
-# Main Streamlit app for Radix - WITH PERSISTENCE ACTIVATED
+# Main Streamlit app for Radix - WITH AUTO-LOAD OF radix_user_data.json
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -8,6 +8,8 @@ import html as pyhtml
 import uuid
 import re
 import unicodedata
+import os
+import json
 from radix_core import (
     component_map, get_db_connection, batch_get_phrase_details,
     search_phrases_by_definition, get_stroke_count, component_usage_count,
@@ -18,7 +20,7 @@ from radix_core import (
 )
 from radix_state import (
     StateManager, ConfigManager, InputValidator,
-    PAGE_CONFIG, PAGE_SIZE, GRID_COLUMNS
+    PAGE_CONFIG, PAGE_SIZE, GRID_COLUMNS, PROFILE_FILENAME, PROFILE_SCHEMA_VERSION
 )
 from radix_ui import (
     apply_styles, generate_clean_card_html, render_ipad_safe_download_html,
@@ -45,6 +47,46 @@ def normalize_pinyin(pinyin_str):
     if not isinstance(pinyin_str, str):
         return ""
     return ''.join(c for c in unicodedata.normalize('NFD', pinyin_str) if unicodedata.category(c) != 'Mn').lower()
+
+
+def auto_load_user_data():
+    """
+    Automatically load radix_user_data.json on startup if it exists.
+    This replaces the manual upload process with automatic loading.
+    """
+    # Only load once per session
+    if state.get("auto_load_attempted"):
+        return
+    
+    state.set("auto_load_attempted", True)
+    
+    # Check if file exists
+    if not os.path.exists(PROFILE_FILENAME):
+        return
+    
+    try:
+        with open(PROFILE_FILENAME, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        # Validate schema
+        if not isinstance(data, dict) or data.get("schema_version") != PROFILE_SCHEMA_VERSION:
+            st.warning(f"⚠️ Found {PROFILE_FILENAME} but schema version mismatch. Skipping auto-load.")
+            return
+        
+        # Import the data
+        config.import_profile_dict(data)
+        
+        # Show success message
+        favs_count = len(data.get("favourites_list", []))
+        if favs_count > 0:
+            st.toast(f"✅ Auto-loaded profile: {favs_count} favourites restored", icon="💾")
+        else:
+            st.toast(f"✅ Auto-loaded profile from {PROFILE_FILENAME}", icon="💾")
+            
+    except json.JSONDecodeError:
+        st.error(f"❌ Error: {PROFILE_FILENAME} contains invalid JSON")
+    except Exception as e:
+        st.error(f"❌ Error loading {PROFILE_FILENAME}: {e}")
 
 
 # ==================== CALLBACKS ====================
@@ -279,14 +321,18 @@ def render_sidebar():
         
         st.markdown("---")
         
-        # 4. Persistence Controls (UPDATED - moved from User Data)
+        # 4. Persistence Controls
         persistence.render_controls()
         
         st.markdown("---")
         
-        # 5. User Data
+        # 5. User Data (Manual Upload/Download)
         with st.expander("💾 User Data", expanded=False):
-            st.markdown(render_ipad_safe_download_html(config.export_profile_str(), "radix_user_data.json", "📥 Download"), unsafe_allow_html=True)
+            st.info(f"💡 {PROFILE_FILENAME} auto-loads on startup if present in the app directory")
+            st.markdown(render_ipad_safe_download_html(config.export_profile_str(), PROFILE_FILENAME, "📥 Download Profile"), unsafe_allow_html=True)
+            
+            st.caption("---")
+            st.caption("**Manual Upload:**")
             if uf := st.file_uploader("📤 Upload JSON", type=["json"], key="sidebar_uploader", label_visibility="collapsed"):
                 import hashlib
                 hash_val = hashlib.sha256(uf.getvalue()).hexdigest()
@@ -301,7 +347,7 @@ def render_sidebar():
 
 def render_grid():
     """Render the main grid view with 3 Tabs."""
-    # ADDED: Show resume button if localStorage has saved session
+    # Show resume button if localStorage has saved session
     persistence.show_resume_option()
     
     # Reordered so Smart Search appears first
@@ -770,8 +816,11 @@ def main():
     state.initialize()
     config.load_server_data()
     config.initialize_prompt_config()
+    
+    # AUTO-LOAD user data file if present (NEW!)
+    auto_load_user_data()
 
-    # Restore from URL (ALREADY WORKING)
+    # Restore from URL
     persistence.try_restore()
 
     # Layout
@@ -788,7 +837,7 @@ def main():
     else:
         render_lineage()
     
-    # Auto-save (ALREADY WORKING)
+    # Auto-save
     persistence.auto_save()
 
 if __name__ == "__main__":
