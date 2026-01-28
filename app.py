@@ -1,5 +1,5 @@
-# app.py - CORRECTED VERSION
-# Preserves ALL original functionality while using consolidated utilities
+# app.py
+# Main Streamlit app for Radix - Streamlined Edition (3 Tabs)
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -7,7 +7,7 @@ import math
 import html as pyhtml
 import uuid
 import re
-import unicodedata
+import unicodedata  # Required for fuzzy pinyin normalization
 from radix_core import (
     component_map, get_db_connection, batch_get_phrase_details,
     search_phrases_by_definition, get_stroke_count, component_usage_count,
@@ -27,9 +27,6 @@ from radix_ui import (
 )
 from radix_persistence import PersistenceManager
 
-# Import utilities for only the places where they help (not wholesale replacement)
-from radix_utils import normalize_pinyin
-
 
 # Configure Streamlit
 st.set_page_config(**PAGE_CONFIG)
@@ -39,6 +36,19 @@ apply_styles()
 state = StateManager()
 config = ConfigManager(state)
 persistence = PersistenceManager(state)
+
+
+# ==================== HELPERS ====================
+
+def normalize_pinyin(pinyin_str):
+    """
+    Remove tone marks from pinyin for fuzzy search (e.g., 'nǐ' -> 'ni').
+    Robust against None, non-strings, or other data types.
+    """
+    if not isinstance(pinyin_str, str):
+        return ""
+    # Decompose unicode characters and strip combining diacritical marks
+    return ''.join(c for c in unicodedata.normalize('NFD', pinyin_str) if unicodedata.category(c) != 'Mn').lower()
 
 
 # ==================== CALLBACKS ====================
@@ -176,15 +186,18 @@ def render_radix_row(c, is_static=False, minimal=False):
                 options=[2, 3, 4],
                 index=[2, 3, 4].index(current_int),
                 key=f"ph_len_{c}_{uid}",
-                on_change=update_phrase_len,
-                horizontal=True
+                horizontal=True,
+                label_visibility="collapsed",
+                on_change=update_phrase_len
             )
-            
-            if phrase_html := _render_phrase_html(c):
-                st.markdown(phrase_html, unsafe_allow_html=True)
+
+            if html := _render_phrase_html(c):
+                st.markdown(html, unsafe_allow_html=True)
+    
+    st.markdown("<div style='height: 15px'></div>", unsafe_allow_html=True)
 
 
-# ==================== SIDEBAR ====================
+# ==================== VIEW RENDERERS ====================
 
 def render_sidebar():
     with st.sidebar:
@@ -285,11 +298,9 @@ def render_sidebar():
                 else:
                     st.success("✓ Current file active")
 
-
-# ==================== GRID VIEWS ====================
-
 def render_grid():
     """Render the main grid view with 3 Tabs."""
+    # Reordered so Smart Search appears first
     tab1, tab2, tab3 = st.tabs(["🔍 Smart Search", "📊 Filter", "⭐ Favourites"])
     
     with tab1:
@@ -313,19 +324,20 @@ def render_smart_search():
             st.warning("Please enter at least 1 character.")
             return
 
-        # Check if query is a single Chinese character
+        # Check if query is a single Chinese character - if so, show it directly
         if len(query) == 1 and query in component_map:
             state.enter_character_view(query)
             st.rerun()
             return
         
         # Check if query is a multi-character Chinese phrase
+        # If all characters are Chinese, try to look it up as a phrase
         if len(query) > 1 and all('\u4e00' <= c <= '\u9fff' for c in query):
             db_conn = get_db_connection()
             if db_conn:
                 phrase_data = batch_get_phrase_details([query], db_conn)
                 if query in phrase_data:
-                    # Found the phrase!
+                    # Found the phrase! Show its details and the characters
                     entry = phrase_data[query]
                     st.success(f"📖 Found phrase: **{query}**")
                     st.markdown(f"**Pinyin:** {entry.get('pinyin', '')}")
@@ -333,6 +345,7 @@ def render_smart_search():
                     st.markdown("---")
                     st.markdown("### Characters in this phrase:")
                     
+                    # Show each character from the phrase
                     chars_in_phrase = [c for c in query if c in component_map]
                     
                     if chars_in_phrase:
@@ -344,23 +357,27 @@ def render_smart_search():
                         st.markdown("</div>", unsafe_allow_html=True)
                     return
 
-        # Regular search: pinyin + English
+        # If not a phrase match, proceed with regular search
+        # Separate results: pinyin matches first, then English matches
         pinyin_results = []
         english_results = []
         phrase_results = []
         
+        # Normalize the query for pinyin comparison (e.g. "jiong")
         query_norm = normalize_pinyin(query)
         query_lower = query.lower()
 
-        # Search characters
+        # Iterate through all components
         for char, info in component_map.items():
             meta = info.get("meta", {})
             
-            # Pinyin Match (Fuzzy)
+            # 1. Pinyin Match (Fuzzy)
+            # 'pinyin' in meta can be a list ["kān"] or string "kān"
             pinyin_data = meta.get("pinyin", [])
             pinyin_match = False
             
             if isinstance(pinyin_data, list):
+                # Check if ANY pronunciation matches
                 for p in pinyin_data:
                     if normalize_pinyin(p) == query_norm:
                         pinyin_match = True
@@ -371,40 +388,45 @@ def render_smart_search():
             
             if pinyin_match:
                 pinyin_results.append(char)
-                continue
+                continue # Matched pinyin, skip checking definition to avoid duplicates in list
 
-            # Definition Match (English) - Strict word boundary
+            # 2. Definition Match (English) - Strict word boundary matching
             definition = meta.get("definition", "")
             if isinstance(definition, str):
+                # Use word boundaries to match whole words only
+                # This ensures "car" doesn't match "carve" or "carriage"
                 pattern = r'\b' + re.escape(query_lower) + r'\b'
                 if re.search(pattern, definition.lower()):
                     english_results.append(char)
                     continue
 
-        # Search phrases by English meaning
+        # 3. Search phrases by English meaning (if query is likely English, not Chinese)
         if not all('\u4e00' <= c <= '\u9fff' for c in query):
             db_conn = get_db_connection()
             if db_conn:
+                # Search phrases with strict word boundary matching
                 all_phrase_results = search_phrases_by_definition(query, db_conn, limit=200) or []
                 
+                # Filter to only include phrases where the query matches as a whole word
                 pattern = r'\b' + re.escape(query_lower) + r'\b'
                 for phrase_data in all_phrase_results:
                     meanings = phrase_data.get('meanings', '')
                     if isinstance(meanings, str) and re.search(pattern, meanings.lower()):
                         phrase_results.append(phrase_data)
 
-        # Combine results
+        # Combine results: pinyin matches first, then English matches
         results = pinyin_results + english_results
 
         # Display Results
         if not results and not phrase_results:
             st.info(f"No matches found for '{query}'.")
         else:
-            # Character results
+            # Show character results
             if results:
                 st.success(f"Found {len(results)} character matches.")
                 st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
                 
+                # Pagination for search results if too many (limit to first 100 for speed)
                 display_results = results[:100]
                 
                 cols = st.columns(GRID_COLUMNS)
@@ -416,16 +438,16 @@ def render_smart_search():
                 if len(results) > 100:
                     st.caption(f"Showing first 100 of {len(results)} results.")
             
-            # Phrase results
+            # Show phrase results
             if phrase_results:
                 st.markdown("---")
                 st.success(f"Found {len(phrase_results)} phrase matches.")
                 st.markdown("<div style='max-width:900px; margin:0 auto;'>", unsafe_allow_html=True)
-                for phrase_data in phrase_results[:50]:
+                for phrase_data in phrase_results[:50]:  # Limit to 50 phrases
                     phrase_word = phrase_data['word']
                     st.markdown(f"<div class='compound-item' style='margin-bottom:15px; cursor:pointer;'><span class='cp-word' style='font-size:1.4em;'>{phrase_word}</span><span class='cp-pinyin'>{phrase_data['pinyin']}</span><span class='cp-mean'>{pyhtml.escape(phrase_data['meanings'][:200] + ('...' if len(phrase_data['meanings']) > 200 else ''))}</span></div>", unsafe_allow_html=True)
                     
-                    # Show clickable characters from phrase
+                    # Show clickable characters from this phrase
                     chars_in_phrase = [c for c in phrase_word if c in component_map]
                     if chars_in_phrase:
                         cols = st.columns(len(chars_in_phrase) if len(chars_in_phrase) <= 8 else 8)
@@ -572,9 +594,6 @@ def render_favourites_grid():
         with cols[i % GRID_COLUMNS]:
             st.button(ch, key=f"fav_{ch}_{i}", type="primary" if state.get_preview_component() == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ==================== LINEAGE VIEW ====================
 
 def render_definition_search_results():
     """Render the results of an English definition search (Legacy Sidebar)."""
