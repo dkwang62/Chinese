@@ -1,5 +1,5 @@
 # app.py
-# Main Streamlit app for Radix - Streamlined Edition (3 Tabs)
+# Main Streamlit app for Radix - WITH PERSISTENCE ACTIVATED
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -7,7 +7,7 @@ import math
 import html as pyhtml
 import uuid
 import re
-import unicodedata  # Required for fuzzy pinyin normalization
+import unicodedata
 from radix_core import (
     component_map, get_db_connection, batch_get_phrase_details,
     search_phrases_by_definition, get_stroke_count, component_usage_count,
@@ -41,13 +41,9 @@ persistence = PersistenceManager(state)
 # ==================== HELPERS ====================
 
 def normalize_pinyin(pinyin_str):
-    """
-    Remove tone marks from pinyin for fuzzy search (e.g., 'nǐ' -> 'ni').
-    Robust against None, non-strings, or other data types.
-    """
+    """Remove tone marks from pinyin for fuzzy search (e.g., 'nǐ' -> 'ni')."""
     if not isinstance(pinyin_str, str):
         return ""
-    # Decompose unicode characters and strip combining diacritical marks
     return ''.join(c for c in unicodedata.normalize('NFD', pinyin_str) if unicodedata.category(c) != 'Mn').lower()
 
 
@@ -283,7 +279,12 @@ def render_sidebar():
         
         st.markdown("---")
         
-        # 4. User Data
+        # 4. Persistence Controls (UPDATED - moved from User Data)
+        persistence.render_controls()
+        
+        st.markdown("---")
+        
+        # 5. User Data
         with st.expander("💾 User Data", expanded=False):
             st.markdown(render_ipad_safe_download_html(config.export_profile_str(), "radix_user_data.json", "📥 Download"), unsafe_allow_html=True)
             if uf := st.file_uploader("📤 Upload JSON", type=["json"], key="sidebar_uploader", label_visibility="collapsed"):
@@ -300,6 +301,9 @@ def render_sidebar():
 
 def render_grid():
     """Render the main grid view with 3 Tabs."""
+    # ADDED: Show resume button if localStorage has saved session
+    persistence.show_resume_option()
+    
     # Reordered so Smart Search appears first
     tab1, tab2, tab3 = st.tabs(["🔍 Smart Search", "📊 Filter", "⭐ Favourites"])
     
@@ -767,7 +771,7 @@ def main():
     config.load_server_data()
     config.initialize_prompt_config()
 
-    # Restore from URL
+    # Restore from URL (ALREADY WORKING)
     persistence.try_restore()
 
     # Layout
@@ -784,7 +788,7 @@ def main():
     else:
         render_lineage()
     
-    # Auto-save
+    # Auto-save (ALREADY WORKING)
     persistence.auto_save()
 
 if __name__ == "__main__":
