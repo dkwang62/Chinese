@@ -1,5 +1,5 @@
-# radix_persistence.py - Cleaned Version
-# URL-based persistence with localStorage backup
+# radix_persistence.py
+# URL-based persistence with localStorage backup (Characters + Favourites)
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -9,19 +9,20 @@ class SessionPersistence:
     
     @staticmethod
     def get_auto_save_script(char: str, favs: list) -> str:
-        """Save character and favourites to localStorage"""
+        """Save character and favourites to localStorage as backup"""
         safe_char = char or ""
         safe_favs = ",".join(favs) if favs else ""
         return f"""<script>
 try {{ 
     localStorage.setItem('radix_last', '{safe_char}'); 
     localStorage.setItem('radix_favs', '{safe_favs}');
-}} catch(e) {{ }}
+}}
+catch(e) {{ console.log('Save skipped'); }}
 </script>"""
     
     @staticmethod
     def get_resume_button(base_url: str) -> str:
-        """Smart resume button that reads localStorage"""
+        """Smart resume button that reads localStorage for Char + Favs"""
         return f"""
 <div id="resume-container" style="text-align:center; margin:25px 0; display:none;">
     <a id="resume-link" href="#" style="
@@ -31,8 +32,8 @@ try {{
         color: white; text-decoration: none; font-weight: 700;
         font-size: 16px; box-shadow: 0 4px 12px rgba(76,175,80,0.3);
         transition: all 0.2s ease; border: 2px solid #2e7d32;
-    " onmouseover="this.style.transform='translateY(-2px)';"
-       onmouseout="this.style.transform='translateY(0)';">
+    " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(76,175,80,0.4)';"
+       onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(76,175,80,0.3)';">
         <span style="font-size:24px;">🔄</span>
         <span id="resume-text">Resume Session</span>
     </a>
@@ -50,6 +51,7 @@ try {{
         const text = document.getElementById('resume-text');
         const container = document.getElementById('resume-container');
         
+        // Build URL with char AND favourites
         let url = '{base_url}'.replace(/\/$/, '') + '/?c=' + encodeURIComponent(savedChar);
         if (savedFavs && savedFavs.length > 0) {{
             url += '&favs=' + encodeURIComponent(savedFavs);
@@ -59,19 +61,20 @@ try {{
         text.textContent = 'Resume: ' + savedChar;
         container.style.display = 'block';
         
+        // Handle click
         link.onclick = (e) => {{
             e.preventDefault();
             text.textContent = 'Restoring...';
             try {{ window.top.location.href = url; }}
             catch(err) {{ window.open(url, '_blank'); }}
         }};
-    }} catch(e) {{ }}
+    }} catch(e) {{ console.log('Resume unavailable'); }}
 }})();
 </script>"""
     
     @staticmethod
     def get_heartbeat() -> str:
-        """Lightweight heartbeat to keep session alive"""
+        """Lightweight heartbeat"""
         return """<script>
 setInterval(()=>fetch(window.location.href,{headers:{'Cache-Control':'no-cache'}}).catch(()=>{}),45000);
 </script>"""
@@ -92,24 +95,27 @@ class PersistenceManager:
         char = self.state.get_selected_component()
         favs = self.state.get_favourites()
         
-        if char or favs:
+        # Save if we have a character OR favourites (don't lose favs if just browsing grid)
+        if (char or favs):
             st_html(SessionPersistence.get_auto_save_script(char, favs), height=0)
     
     def try_restore(self):
-        """Restore from URL params ?c= and ?favs="""
-        # Restore Favourites first
+        """Check URL param ?c= and ?favs= and restore if present"""
+        
+        # 1. Restore Favourites (do this first so they exist regardless of character)
         favs_param = st.query_params.get("favs")
         if favs_param:
             from radix_state import InputValidator
+            raw_list = favs_param.split(",")
             valid_favs = []
-            for f in favs_param.split(","):
+            for f in raw_list:
                 v = InputValidator.validate_character_input(f)
                 if v and v not in valid_favs:
                     valid_favs.append(v)
             if valid_favs:
                 self.state.set("favourites_list", valid_favs)
 
-        # Restore Character
+        # 2. Restore Character
         if self.state.get_selected_component():
             return
         
@@ -117,16 +123,19 @@ class PersistenceManager:
         if not char_param:
             return
         
+        # Validate the character
         from radix_state import InputValidator
         validated = InputValidator.validate_character_input(char_param)
         
         if validated:
-            # Skip startup screens
+            # Deep restore: skip all startup screens
             self.state.state["startup_file_choice_made"] = True
             self.state.state["onboarding_done"] = True
+            
+            # Navigate to character
             self.state.enter_character_view(validated)
             
-            msg = f"🔖 Restored: {validated}"
+            msg = f"📍 Restored: {validated}"
             if favs_param:
                 msg += f" + {len(self.state.get_favourites())} Favourites"
             st.toast(msg, icon="✅")
@@ -147,8 +156,9 @@ class PersistenceManager:
             favs = self.state.get_favourites()
             
             if char:
-                st.success(f"🔖 Current: **{char}**")
+                st.success(f"📍 Current: **{char}**")
                 st.caption("✅ URL bookmark active")
+                st.caption("✅ Heartbeat running")
             else:
                 st.info("Navigate to a character to enable persistence")
             
@@ -160,3 +170,14 @@ class PersistenceManager:
             if st.button("🗑️ Clear History", use_container_width=True):
                 st_html("<script>localStorage.removeItem('radix_last'); localStorage.removeItem('radix_favs');</script>", height=0)
                 st.toast("History cleared")
+            
+            with st.expander("ℹ️ How It Works"):
+                st.caption("""
+                **URL Persistence:**
+                - Characters update URL (e.g., `?c=水`)
+                - Favourites included in resume links
+                
+                **Backup Storage:**
+                - Character & Favourites saved to localStorage
+                - Resume button appears on splash screen
+                """)
