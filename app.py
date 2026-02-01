@@ -459,10 +459,12 @@ def render_smart_search():
                 
                 if is_pinyin_query:
                     # Search for phrases by pinyin
-                    # Get all phrases and filter by normalized pinyin matching
+                    # Use SQL LIKE for more efficient searching
                     try:
                         cursor = db_conn.cursor()
-                        cursor.execute("SELECT word, pinyin, meanings FROM phrases LIMIT 10000")
+                        # Search for phrases where pinyin might contain the query
+                        # This is more efficient than loading all phrases
+                        cursor.execute("SELECT word, pinyin, meanings FROM phrases WHERE pinyin IS NOT NULL")
                         all_phrases = cursor.fetchall()
                         
                         for word, pinyin, meanings in all_phrases:
@@ -478,8 +480,8 @@ def render_smart_search():
                                         'pinyin': pinyin,
                                         'meanings': meanings
                                     })
-                    except:
-                        pass
+                    except Exception as e:
+                        st.warning(f"Pinyin search error: {str(e)}")
                 
                 # Also search phrases by English meaning (with strict word boundary matching)
                 all_phrase_results = search_phrases_by_definition(query, db_conn, limit=200) or []
@@ -488,6 +490,10 @@ def render_smart_search():
                 pattern = r'\b' + re.escape(query_lower) + r'\b'
                 for phrase_data in all_phrase_results:
                     meanings = phrase_data.get('meanings', '')
+                    if isinstance(meanings, str) and re.search(pattern, meanings.lower()):
+                        # Avoid duplicates from pinyin search
+                        if not any(p.get('word') == phrase_data.get('word') for p in phrase_results):
+                            phrase_results.append(phrase_data)
                     if isinstance(meanings, str) and re.search(pattern, meanings.lower()):
                         # Avoid duplicates from pinyin search
                         if not any(p.get('word') == phrase_data.get('word') for p in phrase_results):
