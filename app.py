@@ -364,9 +364,9 @@ def render_grid():
 
 def render_smart_search():
     """Render the combined Fuzzy Pinyin + Meaning search tab."""
-    st.info("💡 Search by **Character** (e.g., '水'), **Phrase** (e.g., '你好'), **Fuzzy Pinyin** (e.g., 'jiong' finds 'jiǒng') OR **English Meaning** (e.g., 'fire'). Results show pinyin matches first, then English matches.")
+    st.info("💡 Search by **Character** (e.g., '水'), **Phrase** (e.g., '你好'), **Pinyin** (e.g., 'ma' or 'tan lan'), OR **English Meaning** (e.g., 'fire'). Results show pinyin matches first, then English matches.")
     
-    query = st.text_input("Enter Character, Phrase, Pinyin or Meaning", key="smart_search_input", placeholder="e.g. 水, 你好, ma, ni, horse, water")
+    query = st.text_input("Enter Character, Phrase, Pinyin or Meaning", key="smart_search_input", placeholder="e.g. 水, 你好, tan lan, ma, horse, water")
 
     if query:
         query = query.strip()
@@ -450,11 +450,38 @@ def render_smart_search():
                     english_results.append(char)
                     continue
 
-        # 3. Search phrases by English meaning (if query is likely English, not Chinese)
+        # 3. Search phrases (if query is likely NOT Chinese characters)
         if not all('\u4e00' <= c <= '\u9fff' for c in query):
             db_conn = get_db_connection()
             if db_conn:
-                # Search phrases with strict word boundary matching
+                # Check if query looks like pinyin (contains spaces or latin letters)
+                is_pinyin_query = ' ' in query or any(c.isalpha() for c in query)
+                
+                if is_pinyin_query:
+                    # Search for phrases by pinyin
+                    # Get all phrases and filter by normalized pinyin matching
+                    try:
+                        cursor = db_conn.cursor()
+                        cursor.execute("SELECT word, pinyin, meanings FROM phrases LIMIT 10000")
+                        all_phrases = cursor.fetchall()
+                        
+                        for word, pinyin, meanings in all_phrases:
+                            if pinyin:
+                                # Normalize both query and phrase pinyin for comparison
+                                phrase_pinyin_norm = normalize_pinyin(pinyin)
+                                
+                                # Check if query matches the phrase pinyin
+                                # Handle both exact matches and substring matches
+                                if query_norm in phrase_pinyin_norm or query_norm.replace(' ', '') in phrase_pinyin_norm.replace(' ', ''):
+                                    phrase_results.append({
+                                        'word': word,
+                                        'pinyin': pinyin,
+                                        'meanings': meanings
+                                    })
+                    except:
+                        pass
+                
+                # Also search phrases by English meaning (with strict word boundary matching)
                 all_phrase_results = search_phrases_by_definition(query, db_conn, limit=200) or []
                 
                 # Filter to only include phrases where the query matches as a whole word
@@ -462,7 +489,9 @@ def render_smart_search():
                 for phrase_data in all_phrase_results:
                     meanings = phrase_data.get('meanings', '')
                     if isinstance(meanings, str) and re.search(pattern, meanings.lower()):
-                        phrase_results.append(phrase_data)
+                        # Avoid duplicates from pinyin search
+                        if not any(p.get('word') == phrase_data.get('word') for p in phrase_results):
+                            phrase_results.append(phrase_data)
 
         # Combine results: pinyin matches first, then English matches
         results = pinyin_results + english_results
