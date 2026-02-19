@@ -49,6 +49,7 @@ DEFAULT_STATE = {
     "definition_search_mode": False,
     "definition_search_query": "",
     "definition_search_results": None,
+    "dataset_editor_mode": False,
     "grid_sort_mode": "usage",
     "grid_script_filter": "Any",
     "derivative_page": 0,  # Track derivatives pagination
