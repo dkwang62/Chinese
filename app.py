@@ -10,6 +10,7 @@ import re
 import unicodedata
 import os
 import json
+import radix_core as rc
 from radix_core import (
     component_map, get_db_connection, batch_get_phrase_details,
     search_phrases_by_definition, get_stroke_count, component_usage_count,
@@ -28,6 +29,7 @@ from radix_ui import (
     render_learning_insights_html
 )
 from radix_persistence import PersistenceManager
+from server import create_editable_copy, save_json_copy, build_download_payload
 
 
 # Configure Streamlit
@@ -38,6 +40,7 @@ apply_styles()
 state = StateManager()
 config = ConfigManager(state)
 persistence = PersistenceManager(state)
+DEFAULT_COMPONENT_MAP_FILE = "enhanced_component_map_with_etymology.json"
 
 
 # ==================== HELPERS ====================
@@ -87,6 +90,344 @@ def auto_load_user_data():
         st.error(f"❌ Error: {PROFILE_FILENAME} contains invalid JSON")
     except Exception as e:
         st.error(f"❌ Error loading {PROFILE_FILENAME}: {e}")
+
+
+def _augment_component_map(data: dict) -> dict:
+    """Recompute derived fields required by the runtime after dataset edits."""
+    if not rc.SUBTLEX_FREQ:
+        rc.load_subtlex_freq()
+
+    for char, info in data.items():
+        meta = info.get("meta", {})
+        rel = info.get("related_characters", [])
+        info["usage_count"] = len({c for c in rel if isinstance(c, str) and len(c) == 1})
+
+        s = meta.get("strokes")
+        try:
+            if isinstance(s, (int, float)) and s > 0:
+                info["stroke_count"] = int(s)
+            elif isinstance(s, str) and s.isdigit():
+                info["stroke_count"] = int(s)
+            else:
+                info["stroke_count"] = None
+        except Exception:
+            info["stroke_count"] = None
+
+        lookup_char = cc_t2s.convert(char) if cc_t2s else char
+        info["freq_per_million"] = rc.SUBTLEX_FREQ.get(lookup_char, 0.0)
+
+    return data
+
+
+def _apply_dataset_to_runtime(content) -> int:
+    """Validate and hot-apply edited dataset into the running app."""
+    validated = save_json_copy(content=content, persist=False)
+    parsed = json.loads(validated["content"])
+    _augment_component_map(parsed)
+    component_map.clear()
+    component_map.update(parsed)
+    stats_cache.clear()
+    stats_cache.update(rc.get_component_stats(component_map))
+    return len(component_map)
+
+
+def _default_entry_template() -> dict:
+    return {
+        "meta": {
+            "definition": "",
+            "pinyin": "",
+            "decomposition": "",
+            "radical": "",
+            "strokes": "",
+            "compounds": [],
+            "etymology": {"hint": "", "details": ""},
+        },
+        "related_characters": [],
+    }
+
+
+def _load_dataset_working_copy(source_path: str) -> None:
+    payload = create_editable_copy(source_path=source_path, persist=False)
+    st.session_state["dataset_working_map"] = json.loads(payload["content"])
+    st.session_state["dataset_editor_filename"] = payload.get("suggestedFilename", "component_map_editable.json")
+    st.session_state["dataset_entry_loaded_for"] = ""
+
+
+def _load_entry_into_editor(char_key: str) -> None:
+    wm = st.session_state.get("dataset_working_map", {})
+    entry = wm.get(char_key, _default_entry_template())
+    st.session_state["dataset_entry_raw"] = json.loads(json.dumps(entry, ensure_ascii=False))
+    st.session_state["dataset_entry_loaded_for"] = char_key
+
+    meta = entry.get("meta", {}) if isinstance(entry, dict) else {}
+
+    def _to_text_list(value):
+        if isinstance(value, list):
+            return "\n".join([str(x) for x in value if isinstance(x, str)])
+        if isinstance(value, str):
+            return value
+        return ""
+
+    pinyin_value = meta.get("pinyin", "")
+    if isinstance(pinyin_value, list):
+        st.session_state["dataset_form_pinyin_type"] = "List"
+        st.session_state["dataset_form_pinyin"] = "\n".join([x for x in pinyin_value if isinstance(x, str)])
+    else:
+        st.session_state["dataset_form_pinyin_type"] = "String"
+        st.session_state["dataset_form_pinyin"] = pinyin_value if isinstance(pinyin_value, str) else ""
+
+    ety = meta.get("etymology", {}) if isinstance(meta.get("etymology"), dict) else {}
+    st.session_state["dataset_form_definition"] = meta.get("definition", "") if isinstance(meta.get("definition"), str) else ""
+    st.session_state["dataset_form_decomposition"] = meta.get("decomposition", "") if isinstance(meta.get("decomposition"), str) else ""
+    st.session_state["dataset_form_radical"] = meta.get("radical", "") if isinstance(meta.get("radical"), str) else ""
+    st.session_state["dataset_form_strokes"] = str(meta.get("strokes", "") or "")
+    st.session_state["dataset_form_compounds"] = _to_text_list(meta.get("compounds", []))
+    st.session_state["dataset_form_etym_hint"] = _to_text_list(ety.get("hint", ""))
+    st.session_state["dataset_form_etym_details"] = _to_text_list(ety.get("details", ""))
+    st.session_state["dataset_form_related"] = _to_text_list(entry.get("related_characters", []))
+
+
+def _split_lines_csv(raw: str) -> list[str]:
+    if not isinstance(raw, str):
+        return []
+    out = []
+    for part in re.split(r"[\n,]+", raw):
+        token = part.strip()
+        if token:
+            out.append(token)
+    return out
+
+
+def _build_entry_from_form() -> dict:
+    original = st.session_state.get("dataset_entry_raw", {})
+    entry = json.loads(json.dumps(original if isinstance(original, dict) else {}, ensure_ascii=False))
+
+    meta = entry.get("meta")
+    if not isinstance(meta, dict):
+        meta = {}
+    entry["meta"] = meta
+
+    meta["definition"] = st.session_state.get("dataset_form_definition", "")
+    pinyin_raw = st.session_state.get("dataset_form_pinyin", "")
+    if st.session_state.get("dataset_form_pinyin_type", "String") == "List":
+        meta["pinyin"] = _split_lines_csv(pinyin_raw)
+    else:
+        meta["pinyin"] = pinyin_raw
+    meta["decomposition"] = st.session_state.get("dataset_form_decomposition", "")
+    meta["radical"] = st.session_state.get("dataset_form_radical", "")
+
+    strokes_raw = st.session_state.get("dataset_form_strokes", "").strip()
+    if strokes_raw.isdigit():
+        meta["strokes"] = int(strokes_raw)
+    else:
+        meta["strokes"] = strokes_raw
+
+    meta["compounds"] = _split_lines_csv(st.session_state.get("dataset_form_compounds", ""))
+
+    ety = meta.get("etymology")
+    if not isinstance(ety, dict):
+        ety = {}
+    ety["hint"] = st.session_state.get("dataset_form_etym_hint", "")
+    ety["details"] = st.session_state.get("dataset_form_etym_details", "")
+    meta["etymology"] = ety
+
+    entry["related_characters"] = _split_lines_csv(st.session_state.get("dataset_form_related", ""))
+    return entry
+
+
+def dataset_pick_char(c: str):
+    """Select a character and immediately load its dataset entry into the editor."""
+    state.set("preview_comp", c)
+    st.session_state["dataset_edit_char"] = c
+    _load_entry_into_editor(c)
+
+
+def open_dataset_editor():
+    state.set("dataset_editor_mode", True)
+
+
+def close_dataset_editor():
+    state.set("dataset_editor_mode", False)
+
+
+def go_to_search_root():
+    state.set("dataset_editor_mode", False)
+    state.go_to_root()
+
+
+def _search_pick_char(c: str, key_prefix: str = "", on_pick=None, collapse_after_pick: bool = False):
+    """Handle character selection from shared search UI."""
+    if on_pick:
+        on_pick(c)
+    else:
+        tile_click(c)
+
+    if collapse_after_pick:
+        st.session_state[f"{key_prefix}selected_char"] = c
+        st.session_state[f"{key_prefix}smart_search_input"] = ""
+        st.rerun()
+
+
+def render_dataset_editor():
+    """Character-focused dataset editor integrated with app search/selection."""
+    st.caption("Search/select a character, then edit it with strict fields (key names are fixed).")
+    st.markdown("### Character Search")
+    render_smart_search("dataset_", on_pick=dataset_pick_char, collapse_after_pick=True)
+    st.markdown("---")
+    st.markdown("### Entry Editor")
+
+    if "dataset_source_path" not in st.session_state:
+        st.session_state["dataset_source_path"] = DEFAULT_COMPONENT_MAP_FILE
+    if "dataset_working_map" not in st.session_state:
+        try:
+            _load_dataset_working_copy(st.session_state["dataset_source_path"])
+        except Exception:
+            st.session_state["dataset_working_map"] = json.loads(json.dumps(component_map, ensure_ascii=False))
+            st.session_state["dataset_editor_filename"] = "component_map_editable.json"
+            st.session_state["dataset_entry_loaded_for"] = ""
+    if "dataset_edit_char" not in st.session_state:
+        st.session_state["dataset_edit_char"] = ""
+    if "dataset_editor_filename" not in st.session_state:
+        st.session_state["dataset_editor_filename"] = "component_map_editable.json"
+    if "dataset_output_path" not in st.session_state:
+        st.session_state["dataset_output_path"] = ""
+    if "dataset_entry_raw" not in st.session_state:
+        st.session_state["dataset_entry_raw"] = {}
+
+    source_path = st.text_input("Source JSON path", key="dataset_source_path")
+    if st.button("Reload Working Copy From Source", key="dataset_load_copy", use_container_width=True):
+        try:
+            _load_dataset_working_copy(source_path)
+            st.success(f"Loaded {source_path} into memory.")
+        except Exception as e:
+            st.error(str(e))
+
+    selected_char = state.get_preview_component() or state.get_selected_component()
+    if selected_char:
+        if st.session_state.get("dataset_edit_char") != selected_char:
+            st.session_state["dataset_edit_char"] = selected_char
+            _load_entry_into_editor(selected_char)
+        st.caption(f"Current search selection: `{selected_char}` (auto-loaded)")
+
+    st.text_input("Character key to edit", key="dataset_edit_char", max_chars=1)
+    e1, e2 = st.columns(2)
+    with e1:
+        if st.button("Load Character Entry", key="dataset_load_char", use_container_width=True):
+            char_key = (st.session_state["dataset_edit_char"] or "").strip()
+            if len(char_key) != 1:
+                st.error("Enter exactly one character key.")
+            else:
+                _load_entry_into_editor(char_key)
+    with e2:
+        if st.button("New Entry Template", key="dataset_new_entry", use_container_width=True):
+            char_key = (st.session_state["dataset_edit_char"] or "").strip()
+            if len(char_key) != 1:
+                st.error("Enter exactly one character key.")
+            else:
+                st.session_state["dataset_entry_raw"] = _default_entry_template()
+                _load_entry_into_editor(char_key)
+
+    char_key = (st.session_state["dataset_edit_char"] or "").strip()
+    wm = st.session_state.get("dataset_working_map", {})
+    if len(char_key) == 1 and char_key in wm:
+        st.markdown("**Current entry snapshot (read-only full data):**")
+        st.json(wm[char_key], expanded=False)
+
+    st.markdown("### Edit Fields (Strict Schema)")
+    st.text_input("meta.definition", key="dataset_form_definition")
+    st.radio("meta.pinyin type", options=["String", "List"], horizontal=True, key="dataset_form_pinyin_type")
+    st.text_area("meta.pinyin", key="dataset_form_pinyin", height=90, help="String or newline/comma separated list.")
+    st.text_input("meta.decomposition", key="dataset_form_decomposition")
+    st.text_input("meta.radical", key="dataset_form_radical")
+    st.text_input("meta.strokes", key="dataset_form_strokes")
+    st.text_area("meta.compounds (newline/comma separated)", key="dataset_form_compounds", height=90)
+    st.text_area("meta.etymology.hint", key="dataset_form_etym_hint", height=70)
+    st.text_area("meta.etymology.details", key="dataset_form_etym_details", height=90)
+    st.text_area("related_characters (newline/comma separated)", key="dataset_form_related", height=90)
+
+    a1, a2 = st.columns(2)
+    with a1:
+        if st.button("Save Entry To Working Copy", key="dataset_save_entry", use_container_width=True):
+            try:
+                char_key = (st.session_state["dataset_edit_char"] or "").strip()
+                if len(char_key) != 1:
+                    raise ValueError("Character key must be exactly one character.")
+
+                parsed_entry = _build_entry_from_form()
+                updated = dict(st.session_state["dataset_working_map"])
+                updated[char_key] = parsed_entry
+                validated = save_json_copy(content=updated, persist=False)
+                normalized_map = json.loads(validated["content"])
+                st.session_state["dataset_working_map"] = normalized_map
+                _load_entry_into_editor(char_key)
+                st.success(f"Entry '{char_key}' saved to working copy.")
+            except Exception as e:
+                st.error(str(e))
+    with a2:
+        if st.button("Delete Entry", key="dataset_delete_entry", use_container_width=True):
+            try:
+                char_key = (st.session_state["dataset_edit_char"] or "").strip()
+                if len(char_key) != 1:
+                    raise ValueError("Character key must be exactly one character.")
+                updated = dict(st.session_state["dataset_working_map"])
+                if char_key not in updated:
+                    raise ValueError(f"Entry '{char_key}' not found.")
+                del updated[char_key]
+                validated = save_json_copy(content=updated, persist=False)
+                st.session_state["dataset_working_map"] = json.loads(validated["content"])
+                st.success(f"Entry '{char_key}' deleted from working copy.")
+            except Exception as e:
+                st.error(str(e))
+
+    st.markdown("---")
+    st.text_input("Download filename", key="dataset_editor_filename")
+    full_dataset = st.session_state.get("dataset_working_map", {})
+
+    o1, o2 = st.columns(2)
+    with o1:
+        if st.button("Validate Full Dataset", key="dataset_validate_all", use_container_width=True):
+            try:
+                save_json_copy(content=full_dataset, persist=False)
+                st.success("Full dataset is valid and app-compatible.")
+            except Exception as e:
+                st.error(str(e))
+    with o2:
+        if st.button("Apply Full Dataset To App", key="dataset_apply_runtime", use_container_width=True, type="primary"):
+            try:
+                count = _apply_dataset_to_runtime(full_dataset)
+                st.success(f"Applied dataset to runtime ({count} characters).")
+                st.rerun()
+            except Exception as e:
+                st.error(str(e))
+
+    try:
+        download_payload = build_download_payload(
+            content=full_dataset,
+            filename=st.session_state["dataset_editor_filename"],
+        )
+        st.download_button(
+            "Download Full Edited JSON",
+            data=download_payload["bytes"],
+            file_name=download_payload["filename"],
+            mime=download_payload["mime"],
+            use_container_width=True,
+            key="dataset_download_btn",
+        )
+    except Exception as e:
+        st.error(str(e))
+
+    st.caption("Optional: save full edited dataset to disk (writable environments only).")
+    st.text_input("Output path", key="dataset_output_path")
+    if st.button("Save Full Dataset To Disk", key="dataset_save_disk", use_container_width=True):
+        try:
+            result = save_json_copy(
+                content=full_dataset,
+                output_path=st.session_state["dataset_output_path"].strip(),
+                persist=True,
+            )
+            st.success(f"Saved: {result.get('outputPath')}")
+        except Exception as e:
+            st.error(str(e))
 
 
 # ==================== CALLBACKS ====================
@@ -252,15 +593,19 @@ def render_sidebar():
             st.markdown(f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>{' → '.join(path_items)}</div>", unsafe_allow_html=True)
         
         # 2. Navigation
-        if not state.is_showing_inputs() or state.is_stroke_view_active():
+        if not state.is_showing_inputs() or state.is_stroke_view_active() or state.get("dataset_editor_mode", False):
             nav_col1, nav_col2 = st.columns(2)
             with nav_col1:
-                if state.is_stroke_view_active():
+                if state.get("dataset_editor_mode", False):
+                    st.button("← Back", on_click=close_dataset_editor, use_container_width=True, type="primary")
+                elif state.is_stroke_view_active():
                     st.button("← Lineage", on_click=state.exit_stroke_view, use_container_width=True, type="primary")
                 else:
                     st.button("← Back", on_click=state.go_back, use_container_width=True, type="primary")
             with nav_col2:
-                st.button("🔍 Search", on_click=state.go_to_root, use_container_width=True)
+                st.button("🔍 Search", on_click=go_to_search_root, use_container_width=True)
+
+        st.button("🧩 Dataset Editor", on_click=open_dataset_editor, use_container_width=True)
 
         # 3. Action Buttons & Character Details
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
@@ -275,6 +620,7 @@ def render_sidebar():
                     b1, b2 = st.columns(2)
                     with b1:
                         if st.button("🌳 Lineage", key="sb_btn_lin", use_container_width=True, type="primary"):
+                             state.set("dataset_editor_mode", False)
                              if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
                                  history = state.get_history()
                                  history.append(state.get_selected_component())
@@ -283,15 +629,18 @@ def render_sidebar():
                              st.rerun()
                     with b2:
                         if st.button("🧠 AI Link", key="sb_btn_ai", use_container_width=True):
+                            state.set("dataset_editor_mode", False)
                             state.enter_stroke_view(current_char_for_sidebar)
                             st.rerun()
                 else:
                     if show_lineage:
                         if st.button("🌳 Lineage", key="sb_btn_lin_full", use_container_width=True, type="primary"):
+                             state.set("dataset_editor_mode", False)
                              state.enter_character_view(current_char_for_sidebar)
                              st.rerun()
                     if show_ai_link:
                         if st.button("🧠 AI Link", key="sb_btn_ai_full", use_container_width=True):
+                            state.set("dataset_editor_mode", False)
                             state.enter_stroke_view(current_char_for_sidebar)
                             st.rerun()
 
@@ -346,11 +695,10 @@ def render_sidebar():
                     st.success("✓ Current file active")
 
 def render_grid():
-    """Render the main grid view with 3 Tabs."""
+    """Render the main grid view with tabs."""
     # Show resume button if localStorage has saved session
     persistence.show_resume_option()
     
-    # Reordered so Smart Search appears first
     tab1, tab2, tab3 = st.tabs(["🔍 Smart Search", "📊 Filter", "⭐ Favourites"])
     
     with tab1:
@@ -362,11 +710,25 @@ def render_grid():
     with tab3:
         render_favourites_grid()
 
-def render_smart_search():
+def render_smart_search(key_prefix: str = "", on_pick=None, collapse_after_pick: bool = False):
     """Render the combined Fuzzy Pinyin + Meaning search tab."""
+    selected_key = f"{key_prefix}selected_char"
+    if collapse_after_pick and st.session_state.get(selected_key):
+        chosen = st.session_state.get(selected_key)
+        st.success(f"Selected character: {chosen}")
+        if st.button("Change character", key=f"{key_prefix}change_char", use_container_width=False):
+            st.session_state[selected_key] = ""
+            st.session_state[f"{key_prefix}smart_search_input"] = ""
+            st.rerun()
+        return
+
     st.info("💡 Search by **Character** (e.g., '水'), **Phrase** (e.g., '你好'), **Pinyin** (e.g., 'ma' or 'tan lan'), OR **English Meaning** (e.g., 'fire'). Results show pinyin matches first, then English matches.")
     
-    query = st.text_input("Enter Character, Phrase, Pinyin or Meaning", key="smart_search_input", placeholder="e.g. 水, 你好, tan lan, ma, horse, water")
+    query = st.text_input(
+        "Enter Character, Phrase, Pinyin or Meaning",
+        key=f"{key_prefix}smart_search_input",
+        placeholder="e.g. 水, 你好, tan lan, ma, horse, water",
+    )
 
     if query:
         query = query.strip()
@@ -376,8 +738,11 @@ def render_smart_search():
 
         # Check if query is a single Chinese character - if so, show it directly
         if len(query) == 1 and query in component_map:
-            state.enter_character_view(query)
-            st.rerun()
+            if on_pick or collapse_after_pick:
+                _search_pick_char(query, key_prefix=key_prefix, on_pick=on_pick, collapse_after_pick=collapse_after_pick)
+            else:
+                state.enter_character_view(query)
+                st.rerun()
             return
         
         # Check if query is a multi-character Chinese phrase
@@ -403,7 +768,19 @@ def render_smart_search():
                         cols = st.columns(GRID_COLUMNS)
                         for i, ch in enumerate(chars_in_phrase):
                             with cols[i % GRID_COLUMNS]:
-                                st.button(ch, key=f"phrase_char_{ch}_{i}", type="primary" if state.get_preview_component() == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
+                                st.button(
+                                    ch,
+                                    key=f"{key_prefix}phrase_char_{ch}_{i}",
+                                    type="primary" if state.get_preview_component() == ch else "secondary",
+                                    on_click=_search_pick_char,
+                                    args=(ch,),
+                                    kwargs={
+                                        "key_prefix": key_prefix,
+                                        "on_pick": on_pick,
+                                        "collapse_after_pick": collapse_after_pick,
+                                    },
+                                    use_container_width=True,
+                                )
                         st.markdown("</div>", unsafe_allow_html=True)
                     return
 
@@ -517,7 +894,19 @@ def render_smart_search():
                 cols = st.columns(GRID_COLUMNS)
                 for i, ch in enumerate(display_results):
                     with cols[i % GRID_COLUMNS]:
-                        st.button(ch, key=f"smart_res_{ch}_{i}", type="primary" if state.get_preview_component() == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
+                        st.button(
+                            ch,
+                            key=f"{key_prefix}smart_res_{ch}_{i}",
+                            type="primary" if state.get_preview_component() == ch else "secondary",
+                            on_click=_search_pick_char,
+                            args=(ch,),
+                            kwargs={
+                                "key_prefix": key_prefix,
+                                "on_pick": on_pick,
+                                "collapse_after_pick": collapse_after_pick,
+                            },
+                            use_container_width=True,
+                        )
                 st.markdown("</div>", unsafe_allow_html=True)
                 
                 if len(results) > 100:
@@ -538,7 +927,19 @@ def render_smart_search():
                         cols = st.columns(len(chars_in_phrase) if len(chars_in_phrase) <= 8 else 8)
                         for i, ch in enumerate(chars_in_phrase[:8]):
                             with cols[i]:
-                                st.button(ch, key=f"phrase_result_{phrase_word}_{ch}_{i}", type="secondary", on_click=tile_click, args=(ch,), use_container_width=True)
+                                st.button(
+                                    ch,
+                                    key=f"{key_prefix}phrase_result_{phrase_word}_{ch}_{i}",
+                                    type="secondary",
+                                    on_click=_search_pick_char,
+                                    args=(ch,),
+                                    kwargs={
+                                        "key_prefix": key_prefix,
+                                        "on_pick": on_pick,
+                                        "collapse_after_pick": collapse_after_pick,
+                                    },
+                                    use_container_width=True,
+                                )
                 
                 st.markdown("</div>", unsafe_allow_html=True)
                 if len(phrase_results) > 50:
@@ -863,7 +1264,9 @@ def main():
     persistence.add_heartbeat()
 
     # Routing
-    if state.is_stroke_view_active():
+    if state.get("dataset_editor_mode", False):
+        render_dataset_editor()
+    elif state.is_stroke_view_active():
         render_ai_link()
     elif state.is_definition_search_active():
         render_definition_search_results()
