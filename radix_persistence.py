@@ -85,10 +85,16 @@ class PersistenceManager:
     
     def __init__(self, state_manager):
         self.state = state_manager
-        self.base_url = st.secrets.get("app", {}).get(
-            "base_url", 
-            "https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app"
-        )
+        default_base_url = "https://chinese-5n7qfcqoljkixr2spprdbr.streamlit.app"
+        try:
+            app_cfg = st.secrets.get("app", {})
+            if isinstance(app_cfg, dict):
+                self.base_url = app_cfg.get("base_url", default_base_url)
+            else:
+                self.base_url = default_base_url
+        except Exception:
+            # Local/dev or read-only deployments may not provide secrets.toml.
+            self.base_url = default_base_url
     
     def auto_save(self):
         """Save current character AND favourites to localStorage"""
