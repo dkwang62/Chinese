@@ -280,7 +280,6 @@ def _search_pick_char(c: str, key_prefix: str = "", on_pick=None, collapse_after
 
     if collapse_after_pick:
         st.session_state[f"{key_prefix}selected_char"] = c
-        st.session_state[f"{key_prefix}smart_search_input"] = ""
         st.rerun()
 
 
