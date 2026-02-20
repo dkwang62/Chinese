@@ -255,12 +255,28 @@ def go_to_search_root():
     state.go_to_root()
 
 
+def _promote_selection_for_navigation(target_char: str):
+    """Promote previewed char into selected state before explicit nav actions."""
+    if not target_char:
+        return
+    selected = state.get_selected_component()
+    if selected and selected != target_char:
+        history = state.get_history()
+        history.append(selected)
+        state.set("history", history)
+    state.set("selected_comp", target_char)
+    state.set("last_valid_selected_comp", target_char)
+    state.set("text_input_comp", target_char)
+    state.set("preview_comp", None)
+
+
 def _search_pick_char(c: str, key_prefix: str = "", on_pick=None, collapse_after_pick: bool = False):
     """Handle character selection from shared search UI."""
     if on_pick:
         on_pick(c)
     else:
-        tile_click(c)
+        # Search picks should stay in Search and only update sidebar preview.
+        state.set("preview_comp", c)
 
     if collapse_after_pick:
         st.session_state[f"{key_prefix}selected_char"] = c
@@ -620,27 +636,27 @@ def render_sidebar():
                     b1, b2 = st.columns(2)
                     with b1:
                         if st.button("🌳 Lineage", key="sb_btn_lin", use_container_width=True, type="primary"):
-                             state.set("dataset_editor_mode", False)
-                             if state.get_selected_component() and state.get_selected_component() != current_char_for_sidebar:
-                                 history = state.get_history()
-                                 history.append(state.get_selected_component())
-                                 state.set("history", history)
-                             state.enter_character_view(current_char_for_sidebar)
-                             st.rerun()
+                            state.set("dataset_editor_mode", False)
+                            _promote_selection_for_navigation(current_char_for_sidebar)
+                            state.enter_character_view(current_char_for_sidebar)
+                            st.rerun()
                     with b2:
                         if st.button("🧠 AI Link", key="sb_btn_ai", use_container_width=True):
                             state.set("dataset_editor_mode", False)
+                            _promote_selection_for_navigation(current_char_for_sidebar)
                             state.enter_stroke_view(current_char_for_sidebar)
                             st.rerun()
                 else:
                     if show_lineage:
                         if st.button("🌳 Lineage", key="sb_btn_lin_full", use_container_width=True, type="primary"):
-                             state.set("dataset_editor_mode", False)
-                             state.enter_character_view(current_char_for_sidebar)
-                             st.rerun()
+                            state.set("dataset_editor_mode", False)
+                            _promote_selection_for_navigation(current_char_for_sidebar)
+                            state.enter_character_view(current_char_for_sidebar)
+                            st.rerun()
                     if show_ai_link:
                         if st.button("🧠 AI Link", key="sb_btn_ai_full", use_container_width=True):
                             state.set("dataset_editor_mode", False)
+                            _promote_selection_for_navigation(current_char_for_sidebar)
                             state.enter_stroke_view(current_char_for_sidebar)
                             st.rerun()
 
@@ -741,8 +757,7 @@ def render_smart_search(key_prefix: str = "", on_pick=None, collapse_after_pick:
             if on_pick or collapse_after_pick:
                 _search_pick_char(query, key_prefix=key_prefix, on_pick=on_pick, collapse_after_pick=collapse_after_pick)
             else:
-                state.enter_character_view(query)
-                st.rerun()
+                state.set("preview_comp", query)
             return
         
         # Check if query is a multi-character Chinese phrase
