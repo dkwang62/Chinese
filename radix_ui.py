@@ -50,6 +50,16 @@ def apply_styles():
     .cp-mean {color: #495057; font-size: 1em; flex: 1; line-height: 1.5;}
     .char-btn-hint {margin-top: 6px; text-align: center; font-size: 0.86em; color: #6c757d; font-weight: 700;}
     .char-btn-hint.previewing {color: #c0392b;}
+    .tier-row {display:flex; align-items:center; justify-content:space-between; margin: 10px 0 12px 0; padding-top: 2px;}
+    .tier-left {display:flex; align-items:center; gap:12px;}
+    .tier-pill {display:inline-block; padding: 7px 16px; border-radius: 14px; font-weight:800; color:#fff; font-size: 0.96em; line-height: 1.1; letter-spacing: 0.1px;}
+    .tier-pill.t1 {background:#34c759;}
+    .tier-pill.t2 {background:#45b95b;}
+    .tier-pill.t3 {background:#f4a623;}
+    .tier-pill.t4 {background:#ef7d22;}
+    .tier-pill.t5 {background:#8a6e63;}
+    .tier-info-btn {display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%; border:2.5px solid #8e8e93; color:#7e7e85; font-weight:800; font-size:21px; background:#fff; box-sizing:border-box;}
+    .tier-reco {font-style: italic; color:#7a7a7a; font-size: 0.96em; font-weight: 500; padding-right: 2px;}
     .splash-wrap {max-width: 850px; margin: 0 auto; padding: 60px 20px 20px 20px;}
     .splash-card {background: #ffffff; border: 1px solid #e0e0e0; border-radius: 40px; padding: 60px; box-shadow: 0 15px 50px rgba(0,0,0,0.05); text-align: center;}
     .splash-title {font-size: 3.0em; font-weight: 800; color: #1a1a1a; margin-bottom: 10px;}
@@ -146,7 +156,7 @@ def _tier_meta_for_char(c: str):
 
 
 def build_frequency_badge(freq: float, minimal: bool = False) -> str:
-    """Build frequency badge HTML."""
+    """Build frequency badge HTML (without old frequency guide tooltip)."""
     if freq > 0:
         if freq >= FREQ_PERCENTILES['p95']:
             label, color = "Top 5%", "#2e7d32"
@@ -158,17 +168,37 @@ def build_frequency_badge(freq: float, minimal: bool = False) -> str:
             label, color = "Below Average", "#f57c00"
         else:
             label, color = "Bottom 25%", "#c62828"
-        
-        if minimal:
-            return f"<span class='meta-tag' title='Frequency: {label} ({freq:,.0f}/M)' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); color: {color}; border: 1px solid {color}40; font-weight:700; cursor: help;'>Freq: {label}</span>"
-        else:
-            legend = "<strong>📊 Frequency Guide</strong><br><br><strong>Top 5% (Essential):</strong> Core survival vocabulary.<br><strong>Top 25% (Common):</strong> Standard for news & business.<br><strong>Above Average:</strong> Topic-specific (e.g. Science).<br><strong>Below Average:</strong> Literary & enrichment words.<br><strong>Bottom 25%:</strong> Rare, archaic, or very specific names."
-            return f"<div class='radix-tooltip'><span class='meta-tag' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); color: {color}; border: 1px solid {color}40; font-weight:700; cursor: help;'>Frequency: {label} ({freq:,.0f}/M)</span><span class='radix-tooltiptext' style='width:250px;'>{legend}</span></div>"
-    else:
-        if minimal:
-            return "<span class='meta-tag' style='color:#999;'>Freq: No Data</span>"
-        else:
-            return "<div class='radix-tooltip'><span class='meta-tag' style='color:#999;'>Freq: No Data</span><span class='radix-tooltiptext'>No frequency data available in SUBTLEX-CH for this character.</span></div>"
+        return f"<span class='meta-tag' style='background: linear-gradient(135deg, {color}15 0%, {color}25 100%); color: {color}; border: 1px solid {color}40; font-weight:700;'>Freq: {label}</span>"
+    return "<span class='meta-tag' style='color:#999;'>Freq: No Data</span>"
+
+def build_tier_info_row(c: str) -> str:
+    tier, tier_name, rank, _, recommendation = _tier_meta_for_char(c)
+    tier_cls = {1: 't1', 2: 't2', 3: 't3', 4: 't4', 5: 't5'}.get(tier, 't5')
+
+    guide = (
+        "<strong>Character Learning Guide</strong><br><br>"
+        "<strong>Tier 1: Core Literacy</strong><br>"
+        "Everyday survival characters. Essential for basic reading.<br><br>"
+        "<strong>Tier 2: Fluency Core</strong><br>"
+        "Required for reading newspapers and modern written content.<br><br>"
+        "<strong>Tier 3: Educated Native</strong><br>"
+        "Required for university-level reading and formal argumentation.<br><br>"
+        "<strong>Tier 4: Academic/Pro</strong><br>"
+        "Specialized, technical, or research-heavy characters.<br><br>"
+        "<strong>Tier 5: Niche/Rare</strong><br>"
+        "Rare names, dialect, or archaic forms. Safe to ignore for most learners."
+    )
+
+    return (
+        f"<div class='tier-row'>"
+        f"<div class='tier-left'>"
+        f"<span class='tier-pill {tier_cls}'>Tier {tier}</span>"
+        f"<div class='radix-tooltip'><span class='tier-info-btn'>i</span><span class='radix-tooltiptext' style='width:308px; left:0; margin-left:0; bottom:115%; font-size:0.82rem; line-height:1.38;'>{guide}</span></div>"
+        f"</div>"
+        f"<span class='tier-reco'>{recommendation}</span>"
+        f"</div>"
+    )
+
 
 def build_usage_badge(count: int, char: str, is_static: bool, minimal: bool) -> str:
     """Build usage badge with tooltip."""
@@ -222,16 +252,6 @@ def generate_clean_card_html(c: str, usage_count: int = None, is_static: bool = 
     # Frequency badge
     freq = info.get('freq_per_million', 0.0)
     meta_items.append(build_frequency_badge(freq, minimal))
-
-    # Fixed-tier badge (top1500 / next1500 / next1000 / next1000 / rest)
-    tier, tier_name, rank, coverage, recommendation = _tier_meta_for_char(c)
-    tier_colors = {1: '#2e7d32', 2: '#388e3c', 3: '#f9a825', 4: '#ef6c00', 5: '#6d4c41'}
-    tier_color = tier_colors.get(tier, '#6d4c41')
-    tier_tip = f"<strong>Character Learning Guide</strong><br><br>Tier {tier}: {tier_name}<br>Rank: {rank}<br>Coverage: {coverage}%<br>Recommendation: {recommendation}"
-    if minimal:
-        meta_items.append(f"<span class='meta-tag' title='Tier {tier} · {tier_name} · Rank {rank}' style='background: linear-gradient(135deg, {tier_color}20 0%, {tier_color}35 100%); color: {tier_color}; border: 1px solid {tier_color}55; font-weight:700;'>Tier {tier}</span>")
-    else:
-        meta_items.append(f"<div class='radix-tooltip'><span class='meta-tag' style='background: linear-gradient(135deg, {tier_color}20 0%, {tier_color}35 100%); color: {tier_color}; border: 1px solid {tier_color}55; font-weight:700;'>Tier {tier}</span><span class='radix-tooltiptext' style='width:260px;'>{tier_tip}</span></div>")
     
     # Script variants
     if cc_t2s:
@@ -252,7 +272,8 @@ def generate_clean_card_html(c: str, usage_count: int = None, is_static: bool = 
     etymology = get_etymology_text(meta)
     ety_html = f"<div class='ety-row'>{etymology}</div>" if etymology else ""
     
-    return f"<div class='char-card'>{meta_html}{def_html}{ety_html}</div>"
+    tier_html = "" if minimal else build_tier_info_row(c)
+    return f"<div class='char-card'>{meta_html}{tier_html}{def_html}{ety_html}</div>"
 
 def render_ipad_safe_download_html(data_str: str, filename: str, label: str) -> str:
     """Build iPad-safe download link."""
