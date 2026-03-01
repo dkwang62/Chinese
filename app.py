@@ -702,45 +702,44 @@ def render_sidebar():
             with nav_col2:
                 st.button("🔍 Search", on_click=go_to_search_root, use_container_width=True)
 
-        st.button("🧩 Dataset Editor", on_click=open_dataset_editor, use_container_width=True)
-
-        # 3. Action Buttons & Character Details
+        # 3. Navigation Pad (6 keys)
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
+        st.markdown("<div style='background:#eceff1; border-radius:14px; padding:10px 8px; margin-bottom:10px;'>", unsafe_allow_html=True)
+        n1, n2, n3 = st.columns(3)
+        with n1:
+            if st.button("🔍\nSearch", key="nav_search_6", use_container_width=True):
+                go_to_search_root()
+                st.rerun()
+        with n2:
+            if st.button("◻️\nBrowse", key="nav_browse_6", use_container_width=True):
+                go_to_search_root()
+                st.rerun()
+        with n3:
+            if st.button("⭐\nFavourites", key="nav_favs_6", use_container_width=True):
+                go_to_search_root()
+                st.rerun()
 
+        n4, n5, n6 = st.columns(3)
+        with n4:
+            if st.button("🧬\nLineage", key="nav_lineage_6", use_container_width=True, disabled=not bool(current_char_for_sidebar)):
+                state.set("dataset_editor_mode", False)
+                _promote_selection_for_navigation(current_char_for_sidebar)
+                state.enter_character_view(current_char_for_sidebar)
+                st.rerun()
+        with n5:
+            if st.button("✨\nAI Link", key="nav_ai_6", use_container_width=True, disabled=not bool(current_char_for_sidebar)):
+                state.set("dataset_editor_mode", False)
+                _promote_selection_for_navigation(current_char_for_sidebar)
+                state.enter_stroke_view(current_char_for_sidebar)
+                st.rerun()
+        with n6:
+            if st.button("🗂️\nDataEdit", key="nav_dataedit_6", use_container_width=True):
+                open_dataset_editor()
+                st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # 4. Character Details
         if current_char_for_sidebar:
-            # Action Buttons
-            show_lineage = state.is_showing_inputs() or state.is_stroke_view_active() or (current_char_for_sidebar != state.get_selected_component())
-            show_ai_link = not state.is_stroke_view_active()
-
-            if show_lineage or show_ai_link:
-                if show_lineage and show_ai_link:
-                    b1, b2 = st.columns(2)
-                    with b1:
-                        if st.button("🌳 Lineage", key="sb_btn_lin", use_container_width=True, type="primary"):
-                            state.set("dataset_editor_mode", False)
-                            _promote_selection_for_navigation(current_char_for_sidebar)
-                            state.enter_character_view(current_char_for_sidebar)
-                            st.rerun()
-                    with b2:
-                        if st.button("🧠 AI Link", key="sb_btn_ai", use_container_width=True):
-                            state.set("dataset_editor_mode", False)
-                            _promote_selection_for_navigation(current_char_for_sidebar)
-                            state.enter_stroke_view(current_char_for_sidebar)
-                            st.rerun()
-                else:
-                    if show_lineage:
-                        if st.button("🌳 Lineage", key="sb_btn_lin_full", use_container_width=True, type="primary"):
-                            state.set("dataset_editor_mode", False)
-                            _promote_selection_for_navigation(current_char_for_sidebar)
-                            state.enter_character_view(current_char_for_sidebar)
-                            st.rerun()
-                    if show_ai_link:
-                        if st.button("🧠 AI Link", key="sb_btn_ai_full", use_container_width=True):
-                            state.set("dataset_editor_mode", False)
-                            _promote_selection_for_navigation(current_char_for_sidebar)
-                            state.enter_stroke_view(current_char_for_sidebar)
-                            st.rerun()
-
             # Visuals
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
             if sidebar_html:
@@ -767,12 +766,12 @@ def render_sidebar():
         
         st.markdown("---")
         
-        # 4. Persistence Controls
+        # 5. Persistence Controls
         persistence.render_controls()
         
         st.markdown("---")
         
-        # 5. User Data (Manual Upload/Download)
+        # 6. User Data (Manual Upload/Download)
         with st.expander("💾 User Data", expanded=False):
             st.info(f"💡 {PROFILE_FILENAME} auto-loads on startup if present in the app directory")
             st.markdown(render_ipad_safe_download_html(config.export_profile_str(), PROFILE_FILENAME, "📥 Download Profile"), unsafe_allow_html=True)
@@ -1050,12 +1049,11 @@ def render_all_components_grid():
         mode_map = {
             "usage": "Component frequency",
             "frequency": "Character frequency",
-            "tier": "Tier ranking",
         }
         current_mode = state.get_grid_sort_mode()
         if current_mode not in mode_map:
             current_mode = "usage"
-        options = ["Component frequency", "Character frequency", "Tier ranking"]
+        options = ["Component frequency", "Character frequency"]
         sort_choice = st.radio(
             "Sort by",
             options=options,
@@ -1067,18 +1065,15 @@ def render_all_components_grid():
         state.set("grid_sort_mode", selected_mode)
 
     with col_script:
-        if state.get_grid_sort_mode() == "frequency":
-            gsf = state.get("grid_script_filter", "Any")
-            script_choice = st.radio(
-                "Script",
-                options=["Simplified", "Traditional", "Any"],
-                index=["Simplified", "Traditional", "Any"].index(gsf),
-                horizontal=True,
-                key="grid_script_radio",
-            )
-            state.set("grid_script_filter", script_choice)
-        else:
-            st.caption("Tier ranking uses global frequency rank buckets.")
+        gsf = state.get("grid_script_filter", "Any")
+        script_choice = st.radio(
+            "Script",
+            options=["Simplified", "Traditional", "Any"],
+            index=["Simplified", "Traditional", "Any"].index(gsf),
+            horizontal=True,
+            key="grid_script_radio",
+        )
+        state.set("grid_script_filter", script_choice)
 
     col_stroke, col_radical, col_idc = st.columns([2, 2, 2])
 
@@ -1137,21 +1132,16 @@ def render_all_components_grid():
     if state.get("component_idc") != "none":
         filtered = [c for c in filtered if component_map[c]["meta"].get("decomposition", "").startswith(state.get("component_idc"))]
 
-    metrics = None
     if state.get_grid_sort_mode() == "usage":
         filtered = [c for c in filtered if c in stats_cache["used_components"]]
 
     if state.get_grid_sort_mode() == "frequency":
         filtered = apply_script_filter(filtered, state.get("grid_script_filter"))
 
-    if state.get_grid_sort_mode() == "tier":
-        metrics = _compute_tier_metrics()
-        sorted_comps = sorted(filtered, key=lambda ch: metrics.get(ch, {}).get("sort_key", (9, 999999, ch)))
-    else:
-        sorted_comps = sorted(
-            filtered,
-            key=sort_key_frequency_primary if state.get_grid_sort_mode() == "frequency" else sort_key_usage_primary,
-        )
+    sorted_comps = sorted(
+        filtered,
+        key=sort_key_frequency_primary if state.get_grid_sort_mode() == "frequency" else sort_key_usage_primary,
+    )
 
     if not sorted_comps:
         st.info("No components match filters.")
@@ -1193,23 +1183,7 @@ def render_all_components_grid():
             )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    if state.get_grid_sort_mode() == "tier" and metrics:
-        st.markdown("### Character Learning Guide (Current Page)")
-        table_rows = []
-        for ch in page_items:
-            m = metrics.get(ch, {})
-            table_rows.append(
-                {
-                    "Character": ch,
-                    "Tier": f"Tier {m.get('tier', '')}",
-                    "Tier Name": m.get("tier_name", ""),
-                    "Base Frequency Rank": m.get("base_frequency_rank", ""),
-                    "Corpus Coverage %": m.get("coverage_pct", ""),
-                    "Learning Recommendation": m.get("recommendation", ""),
-                    "Notes": m.get("notes", ""),
-                }
-            )
-        st.dataframe(table_rows, use_container_width=True, hide_index=True)
+
 
 def render_favourites_grid():
     favs = state.get_favourites()
