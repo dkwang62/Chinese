@@ -836,9 +836,6 @@ def render_sidebar():
             st.checkbox("⭐ Favourite", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
 
         st.markdown("---")
-        persistence.render_controls()
-
-        st.markdown("---")
         with st.expander("💾 User Data", expanded=False):
             st.info(f"💡 {PROFILE_FILENAME} auto-loads on startup if present in the app directory")
             st.markdown(render_ipad_safe_download_html(config.export_profile_str(), PROFILE_FILENAME, "📥 Download Profile"), unsafe_allow_html=True)
