@@ -337,6 +337,23 @@ def go_to_search_root():
     state.go_to_root()
 
 
+def open_search_screen():
+    go_to_search_root()
+    state.set("home_screen", "search")
+
+
+def open_browse_screen():
+    go_to_search_root()
+    state.set("home_screen", "browse")
+    state.set("page", 1)
+
+
+def open_favourites_screen():
+    go_to_search_root()
+    state.set("home_screen", "favourites")
+    state.set("page", 1)
+
+
 def _promote_selection_for_navigation(target_char: str):
     """Promote previewed char into selected state before explicit nav actions."""
     if not target_char:
@@ -678,8 +695,7 @@ def render_radix_row(c, is_static=False, minimal=False):
 def render_sidebar():
     with st.sidebar:
         st.markdown("# 🈳 Radix")
-        
-        # 1. Breadcrumbs
+
         current_char = state.get("stroke_view_char") if state.is_stroke_view_active() else state.get_selected_component()
         if current_char:
             path_items = ["🏠 Search"] + state.get_history()
@@ -687,68 +703,107 @@ def render_sidebar():
                 path_items.append(f"<i>{current_char}</i> (AI)")
             else:
                 path_items.append(f"<b>{current_char}</b>")
-            st.markdown(f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>{' → '.join(path_items)}</div>", unsafe_allow_html=True)
-        
-        # 2. Navigation
-        if not state.is_showing_inputs() or state.is_stroke_view_active() or state.get("dataset_editor_mode", False):
-            nav_col1, nav_col2 = st.columns(2)
-            with nav_col1:
-                if state.get("dataset_editor_mode", False):
-                    st.button("← Back", on_click=close_dataset_editor, use_container_width=True, type="primary")
-                elif state.is_stroke_view_active():
-                    st.button("← Lineage", on_click=state.exit_stroke_view, use_container_width=True, type="primary")
-                else:
-                    st.button("← Back", on_click=state.go_back, use_container_width=True, type="primary")
-            with nav_col2:
-                st.button("🔍 Search", on_click=go_to_search_root, use_container_width=True)
+            st.markdown(
+                f"<div style='font-size:0.85em; margin:0 0 12px 0; padding:10px; color:#fff; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:8px; text-align:center; font-weight:600; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);'>{' → '.join(path_items)}</div>",
+                unsafe_allow_html=True,
+            )
 
-        # 3. Navigation Pad (6 keys)
+        st.markdown(
+            """
+            <style>
+            .st-key-nav_pad [data-testid='stButton'] > button {
+                height: 74px;
+                min-height: 74px;
+                border-radius: 11px;
+                background: #eef1f3;
+                border: 1px solid #d6dbe0;
+                color: #4f555b;
+                white-space: pre-line;
+                font-size: 9.5px;
+                font-weight: 600;
+                line-height: 1.0;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                gap: 1px;
+                padding: 3px 1px 1px 1px;
+                text-align: center;
+            }
+            .st-key-nav_pad [data-testid='stButton'] > button [data-testid='stIconMaterial'] {
+                font-size: 18px;
+            }
+            .st-key-nav_bottom [data-testid='stButton'] > button {
+                height: 42px;
+                border-radius: 999px;
+                font-size: 12px;
+                font-weight: 700;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
         current_char_for_sidebar = state.get("stroke_view_char") if state.is_stroke_view_active() else (state.get_preview_component() or state.get_selected_component())
-        st.markdown("<div style='background:#eceff1; border-radius:14px; padding:10px 8px; margin-bottom:10px;'>", unsafe_allow_html=True)
-        n1, n2, n3 = st.columns(3)
-        with n1:
-            if st.button("🔍\nSearch", key="nav_search_6", use_container_width=True):
-                go_to_search_root()
-                st.rerun()
-        with n2:
-            if st.button("◻️\nBrowse", key="nav_browse_6", use_container_width=True):
-                go_to_search_root()
-                st.rerun()
-        with n3:
-            if st.button("⭐\nFavourites", key="nav_favs_6", use_container_width=True):
-                go_to_search_root()
-                st.rerun()
 
-        n4, n5, n6 = st.columns(3)
-        with n4:
-            if st.button("🧬\nLineage", key="nav_lineage_6", use_container_width=True, disabled=not bool(current_char_for_sidebar)):
-                state.set("dataset_editor_mode", False)
-                _promote_selection_for_navigation(current_char_for_sidebar)
-                state.enter_character_view(current_char_for_sidebar)
-                st.rerun()
-        with n5:
-            if st.button("✨\nAI Link", key="nav_ai_6", use_container_width=True, disabled=not bool(current_char_for_sidebar)):
-                state.set("dataset_editor_mode", False)
-                _promote_selection_for_navigation(current_char_for_sidebar)
-                state.enter_stroke_view(current_char_for_sidebar)
-                st.rerun()
-        with n6:
-            if st.button("🗂️\nDataEdit", key="nav_dataedit_6", use_container_width=True):
-                open_dataset_editor()
-                st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container(key="nav_pad"):
+            r1c1, r1c2, r1c3 = st.columns(3)
+            with r1c1:
+                if st.button("Search", key="nav_search_6", icon=":material/search:", use_container_width=True):
+                    open_search_screen()
+                    st.rerun()
+            with r1c2:
+                if st.button("Browse", key="nav_browse_6", icon=":material/grid_view:", use_container_width=True):
+                    open_browse_screen()
+                    st.rerun()
+            with r1c3:
+                if st.button("Favourites", key="nav_favs_6", icon=":material/star:", use_container_width=True):
+                    open_favourites_screen()
+                    st.rerun()
 
-        # 4. Character Details
+            r2c1, r2c2, r2c3 = st.columns(3)
+            with r2c1:
+                if st.button("Lineage", key="nav_lineage_6", icon=":material/account_tree:", use_container_width=True, disabled=not bool(current_char_for_sidebar)):
+                    state.set("dataset_editor_mode", False)
+                    _promote_selection_for_navigation(current_char_for_sidebar)
+                    state.enter_character_view(current_char_for_sidebar)
+                    st.rerun()
+            with r2c2:
+                if st.button("AI Link", key="nav_ai_6", icon=":material/auto_awesome:", use_container_width=True, disabled=not bool(current_char_for_sidebar)):
+                    state.set("dataset_editor_mode", False)
+                    _promote_selection_for_navigation(current_char_for_sidebar)
+                    state.enter_stroke_view(current_char_for_sidebar)
+                    st.rerun()
+            with r2c3:
+                if st.button("DataEdit", key="nav_dataedit_6", icon=":material/storage:", use_container_width=True):
+                    open_dataset_editor()
+                    st.rerun()
+
+        back_disabled = state.is_showing_inputs() and (not state.is_stroke_view_active()) and (not state.get("dataset_editor_mode", False))
+        with st.container(key="nav_bottom"):
+            b1, b2 = st.columns(2)
+            with b1:
+                if st.button("Back", key="nav_back_bottom", icon=":material/chevron_left:", use_container_width=True, disabled=back_disabled):
+                    if state.get("dataset_editor_mode", False):
+                        close_dataset_editor()
+                    elif state.is_stroke_view_active():
+                        state.exit_stroke_view()
+                    else:
+                        state.go_back()
+                    st.rerun()
+            with b2:
+                if st.button("Search", key="nav_search_bottom", icon=":material/search:", use_container_width=True):
+                    open_search_screen()
+                    st.rerun()
+
         if current_char_for_sidebar:
-            # Visuals
             sidebar_html, sidebar_height = get_stroke_order_sidebar_html(current_char_for_sidebar, size=140)
             if sidebar_html:
                 st_html(sidebar_html, height=sidebar_height)
-            
+
             card_html = generate_clean_card_html(current_char_for_sidebar, usage_count=component_usage_count(current_char_for_sidebar), is_static=True)
             st.markdown(f"<div style='margin-top: 15px;'>{card_html}</div>", unsafe_allow_html=True)
 
-            # Logic Breakdown
             analysis = analyze_component_structure(current_char_for_sidebar)
             if analysis['semantic'] or analysis['phonetic']:
                 s_txt = f"💡 <b>{analysis['semantic']}</b> = Meaning" if analysis['semantic'] else ""
@@ -760,22 +815,18 @@ def render_sidebar():
                     <div style='font-size: 0.85em; color: #31333F; line-height: 1.4;'>{p_txt}</div>
                 </div>
                 """, unsafe_allow_html=True)
-            
+
             st.markdown("---")
             st.checkbox("⭐ Favourite", value=(current_char_for_sidebar in state.get_favourites()), key=f"fav_chk_{current_char_for_sidebar}", on_change=toggle_favourite, args=(current_char_for_sidebar,))
-        
+
         st.markdown("---")
-        
-        # 5. Persistence Controls
         persistence.render_controls()
-        
+
         st.markdown("---")
-        
-        # 6. User Data (Manual Upload/Download)
         with st.expander("💾 User Data", expanded=False):
             st.info(f"💡 {PROFILE_FILENAME} auto-loads on startup if present in the app directory")
             st.markdown(render_ipad_safe_download_html(config.export_profile_str(), PROFILE_FILENAME, "📥 Download Profile"), unsafe_allow_html=True)
-            
+
             st.caption("---")
             st.caption("**Manual Upload:**")
             if uf := st.file_uploader("📤 Upload JSON", type=["json"], key="sidebar_uploader", label_visibility="collapsed"):
@@ -790,21 +841,21 @@ def render_sidebar():
                 else:
                     st.success("✓ Current file active")
 
-def render_grid():
-    """Render the main grid view with tabs."""
-    # Show resume button if localStorage has saved session
-    persistence.show_resume_option()
-    
-    tab1, tab2, tab3 = st.tabs(["🔍 Smart Search", "📊 Filter", "⭐ Favourites"])
-    
-    with tab1:
-        render_smart_search()
-    
-    with tab2:
-        render_all_components_grid()
 
-    with tab3:
+def render_grid():
+    """Render home routes as separate screens (Search/Browse/Favourites)."""
+    persistence.show_resume_option()
+
+    screen = state.get("home_screen", "search")
+    if screen == "browse":
+        st.markdown("### Browse")
+        render_all_components_grid()
+    elif screen == "favourites":
+        st.markdown("### Favourites")
         render_favourites_grid()
+    else:
+        st.markdown("### Search")
+        render_smart_search()
 
 def render_smart_search(key_prefix: str = "", on_pick=None, collapse_after_pick: bool = False):
     """Render the combined Fuzzy Pinyin + Meaning search tab."""
