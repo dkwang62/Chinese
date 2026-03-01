@@ -41,6 +41,7 @@ state = StateManager()
 config = ConfigManager(state)
 persistence = PersistenceManager(state)
 DEFAULT_COMPONENT_MAP_FILE = "enhanced_component_map_with_etymology.json"
+NAV_ICON_ONLY_LABEL = "\u200b"
 
 
 # ==================== HELPERS ====================
@@ -715,24 +716,31 @@ def render_sidebar():
                 height: 88px;
                 min-height: 88px;
                 border-radius: 16px;
-                background: #d8dde2;
-                border: 2px solid #c1c7cf;
-                color: #555d67;
+                background: linear-gradient(180deg, #d7dce2 0%, #d2d8df 100%);
+                border: 2px solid #b7bec8;
+                color: #4f5762;
                 white-space: normal;
-                font-size: 11px;
+                font-size: 0;
                 font-weight: 600;
                 line-height: 1.05;
                 display: flex;
-                flex-direction: row;
+                flex-direction: column;
                 justify-content: center;
                 align-items: center;
-                gap: 6px;
-                padding: 0 10px;
+                gap: 0;
+                padding: 0;
                 text-align: center;
                 box-shadow: none;
             }
+            .st-key-nav_pad [data-testid='stButton'] > button:hover {
+                border-color: #9ea8b5;
+                background: linear-gradient(180deg, #dbe1e7 0%, #d6dde5 100%);
+            }
+            .st-key-nav_pad [data-testid='stButton'] > button [data-testid='stMarkdownContainer'] {
+                display: none;
+            }
             .st-key-nav_pad [data-testid='stButton'] > button [data-testid='stIconMaterial'] {
-                font-size: 21px;
+                font-size: 31px;
                 line-height: 1;
             }
             .st-key-nav_bottom [data-testid='stButton'] > button {
@@ -753,33 +761,33 @@ def render_sidebar():
         with st.container(key="nav_pad"):
             r1c1, r1c2, r1c3 = st.columns(3)
             with r1c1:
-                if st.button("Search", key="nav_search_6", icon=":material/search:", use_container_width=True):
+                if st.button(NAV_ICON_ONLY_LABEL, key="nav_search_6", icon=":material/search:", help="Search", use_container_width=True):
                     open_search_screen()
                     st.rerun()
             with r1c2:
-                if st.button("Browse", key="nav_browse_6", icon=":material/grid_view:", use_container_width=True):
+                if st.button(NAV_ICON_ONLY_LABEL, key="nav_browse_6", icon=":material/grid_view:", help="Browse", use_container_width=True):
                     open_browse_screen()
                     st.rerun()
             with r1c3:
-                if st.button("Favourite\ns", key="nav_favs_6", icon=":material/star_outline:", use_container_width=True):
+                if st.button(NAV_ICON_ONLY_LABEL, key="nav_favs_6", icon=":material/star_outline:", help="Favourites", use_container_width=True):
                     open_favourites_screen()
                     st.rerun()
 
             r2c1, r2c2, r2c3 = st.columns(3)
             with r2c1:
-                if st.button("Lineage", key="nav_lineage_6", icon=":material/account_tree:", use_container_width=True, disabled=not bool(current_char_for_sidebar)):
+                if st.button(NAV_ICON_ONLY_LABEL, key="nav_lineage_6", icon=":material/account_tree:", help="Lineage", use_container_width=True, disabled=not bool(current_char_for_sidebar)):
                     state.set("dataset_editor_mode", False)
                     _promote_selection_for_navigation(current_char_for_sidebar)
                     state.enter_character_view(current_char_for_sidebar)
                     st.rerun()
             with r2c2:
-                if st.button("AI Link", key="nav_ai_6", icon=":material/auto_awesome:", use_container_width=True, disabled=not bool(current_char_for_sidebar)):
+                if st.button(NAV_ICON_ONLY_LABEL, key="nav_ai_6", icon=":material/auto_awesome:", help="AI Link", use_container_width=True, disabled=not bool(current_char_for_sidebar)):
                     state.set("dataset_editor_mode", False)
                     _promote_selection_for_navigation(current_char_for_sidebar)
                     state.enter_stroke_view(current_char_for_sidebar)
                     st.rerun()
             with r2c3:
-                if st.button("DataEdit", key="nav_dataedit_6", icon=":material/view_list:", use_container_width=True):
+                if st.button(NAV_ICON_ONLY_LABEL, key="nav_dataedit_6", icon=":material/view_list:", help="DataEdit", use_container_width=True):
                     open_dataset_editor()
                     st.rerun()
 
