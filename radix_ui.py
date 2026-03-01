@@ -249,9 +249,6 @@ def generate_clean_card_html(c: str, usage_count: int = None, is_static: bool = 
     if usage_count is not None and usage_count > 0:
         meta_items.append(build_usage_badge(usage_count, c, is_static, minimal))
     
-    # Frequency badge
-    freq = info.get('freq_per_million', 0.0)
-    meta_items.append(build_frequency_badge(freq, minimal))
     
     # Script variants
     if cc_t2s:
