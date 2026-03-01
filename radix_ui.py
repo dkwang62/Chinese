@@ -76,6 +76,75 @@ def apply_styles():
 
 FREQ_PERCENTILES = {'p95': 8500, 'p75': 3200, 'p50': 800, 'p25': 150}
 
+_TIER_RANK_CACHE = None
+
+
+def _build_freq_rank_and_coverage_maps():
+    freq_pairs = []
+    for ch, info in component_map.items():
+        freq = float(info.get('freq_per_million', 0.0) or 0.0)
+        freq_pairs.append((ch, max(freq, 0.0)))
+
+    ranked = sorted(freq_pairs, key=lambda x: (-x[1], x[0]))
+    rank_map = {}
+    coverage_map = {}
+    total = sum(v for _, v in ranked if v > 0)
+    cumulative = 0.0
+    rank = 0
+    for ch, freq in ranked:
+        if freq > 0:
+            rank += 1
+            rank_map[ch] = rank
+            cumulative += freq
+            coverage_map[ch] = (cumulative / total * 100.0) if total else 0.0
+        else:
+            rank_map[ch] = len(component_map) + 1
+            coverage_map[ch] = 100.0
+    return rank_map, coverage_map
+
+
+
+
+def _get_tier_rank_cache():
+    global _TIER_RANK_CACHE
+    if _TIER_RANK_CACHE is None:
+        _TIER_RANK_CACHE = _build_freq_rank_and_coverage_maps()
+    return _TIER_RANK_CACHE
+
+
+def _tier_from_freq_rank(rank: int) -> int:
+    if rank <= 1500:
+        return 1
+    if rank <= 3000:
+        return 2
+    if rank <= 4000:
+        return 3
+    if rank <= 5000:
+        return 4
+    return 5
+
+
+def _tier_meta_for_char(c: str):
+    rank_map, coverage_map = _get_tier_rank_cache()
+    rank = int(rank_map.get(c, len(component_map) + 1))
+    tier = _tier_from_freq_rank(rank)
+    tier_name = {
+        1: 'Core Literacy',
+        2: 'Fluency Core',
+        3: 'Educated Native',
+        4: 'Academic/Pro',
+        5: 'Niche/Rare',
+    }[tier]
+    recommendation = {
+        1: 'Essential',
+        2: 'Required',
+        3: 'Recommended',
+        4: 'Optional',
+        5: 'Ignore',
+    }[tier]
+    return tier, tier_name, rank, round(float(coverage_map.get(c, 100.0)), 2), recommendation
+
+
 def build_frequency_badge(freq: float, minimal: bool = False) -> str:
     """Build frequency badge HTML."""
     if freq > 0:
@@ -153,6 +222,16 @@ def generate_clean_card_html(c: str, usage_count: int = None, is_static: bool = 
     # Frequency badge
     freq = info.get('freq_per_million', 0.0)
     meta_items.append(build_frequency_badge(freq, minimal))
+
+    # Fixed-tier badge (top1500 / next1500 / next1000 / next1000 / rest)
+    tier, tier_name, rank, coverage, recommendation = _tier_meta_for_char(c)
+    tier_colors = {1: '#2e7d32', 2: '#388e3c', 3: '#f9a825', 4: '#ef6c00', 5: '#6d4c41'}
+    tier_color = tier_colors.get(tier, '#6d4c41')
+    tier_tip = f"<strong>Character Learning Guide</strong><br><br>Tier {tier}: {tier_name}<br>Rank: {rank}<br>Coverage: {coverage}%<br>Recommendation: {recommendation}"
+    if minimal:
+        meta_items.append(f"<span class='meta-tag' title='Tier {tier} · {tier_name} · Rank {rank}' style='background: linear-gradient(135deg, {tier_color}20 0%, {tier_color}35 100%); color: {tier_color}; border: 1px solid {tier_color}55; font-weight:700;'>Tier {tier}</span>")
+    else:
+        meta_items.append(f"<div class='radix-tooltip'><span class='meta-tag' style='background: linear-gradient(135deg, {tier_color}20 0%, {tier_color}35 100%); color: {tier_color}; border: 1px solid {tier_color}55; font-weight:700;'>Tier {tier}</span><span class='radix-tooltiptext' style='width:260px;'>{tier_tip}</span></div>")
     
     # Script variants
     if cc_t2s:
