@@ -42,6 +42,7 @@ config = ConfigManager(state)
 persistence = PersistenceManager(state)
 DEFAULT_COMPONENT_MAP_FILE = "enhanced_component_map_with_etymology.json"
 NAV_ICON_ONLY_LABEL = "\u200b"
+APP_LOGO_PATH = "radix_logo.png"
 
 
 # ==================== HELPERS ====================
@@ -695,7 +696,10 @@ def render_radix_row(c, is_static=False, minimal=False):
 
 def render_sidebar():
     with st.sidebar:
-        st.markdown("# 🈳 Radix")
+        if os.path.exists(APP_LOGO_PATH):
+            st.image(APP_LOGO_PATH, use_container_width=True)
+        else:
+            st.markdown("# 🈳 Radix")
 
         current_char = state.get("stroke_view_char") if state.is_stroke_view_active() else state.get_selected_component()
         if current_char:
