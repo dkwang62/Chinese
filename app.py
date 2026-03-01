@@ -712,32 +712,36 @@ def render_sidebar():
             """
             <style>
             .st-key-nav_pad [data-testid='stButton'] > button {
-                height: 74px;
-                min-height: 74px;
-                border-radius: 11px;
-                background: #eef1f3;
-                border: 1px solid #d6dbe0;
-                color: #4f555b;
-                white-space: pre-line;
-                font-size: 9.5px;
+                height: 88px;
+                min-height: 88px;
+                border-radius: 16px;
+                background: #d8dde2;
+                border: 2px solid #c1c7cf;
+                color: #555d67;
+                white-space: normal;
+                font-size: 11px;
                 font-weight: 600;
-                line-height: 1.0;
+                line-height: 1.05;
                 display: flex;
-                flex-direction: column;
+                flex-direction: row;
                 justify-content: center;
                 align-items: center;
-                gap: 1px;
-                padding: 3px 1px 1px 1px;
+                gap: 6px;
+                padding: 0 10px;
                 text-align: center;
+                box-shadow: none;
             }
             .st-key-nav_pad [data-testid='stButton'] > button [data-testid='stIconMaterial'] {
-                font-size: 18px;
+                font-size: 21px;
+                line-height: 1;
             }
             .st-key-nav_bottom [data-testid='stButton'] > button {
-                height: 42px;
+                height: 50px;
                 border-radius: 999px;
-                font-size: 12px;
-                font-weight: 700;
+                font-size: 15px;
+                font-weight: 500;
+                border: 2px solid #c8c8cd;
+                background: #f2f2f3;
             }
             </style>
             """,
@@ -757,7 +761,7 @@ def render_sidebar():
                     open_browse_screen()
                     st.rerun()
             with r1c3:
-                if st.button("Favourites", key="nav_favs_6", icon=":material/star:", use_container_width=True):
+                if st.button("Favourite\ns", key="nav_favs_6", icon=":material/star_outline:", use_container_width=True):
                     open_favourites_screen()
                     st.rerun()
 
@@ -775,7 +779,7 @@ def render_sidebar():
                     state.enter_stroke_view(current_char_for_sidebar)
                     st.rerun()
             with r2c3:
-                if st.button("DataEdit", key="nav_dataedit_6", icon=":material/storage:", use_container_width=True):
+                if st.button("DataEdit", key="nav_dataedit_6", icon=":material/view_list:", use_container_width=True):
                     open_dataset_editor()
                     st.rerun()
 
