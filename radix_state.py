@@ -51,6 +51,7 @@ DEFAULT_STATE = {
     "definition_search_results": None,
     "dataset_editor_mode": False,
     "grid_sort_mode": "usage",
+    "learner_goal": "News / General Literacy",
     "grid_script_filter": "Any",
     "derivative_page": 0,  # Track derivatives pagination
 }
