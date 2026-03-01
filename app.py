@@ -52,58 +52,40 @@ def normalize_pinyin(pinyin_str):
     return ''.join(c for c in unicodedata.normalize('NFD', pinyin_str) if unicodedata.category(c) != 'Mn').lower()
 
 
-GOAL_PROFILES = {
-    "Casual Reader": {1: "Mandatory", 2: "Optional", 3: "Ignore", 4: "Ignore", 5: "Ignore"},
-    "News / General Literacy": {1: "Mandatory", 2: "Mandatory", 3: "Optional", 4: "Ignore", 5: "Ignore"},
-    "University / Educated Native": {1: "Mandatory", 2: "Mandatory", 3: "Mandatory", 4: "Optional", 5: "Ignore"},
-    "Academic / Professional": {1: "Mandatory", 2: "Mandatory", 3: "Mandatory", 4: "Mandatory", 5: "Ignore"},
+TIER_NAMES = {
+    1: "Core Literacy",
+    2: "Fluency Core",
+    3: "Educated Native",
+    4: "Academic/Pro",
+    5: "Niche/Rare",
 }
 
-ABSTRACT_KEYWORDS = {
-    "abstract", "concept", "theory", "principle", "system", "policy", "logic", "quality", "nature", "meaning",
-    "method", "culture", "society", "state", "govern", "governance", "analysis", "argument", "discuss", "debate",
+TIER_RECOMMENDATION = {
+    1: "Essential",
+    2: "Required",
+    3: "Recommended",
+    4: "Optional",
+    5: "Ignore",
 }
-
-EDUCATION_KEYWORDS = {
-    "education", "school", "student", "university", "learn", "study", "knowledge", "literature", "essay", "academic",
-}
-
-DOMAIN_KEYWORDS = {
-    "science", "medical", "medicine", "biology", "chemistry", "physics", "technology", "engineering", "law", "economics",
-    "finance", "research", "professional", "technical", "discipline", "industry",
-}
-
-RARE_KEYWORDS = {
-    "archaic", "old variant", "dialect", "surname", "rare", "obsolete", "classical", "variant",
-}
-
-
-def _contains_any(text: str, keywords: set[str]) -> int:
-    return sum(1 for kw in keywords if kw in text)
-
-
-def _safe_compounds_count(info: dict) -> int:
-    compounds = info.get("meta", {}).get("compounds", [])
-    if isinstance(compounds, list):
-        return len([c for c in compounds if isinstance(c, str) and c])
-    return 0
 
 
 def _base_tier_from_rank(rank: int, has_freq: bool) -> int:
+    # Fixed bucket definition requested by user.
+    # Tier 1: top 1500, Tier 2: next 1500, Tier 3: next 1000, Tier 4: next 1000, Tier 5: rest.
     if not has_freq:
         return 5
     if rank <= 1500:
         return 1
     if rank <= 3000:
         return 2
-    if rank <= 4500:
+    if rank <= 4000:
         return 3
-    if rank <= 7000:
+    if rank <= 5000:
         return 4
     return 5
 
 
-def _compute_goal_sensitive_metrics(goal: str) -> dict[str, dict]:
+def _compute_tier_metrics() -> dict[str, dict]:
     freq_pairs = []
     for ch, info in component_map.items():
         freq = float(info.get("freq_per_million", 0.0) or 0.0)
@@ -126,65 +108,11 @@ def _compute_goal_sensitive_metrics(goal: str) -> dict[str, dict]:
             rank_map[ch] = len(component_map) + 1
             coverage_map[ch] = 100.0
 
-    goal_profile = GOAL_PROFILES.get(goal, GOAL_PROFILES["News / General Literacy"])
     metrics = {}
-
-    for ch, info in component_map.items():
-        meta = info.get("meta", {})
-        definition = str(meta.get("definition", "") or "").lower()
-
-        usage = int(info.get("usage_count", 0) or 0)
-        compounds_count = _safe_compounds_count(info)
-        freq = float(info.get("freq_per_million", 0.0) or 0.0)
-        has_freq = freq > 0
+    for ch, _ in ranked_freq:
         rank = int(rank_map.get(ch, len(component_map) + 1))
-        coverage = float(coverage_map.get(ch, 100.0))
-
-        abstract_hits = _contains_any(definition, ABSTRACT_KEYWORDS)
-        education_hits = _contains_any(definition, EDUCATION_KEYWORDS)
-        domain_hits = _contains_any(definition, DOMAIN_KEYWORDS)
-        rare_hits = _contains_any(definition, RARE_KEYWORDS)
-
-        utility_numeric = (
-            min(usage, 30) * 2.2
-            + min(compounds_count, 30) * 1.4
-            + abstract_hits * 8.0
-            + education_hits * 6.0
-            + domain_hits * 5.0
-        )
-        utility_numeric = max(0.0, min(100.0, utility_numeric))
-
-        if utility_numeric >= 75:
-            utility_label = "Very High"
-        elif utility_numeric >= 55:
-            utility_label = "High"
-        elif utility_numeric >= 35:
-            utility_label = "Medium"
-        else:
-            utility_label = "Low"
-
+        has_freq = rank <= len(component_map)
         tier = _base_tier_from_rank(rank, has_freq)
-
-        # Aggressive promotions for high-leverage characters
-        if utility_numeric >= 70 and rank <= 3000 and tier > 1:
-            tier -= 1
-        if utility_numeric >= 82 and rank <= 4500 and tier > 2:
-            tier -= 1
-
-        # Domain-heavy content is relevant mainly in Tier 4 contexts
-        if domain_hits > 0 and tier < 4 and rank > 2500:
-            tier = 4
-
-        # Rare/archaic/dialect stays in Tier 5 by default
-        if rare_hits > 0:
-            tier = 5
-
-        recommendation = goal_profile.get(tier, "Ignore")
-        if goal == "Academic / Professional" and tier == 5 and domain_hits > 0:
-            recommendation = "Optional"
-
-        utility_sort = -utility_numeric
-        rec_weight = {"Mandatory": 0, "Recommended": 1, "Optional": 2, "Ignore": 3}.get(recommendation, 3)
 
         notes = []
         if cc_t2s and cc_s2t:
@@ -192,29 +120,15 @@ def _compute_goal_sensitive_metrics(goal: str) -> dict[str, dict]:
             trad = cc_s2t.convert(ch)
             if simp != trad:
                 notes.append(f"Forms: {simp} / {trad}")
-        if domain_hits > 0:
-            notes.append("Domain-specific leverage")
-        if rare_hits > 0:
-            notes.append("Rare/archaic signal")
-
-        recommended_for = {
-            1: "All learner goals",
-            2: "News, University, Academic",
-            3: "University, Academic",
-            4: "Academic/Professional",
-            5: "Niche only",
-        }.get(tier, "Niche only")
 
         metrics[ch] = {
             "tier": tier,
+            "tier_name": TIER_NAMES[tier],
             "base_frequency_rank": rank,
-            "coverage_pct": round(coverage, 2),
-            "utility_score": utility_label,
-            "utility_numeric": round(utility_numeric, 2),
-            "recommendation": recommendation,
-            "recommended_for": recommended_for,
+            "coverage_pct": round(float(coverage_map.get(ch, 100.0)), 2),
+            "recommendation": TIER_RECOMMENDATION[tier],
             "notes": "; ".join(notes) if notes else "",
-            "sort_key": (tier, rec_weight, rank, utility_sort, ch),
+            "sort_key": (tier, rank, ch),
         }
 
     return metrics
@@ -1130,18 +1044,18 @@ def render_smart_search(key_prefix: str = "", on_pick=None, collapse_after_pick:
 def render_all_components_grid():
     st.markdown("<div style='background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
 
-    col_sort, col_goal, col_script = st.columns([1.2, 1.3, 1.1])
+    col_sort, col_script = st.columns([1.2, 1.2])
 
     with col_sort:
         mode_map = {
             "usage": "Component frequency",
             "frequency": "Character frequency",
-            "goal_sensitive": "Goal-sensitive utility",
+            "tier": "Tier ranking",
         }
         current_mode = state.get_grid_sort_mode()
         if current_mode not in mode_map:
             current_mode = "usage"
-        options = ["Component frequency", "Character frequency", "Goal-sensitive utility"]
+        options = ["Component frequency", "Character frequency", "Tier ranking"]
         sort_choice = st.radio(
             "Sort by",
             options=options,
@@ -1151,20 +1065,6 @@ def render_all_components_grid():
         )
         selected_mode = {v: k for k, v in mode_map.items()}[sort_choice]
         state.set("grid_sort_mode", selected_mode)
-
-    with col_goal:
-        goal_options = list(GOAL_PROFILES.keys())
-        current_goal = state.get("learner_goal", "News / General Literacy")
-        if current_goal not in goal_options:
-            current_goal = "News / General Literacy"
-        learner_goal = st.selectbox(
-            "Learner goal",
-            options=goal_options,
-            index=goal_options.index(current_goal),
-            key="grid_learner_goal",
-            help="Tier assignment and recommendations adapt to this goal.",
-        )
-        state.set("learner_goal", learner_goal)
 
     with col_script:
         if state.get_grid_sort_mode() == "frequency":
@@ -1178,7 +1078,7 @@ def render_all_components_grid():
             )
             state.set("grid_script_filter", script_choice)
         else:
-            st.caption("Script filter applies in Character frequency mode.")
+            st.caption("Tier ranking uses global frequency rank buckets.")
 
     col_stroke, col_radical, col_idc = st.columns([2, 2, 2])
 
@@ -1244,9 +1144,9 @@ def render_all_components_grid():
     if state.get_grid_sort_mode() == "frequency":
         filtered = apply_script_filter(filtered, state.get("grid_script_filter"))
 
-    if state.get_grid_sort_mode() == "goal_sensitive":
-        metrics = _compute_goal_sensitive_metrics(state.get("learner_goal", "News / General Literacy"))
-        sorted_comps = sorted(filtered, key=lambda ch: metrics.get(ch, {}).get("sort_key", (9, 9, 999999, 0, ch)))
+    if state.get_grid_sort_mode() == "tier":
+        metrics = _compute_tier_metrics()
+        sorted_comps = sorted(filtered, key=lambda ch: metrics.get(ch, {}).get("sort_key", (9, 999999, ch)))
     else:
         sorted_comps = sorted(
             filtered,
@@ -1293,7 +1193,7 @@ def render_all_components_grid():
             )
     st.markdown("</div>", unsafe_allow_html=True)
 
-    if state.get_grid_sort_mode() == "goal_sensitive" and metrics:
+    if state.get_grid_sort_mode() == "tier" and metrics:
         st.markdown("### Character Learning Guide (Current Page)")
         table_rows = []
         for ch in page_items:
@@ -1301,12 +1201,11 @@ def render_all_components_grid():
             table_rows.append(
                 {
                     "Character": ch,
-                    "Tier": m.get("tier", ""),
+                    "Tier": f"Tier {m.get('tier', '')}",
+                    "Tier Name": m.get("tier_name", ""),
                     "Base Frequency Rank": m.get("base_frequency_rank", ""),
                     "Corpus Coverage %": m.get("coverage_pct", ""),
-                    "Utility Score": m.get("utility_score", ""),
-                    "Recommended": m.get("recommendation", ""),
-                    "Recommended For": m.get("recommended_for", ""),
+                    "Learning Recommendation": m.get("recommendation", ""),
                     "Notes": m.get("notes", ""),
                 }
             )
