@@ -52,6 +52,174 @@ def normalize_pinyin(pinyin_str):
     return ''.join(c for c in unicodedata.normalize('NFD', pinyin_str) if unicodedata.category(c) != 'Mn').lower()
 
 
+GOAL_PROFILES = {
+    "Casual Reader": {1: "Mandatory", 2: "Optional", 3: "Ignore", 4: "Ignore", 5: "Ignore"},
+    "News / General Literacy": {1: "Mandatory", 2: "Mandatory", 3: "Optional", 4: "Ignore", 5: "Ignore"},
+    "University / Educated Native": {1: "Mandatory", 2: "Mandatory", 3: "Mandatory", 4: "Optional", 5: "Ignore"},
+    "Academic / Professional": {1: "Mandatory", 2: "Mandatory", 3: "Mandatory", 4: "Mandatory", 5: "Ignore"},
+}
+
+ABSTRACT_KEYWORDS = {
+    "abstract", "concept", "theory", "principle", "system", "policy", "logic", "quality", "nature", "meaning",
+    "method", "culture", "society", "state", "govern", "governance", "analysis", "argument", "discuss", "debate",
+}
+
+EDUCATION_KEYWORDS = {
+    "education", "school", "student", "university", "learn", "study", "knowledge", "literature", "essay", "academic",
+}
+
+DOMAIN_KEYWORDS = {
+    "science", "medical", "medicine", "biology", "chemistry", "physics", "technology", "engineering", "law", "economics",
+    "finance", "research", "professional", "technical", "discipline", "industry",
+}
+
+RARE_KEYWORDS = {
+    "archaic", "old variant", "dialect", "surname", "rare", "obsolete", "classical", "variant",
+}
+
+
+def _contains_any(text: str, keywords: set[str]) -> int:
+    return sum(1 for kw in keywords if kw in text)
+
+
+def _safe_compounds_count(info: dict) -> int:
+    compounds = info.get("meta", {}).get("compounds", [])
+    if isinstance(compounds, list):
+        return len([c for c in compounds if isinstance(c, str) and c])
+    return 0
+
+
+def _base_tier_from_rank(rank: int, has_freq: bool) -> int:
+    if not has_freq:
+        return 5
+    if rank <= 1500:
+        return 1
+    if rank <= 3000:
+        return 2
+    if rank <= 4500:
+        return 3
+    if rank <= 7000:
+        return 4
+    return 5
+
+
+def _compute_goal_sensitive_metrics(goal: str) -> dict[str, dict]:
+    freq_pairs = []
+    for ch, info in component_map.items():
+        freq = float(info.get("freq_per_million", 0.0) or 0.0)
+        freq_pairs.append((ch, max(freq, 0.0)))
+
+    ranked_freq = sorted(freq_pairs, key=lambda x: (-x[1], x[0]))
+    rank_map = {}
+    coverage_map = {}
+
+    total_freq = sum(v for _, v in ranked_freq if v > 0)
+    cumulative = 0.0
+    current_rank = 0
+    for ch, freq in ranked_freq:
+        if freq > 0:
+            current_rank += 1
+            rank_map[ch] = current_rank
+            cumulative += freq
+            coverage_map[ch] = (cumulative / total_freq * 100.0) if total_freq else 0.0
+        else:
+            rank_map[ch] = len(component_map) + 1
+            coverage_map[ch] = 100.0
+
+    goal_profile = GOAL_PROFILES.get(goal, GOAL_PROFILES["News / General Literacy"])
+    metrics = {}
+
+    for ch, info in component_map.items():
+        meta = info.get("meta", {})
+        definition = str(meta.get("definition", "") or "").lower()
+
+        usage = int(info.get("usage_count", 0) or 0)
+        compounds_count = _safe_compounds_count(info)
+        freq = float(info.get("freq_per_million", 0.0) or 0.0)
+        has_freq = freq > 0
+        rank = int(rank_map.get(ch, len(component_map) + 1))
+        coverage = float(coverage_map.get(ch, 100.0))
+
+        abstract_hits = _contains_any(definition, ABSTRACT_KEYWORDS)
+        education_hits = _contains_any(definition, EDUCATION_KEYWORDS)
+        domain_hits = _contains_any(definition, DOMAIN_KEYWORDS)
+        rare_hits = _contains_any(definition, RARE_KEYWORDS)
+
+        utility_numeric = (
+            min(usage, 30) * 2.2
+            + min(compounds_count, 30) * 1.4
+            + abstract_hits * 8.0
+            + education_hits * 6.0
+            + domain_hits * 5.0
+        )
+        utility_numeric = max(0.0, min(100.0, utility_numeric))
+
+        if utility_numeric >= 75:
+            utility_label = "Very High"
+        elif utility_numeric >= 55:
+            utility_label = "High"
+        elif utility_numeric >= 35:
+            utility_label = "Medium"
+        else:
+            utility_label = "Low"
+
+        tier = _base_tier_from_rank(rank, has_freq)
+
+        # Aggressive promotions for high-leverage characters
+        if utility_numeric >= 70 and rank <= 3000 and tier > 1:
+            tier -= 1
+        if utility_numeric >= 82 and rank <= 4500 and tier > 2:
+            tier -= 1
+
+        # Domain-heavy content is relevant mainly in Tier 4 contexts
+        if domain_hits > 0 and tier < 4 and rank > 2500:
+            tier = 4
+
+        # Rare/archaic/dialect stays in Tier 5 by default
+        if rare_hits > 0:
+            tier = 5
+
+        recommendation = goal_profile.get(tier, "Ignore")
+        if goal == "Academic / Professional" and tier == 5 and domain_hits > 0:
+            recommendation = "Optional"
+
+        utility_sort = -utility_numeric
+        rec_weight = {"Mandatory": 0, "Recommended": 1, "Optional": 2, "Ignore": 3}.get(recommendation, 3)
+
+        notes = []
+        if cc_t2s and cc_s2t:
+            simp = cc_t2s.convert(ch)
+            trad = cc_s2t.convert(ch)
+            if simp != trad:
+                notes.append(f"Forms: {simp} / {trad}")
+        if domain_hits > 0:
+            notes.append("Domain-specific leverage")
+        if rare_hits > 0:
+            notes.append("Rare/archaic signal")
+
+        recommended_for = {
+            1: "All learner goals",
+            2: "News, University, Academic",
+            3: "University, Academic",
+            4: "Academic/Professional",
+            5: "Niche only",
+        }.get(tier, "Niche only")
+
+        metrics[ch] = {
+            "tier": tier,
+            "base_frequency_rank": rank,
+            "coverage_pct": round(coverage, 2),
+            "utility_score": utility_label,
+            "utility_numeric": round(utility_numeric, 2),
+            "recommendation": recommendation,
+            "recommended_for": recommended_for,
+            "notes": "; ".join(notes) if notes else "",
+            "sort_key": (tier, rec_weight, rank, utility_sort, ch),
+        }
+
+    return metrics
+
+
 def auto_load_user_data():
     """
     Automatically load radix_user_data.json on startup if it exists.
@@ -961,26 +1129,63 @@ def render_smart_search(key_prefix: str = "", on_pick=None, collapse_after_pick:
 
 def render_all_components_grid():
     st.markdown("<div style='background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
-    
-    # Row 1: Sort and Script
-    col_sort, col_script = st.columns([1, 1])
+
+    col_sort, col_goal, col_script = st.columns([1.2, 1.3, 1.1])
+
     with col_sort:
-        sort_choice = st.radio("Sort by", options=["Component frequency", "Character frequency"], index=0 if state.get_grid_sort_mode() == "usage" else 1, horizontal=True, key="grid_sort_radio")
-        state.set("grid_sort_mode", "usage" if "Component" in sort_choice else "frequency")
-    
+        mode_map = {
+            "usage": "Component frequency",
+            "frequency": "Character frequency",
+            "goal_sensitive": "Goal-sensitive utility",
+        }
+        current_mode = state.get_grid_sort_mode()
+        if current_mode not in mode_map:
+            current_mode = "usage"
+        options = ["Component frequency", "Character frequency", "Goal-sensitive utility"]
+        sort_choice = st.radio(
+            "Sort by",
+            options=options,
+            index=options.index(mode_map[current_mode]),
+            horizontal=True,
+            key="grid_sort_radio",
+        )
+        selected_mode = {v: k for k, v in mode_map.items()}[sort_choice]
+        state.set("grid_sort_mode", selected_mode)
+
+    with col_goal:
+        goal_options = list(GOAL_PROFILES.keys())
+        current_goal = state.get("learner_goal", "News / General Literacy")
+        if current_goal not in goal_options:
+            current_goal = "News / General Literacy"
+        learner_goal = st.selectbox(
+            "Learner goal",
+            options=goal_options,
+            index=goal_options.index(current_goal),
+            key="grid_learner_goal",
+            help="Tier assignment and recommendations adapt to this goal.",
+        )
+        state.set("learner_goal", learner_goal)
+
     with col_script:
         if state.get_grid_sort_mode() == "frequency":
             gsf = state.get("grid_script_filter", "Any")
-            script_choice = st.radio("Script", options=["Simplified", "Traditional", "Any"], index=["Simplified", "Traditional", "Any"].index(gsf), horizontal=True, key="grid_script_radio")
+            script_choice = st.radio(
+                "Script",
+                options=["Simplified", "Traditional", "Any"],
+                index=["Simplified", "Traditional", "Any"].index(gsf),
+                horizontal=True,
+                key="grid_script_radio",
+            )
             state.set("grid_script_filter", script_choice)
-    
-    # Row 2: Filters
+        else:
+            st.caption("Script filter applies in Character frequency mode.")
+
     col_stroke, col_radical, col_idc = st.columns([2, 2, 2])
-    
+
     with col_stroke:
         stroke_range = st.slider("Strokes", 1, 30, value=state.get_stroke_range(), key="grid_stroke_slider")
         state.set("stroke_range", stroke_range)
-    
+
     with col_radical:
         rad_groups = stats_cache.get("rad_groups", {})
         radical_options = ["none"]
@@ -989,75 +1194,123 @@ def render_all_components_grid():
             if rads_in_group:
                 for rad in rads_in_group:
                     radical_options.append(rad)
-        
+
         def format_radical(rad):
-            if rad == "none": return "none"
+            if rad == "none":
+                return "none"
             rad_info = component_map.get(rad, {})
-            strokes = rad_info.get('stroke_count')
-            if strokes: return f"{rad} ({strokes} strokes)"
+            strokes = rad_info.get("stroke_count")
+            if strokes:
+                return f"{rad} ({strokes} strokes)"
             return rad
-        
+
         current_rad = state.get("radical", "none")
         current_index = radical_options.index(current_rad) if current_rad in radical_options else 0
-        radical_choice = st.selectbox("Radical", options=radical_options, format_func=format_radical, index=current_index, key="grid_radical_select")
+        radical_choice = st.selectbox(
+            "Radical",
+            options=radical_options,
+            format_func=format_radical,
+            index=current_index,
+            key="grid_radical_select",
+        )
         state.set("radical", radical_choice)
-    
+
     with col_idc:
         idcs = sorted(stats_cache.get("idc_counts", {}).keys())
         idc = state.get("component_idc", "none")
-        idc_choice = st.selectbox("Structure", options=["none"] + idcs, index=(["none"] + idcs).index(idc) if idc in idcs else 0, key="grid_idc_select")
+        idc_choice = st.selectbox(
+            "Structure",
+            options=["none"] + idcs,
+            index=(["none"] + idcs).index(idc) if idc in idcs else 0,
+            key="grid_idc_select",
+        )
         state.set("component_idc", idc_choice)
-    
+
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Filter Logic
     cur_min, cur_max = state.get_stroke_range()
-    
     filtered = [c for c in component_map if (s := get_stroke_count(c)) is not None and cur_min <= s <= cur_max]
-    
+
     if state.get("radical") != "none":
         filtered = [c for c in filtered if component_map[c]["meta"].get("radical") == state.get("radical")]
-    
+
     if state.get("component_idc") != "none":
         filtered = [c for c in filtered if component_map[c]["meta"].get("decomposition", "").startswith(state.get("component_idc"))]
-    
+
+    metrics = None
     if state.get_grid_sort_mode() == "usage":
-         filtered = [c for c in filtered if c in stats_cache["used_components"]]
-    
+        filtered = [c for c in filtered if c in stats_cache["used_components"]]
+
     if state.get_grid_sort_mode() == "frequency":
         filtered = apply_script_filter(filtered, state.get("grid_script_filter"))
-    
-    sorted_comps = sorted(filtered, key=sort_key_frequency_primary if state.get_grid_sort_mode() == "frequency" else sort_key_usage_primary)
+
+    if state.get_grid_sort_mode() == "goal_sensitive":
+        metrics = _compute_goal_sensitive_metrics(state.get("learner_goal", "News / General Literacy"))
+        sorted_comps = sorted(filtered, key=lambda ch: metrics.get(ch, {}).get("sort_key", (9, 9, 999999, 0, ch)))
+    else:
+        sorted_comps = sorted(
+            filtered,
+            key=sort_key_frequency_primary if state.get_grid_sort_mode() == "frequency" else sort_key_usage_primary,
+        )
 
     if not sorted_comps:
         st.info("No components match filters.")
         return
 
-    # Pagination
     total = len(sorted_comps)
     max_page = max(1, math.ceil(total / PAGE_SIZE))
     page = max(1, min(state.get_current_page(), max_page))
     state.set("page", page)
-    
+
     p1, p2, p3 = st.columns([1, 3, 1])
     with p1:
         if st.button("◀ Prev", disabled=page <= 1, use_container_width=True, key="grid_prev"):
             state.set("page", page - 1)
             st.rerun()
     with p2:
-        st.markdown(f"<div style='text-align:center; padding:10px 0; color:#555;'><div style='font-size:1.1em; font-weight:bold;'>{(page - 1) * PAGE_SIZE + 1}–{min(page * PAGE_SIZE, total)} of {total}</div></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='text-align:center; padding:10px 0; color:#555;'><div style='font-size:1.1em; font-weight:bold;'>{(page - 1) * PAGE_SIZE + 1}–{min(page * PAGE_SIZE, total)} of {total}</div></div>",
+            unsafe_allow_html=True,
+        )
     with p3:
         if st.button("Next ▶", disabled=page >= max_page, use_container_width=True, key="grid_next"):
             state.set("page", page + 1)
             st.rerun()
 
-    # Tiles
+    page_items = sorted_comps[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]
+
     st.markdown("<div class='comp-grid'>", unsafe_allow_html=True)
     cols = st.columns(GRID_COLUMNS)
-    for i, ch in enumerate(sorted_comps[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]):
+    for i, ch in enumerate(page_items):
         with cols[i % GRID_COLUMNS]:
-            st.button(ch, key=f"grid_{ch}_{page}", type="primary" if state.get_preview_component() == ch else "secondary", on_click=tile_click, args=(ch,), use_container_width=True)
+            st.button(
+                ch,
+                key=f"grid_{ch}_{page}",
+                type="primary" if state.get_preview_component() == ch else "secondary",
+                on_click=tile_click,
+                args=(ch,),
+                use_container_width=True,
+            )
     st.markdown("</div>", unsafe_allow_html=True)
+
+    if state.get_grid_sort_mode() == "goal_sensitive" and metrics:
+        st.markdown("### Character Learning Guide (Current Page)")
+        table_rows = []
+        for ch in page_items:
+            m = metrics.get(ch, {})
+            table_rows.append(
+                {
+                    "Character": ch,
+                    "Tier": m.get("tier", ""),
+                    "Base Frequency Rank": m.get("base_frequency_rank", ""),
+                    "Corpus Coverage %": m.get("coverage_pct", ""),
+                    "Utility Score": m.get("utility_score", ""),
+                    "Recommended": m.get("recommendation", ""),
+                    "Recommended For": m.get("recommended_for", ""),
+                    "Notes": m.get("notes", ""),
+                }
+            )
+        st.dataframe(table_rows, use_container_width=True, hide_index=True)
 
 def render_favourites_grid():
     favs = state.get_favourites()
